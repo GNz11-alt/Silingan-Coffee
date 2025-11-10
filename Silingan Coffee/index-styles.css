@@ -1,0 +1,211 @@
+html, body {
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+
+
+/* Fonts */
+@font-face {
+  font-family: 'Instrument Sans (Regular)';;
+  src: url(/assets/Instrument_Sans/static/InstrumentSans-Regular.ttf);
+}
+
+@font-face {
+  font-family: 'Instrument Sans (Bold)';;
+  src: url(/assets/Instrument_Sans/static/InstrumentSans-Bold.ttf);
+}
+
+/* Background */
+.bg-image {
+  width: 100%;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  object-fit: cover;
+}
+
+/* Transparent Box */
+.transparent-box {
+  width: clamp(70%, 90vw, 90%);
+  height: clamp(60vh, 90vh, 95vh);
+  background-color: rgba(248, 248, 248, 0.33);
+  border-radius: clamp(2vw, 4vw, 6vw);
+  backdrop-filter: blur(6px);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  transition: transform 0.7s ease, width 0.7s ease;
+  padding: clamp(1em, 2vw, 3em);
+  box-sizing: border-box;
+  overflow: clip;
+}
+
+/* Move Right on Click */
+.move-right {
+  width: clamp(45%, 50vw, 60%);
+  transform: translate(clamp(-10%, -5vw, -5%), -50%);
+}
+
+/* Logo with Title */
+.logo-w-title {
+  width: clamp(220px, 45vw, 492px);
+  height: auto;
+  position: absolute;
+  top: clamp(10px, 3vh, 30px);
+  left: clamp(-10px, 2vw, 0px);
+}
+
+/* Logo */
+.logo {
+  width: clamp(80px, 10vw, 130px);
+  height: auto;
+  position: absolute;
+  top: clamp(60px, 10vh, 95px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Titles */
+.transparent-box h1 {
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  color: #4f4f4f;
+  font-family: 'Instrument Sans (Regular)';
+  font-weight: 500;
+  position: absolute;
+  top: clamp(180px, 35vh, 245px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+}
+
+/* Login Button */
+.loginButton {
+  font-size: clamp(0.75rem, 1.5vw, 2rem);
+  color: #FFFFFF;
+  font-family: 'Instrument Sans (Bold)';
+  text-align: center;
+  cursor: pointer;
+
+  background-color: #30251F;
+  width: clamp(115px, 20vw, 200px);
+  height: clamp(35px, 6vw, 57px);
+  border-radius: 1vw;
+  position: absolute;
+  right: 3%;
+}
+
+/* Hidden by default */
+.hidden-img {
+  width: clamp(220px, 45vw, 492px);
+  height: auto;
+  position: absolute;
+  top: clamp(10px, 4.5vh, 30px);
+  left: clamp(-10px, 2vw, 0px);
+  transition: opacity 0.7s ease;
+  opacity: 0;
+}
+
+.hidden-text {
+  position: absolute;
+  margin: -0.40em;
+  top: 30%;
+  right: 62%;
+  font-family: 'Instrument Sans (Bold)';
+  font-size: clamp(32px, 5vw, 64px);
+  color: #30251F;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.7s ease;
+  padding-left: 15px;
+}
+
+/* Class to show the hidden */
+.show-img {
+  display: block;
+  opacity: 1;
+}
+
+.show-text {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Login */
+form {
+  display: flex;
+  flex-direction: column;
+  border-radius: 1rem;
+  width: clamp(1px, 40vw, 400px); /* keeps the form width responsive */
+  margin: 0 auto;
+}
+
+/* Labels */
+form label {
+  font-size: clamp(1rem, 1.2vw, 1.3rem);
+  color: #30251F;
+  font-family: 'Instrument Sans (Bold)';
+  text-align: left;
+  margin-top: clamp(0.8em, 1.5vw, 1em); /* responsive top spacing */
+  margin-bottom: clamp(-0.5em, -1vw, -1em); /* preserves your negative spacing */
+  margin-right: clamp(5em, 10vw, 10em); /* responsive right margin, keeps placement */
+}
+
+/* Select Dropdown */
+form select {
+  width: clamp(100%, 107%, 110%); /* scales relative to form width */
+  padding: clamp(0.6em, 1vw, 0.8em);
+  font-size: clamp(0.9rem, 1vw, 1.1rem);
+  border: 1px solid #30251F;
+  border-radius: clamp(1rem, 2vw, 2rem);
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: 0.3s ease;
+  margin-top: clamp(6em, 8vw, 8em); /* keeps your large spacing */
+  cursor: pointer;
+}
+
+option {
+  background-color: rgba(48, 37, 31, 0.95);
+  color: #fff;
+}
+
+/* Input Fields */
+form input {
+  width: 100%;
+  padding: clamp(0.6em, 1vw, 0.8em);
+  font-size: clamp(0.9rem, 1vw, 1.1rem);
+  border: 1px solid #30251F;
+  border-radius: clamp(1rem, 2vw, 2rem);
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: 0.3s ease;
+}
+
+form input:focus {
+  outline: none;
+  border-color: #30251F;
+  box-shadow: 0 0 5px rgba(48, 37, 31, 0.5);
+}
+
+/* Button */
+form button {
+  width: clamp(8em, 25vw, 10em); /* responsive width while keeping placement */
+  background-color: #30251F;
+  font-family: 'Instrument Sans (Bold)';
+  color: white;
+  border: none;
+  border-radius: clamp(0.5rem, 1vw, 0.5rem);
+  padding: clamp(1em, 1vw, 1.2em);
+  font-size: clamp(1rem, 1vw, 1rem);
+  cursor: pointer;
+  transition: 0.3s;
+  margin-top: clamp(1em, 2vw, 1em);
+  margin: clamp(1em, 2vw, 1em) auto 0 auto; /* keeps button centered */
+}
+
+form button:hover {
+  background-color: #4a3a31;
+}
