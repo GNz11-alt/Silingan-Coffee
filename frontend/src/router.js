@@ -29,7 +29,17 @@ const routes = [
         path: 'inventory',
         name: 'Inventory',
         component: Inventory
-      }
+      },
+      {
+        path: 'search',
+        name: 'Search',
+        component: () => import('./views/Search.vue')
+      },
+      {
+        path: 'about',
+        name: 'About',
+        component: () => import('./views/About.vue')
+      },
     ]
   }
 ]
