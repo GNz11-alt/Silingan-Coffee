@@ -1,14 +1,11 @@
 <template>
   <div class="dashboard" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
-    <!-- Sidebar - Copied from Dashboard.vue -->
     <aside class="sidebar">
       <div class="sidebar-top">
-        <!-- Toggle Button -->
         <button class="toggle-btn" @click="toggleSidebar">
           <component :is="isSidebarCollapsed ? ChevronRight : ChevronLeft" :size="20" />
         </button>
 
-        <!-- Brand Section -->
         <div class="brand-section">
           <div class="logo-wrapper">
             <img src="@/assets/images/logo.png" alt="Silingan Coffee" class="logo" />
@@ -20,7 +17,6 @@
         </div>
       </div>
 
-      <!-- Navigation Menu -->
       <nav class="sidebar-nav">
         <router-link to="/dashboard" class="nav-item" :class="{ active: $route.path === '/dashboard' }">
           <component :is="Home" class="nav-icon" :size="20" />
@@ -83,7 +79,6 @@
         </router-link>
       </nav>
 
-      <!-- Bottom Section: Notifications & Logout -->
       <div class="sidebar-bottom">
         <button class="nav-item notification-btn" @click="showNotifications">
           <component :is="Bell" class="nav-icon" :size="20" />
@@ -98,7 +93,6 @@
       </div>
     </aside>
 
-    <!-- Main Content - This is where your pages will load -->
     <main class="main-content">
       <router-view />
     </main>
@@ -165,11 +159,10 @@ if (savedState !== null) {
   background: #F8F9FA;
 }
 
-/* Sidebar */
+/* Sidebar - Updated to Deep Brown */
 .sidebar {
   width: 280px;
-  background: #FFFFFF;
-  border-right: 1px solid #E9ECEF;
+  background: #31201D; /* Dark coffee brown from image */
   position: fixed;
   height: 100vh;
   display: flex;
@@ -177,6 +170,7 @@ if (savedState !== null) {
   transition: width 0.3s ease;
   overflow-y: auto;
   z-index: 100;
+  color: white;
 }
 
 .dashboard.sidebar-collapsed .sidebar {
@@ -184,125 +178,108 @@ if (savedState !== null) {
 }
 
 .sidebar-top {
-  padding: 20px;
-  border-bottom: 1px solid #E9ECEF;
+  padding: 24px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
 }
 
 .toggle-btn {
   position: absolute;
-  right: -12px;
+  right: 15px;
   top: 28px;
-  background: #FFFFFF;
-  border: 1px solid #E9ECEF;
-  border-radius: 50%;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: none;
+  border: none;
   cursor: pointer;
-  color: #8B4513;
+  color: #FFFFFF;
   transition: all 0.2s ease;
   z-index: 10;
 }
 
-.toggle-btn:hover {
-  background: #8B4513;
-  color: white;
-  border-color: #8B4513;
+.brand-section {
+  display: flex;
+  flex-direction: column; /* Stacked layout like image */
+  gap: 15px;
 }
 
-.brand-section {
+.logo-container {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.logo-wrapper {
-  flex-shrink: 0;
-}
-
 .logo {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
+  width: 32px;
+  height: 32px;
+  filter: invert(1); /* Makes black logo white if needed */
 }
 
 .brand-text h2 {
   font-size: 18px;
-  font-weight: 600;
-  color: #8B4513;
+  font-weight: 500;
+  color: #FFFFFF;
   margin: 0;
-  line-height: 1.3;
+}
+
+.user-info {
+  margin-top: 10px;
+}
+
+.user-name {
+  font-size: 18px;
+  font-weight: 500;
+  color: white;
+  display: block;
 }
 
 .user-role {
-  font-size: 12px;
-  color: #6C757D;
+  font-size: 14px;
+  color: #A69794; /* Muted grey/brown */
   margin-top: 2px;
-}
-
-.dashboard.sidebar-collapsed .brand-text {
-  display: none;
-}
-
-.dashboard.sidebar-collapsed .brand-section {
-  justify-content: center;
 }
 
 /* Navigation */
 .sidebar-nav {
   flex: 1;
-  padding: 16px 0;
-  overflow-y: auto;
+  padding: 10px 12px; /* Spacing for the active background rounded corners */
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 10px 20px;
-  color: #495057;
+  padding: 12px 16px;
+  color: #FFFFFF;
   text-decoration: none;
   transition: all 0.2s ease;
-  gap: 12px;
-  font-size: 14px;
+  gap: 16px;
+  font-size: 15px;
   cursor: pointer;
   background: none;
   border: none;
   width: 100%;
-  text-align: left;
+  border-radius: 8px; /* Rounded highlight like image */
+  margin-bottom: 4px;
 }
 
 .nav-item:hover {
-  background: #F8F9FA;
-  color: #8B4513;
+  background: rgba(255, 255, 255, 0.05);
 }
 
+/* Active State - Gold/Tan Highlight */
 .nav-item.active {
-  background: #FFF4E6;
-  color: #8B4513;
-  border-right: 3px solid #8B4513;
+  background: #C49A6C; /* Gold/Tan color from image */
+  color: #2D1B18; /* Dark text for contrast on gold */
+  font-weight: 500;
 }
 
 .nav-icon {
-  stroke-width: 1.5;
+  stroke-width: 1.8;
   flex-shrink: 0;
-}
-
-.dashboard.sidebar-collapsed .nav-item {
-  justify-content: center;
-  padding: 12px;
-}
-
-.dashboard.sidebar-collapsed .nav-item span {
-  display: none;
 }
 
 /* Sidebar Bottom */
 .sidebar-bottom {
-  padding: 16px 0;
-  border-top: 1px solid #E9ECEF;
+  padding: 16px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .notification-btn {
@@ -310,27 +287,21 @@ if (savedState !== null) {
 }
 
 .notification-badge {
-  position: absolute;
-  right: 20px;
-  background: #DC3545;
+  background: #E5533D; /* Muted red from image */
   color: white;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  font-weight: 600;
-}
-
-.dashboard.sidebar-collapsed .notification-badge {
-  display: none;
+  font-size: 11px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-weight: bold;
+  margin-left: auto; /* Push to right */
 }
 
 .logout-btn {
-  color: #DC3545;
-}
-
-.logout-btn:hover {
-  background: #FFF5F5;
-  color: #DC3545;
+  margin-top: 10px;
 }
 
 /* Main Content */
@@ -342,30 +313,5 @@ if (savedState !== null) {
 
 .dashboard.sidebar-collapsed .main-content {
   margin-left: 80px;
-}
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .sidebar {
-    width: 80px;
-  }
-  
-  .brand-text,
-  .nav-item span {
-    display: none;
-  }
-  
-  .main-content {
-    margin-left: 80px;
-  }
-  
-  .nav-item {
-    justify-content: center;
-    padding: 12px;
-  }
-  
-  .notification-badge {
-    display: none;
-  }
 }
 </style>
