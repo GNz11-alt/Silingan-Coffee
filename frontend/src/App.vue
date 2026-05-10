@@ -5,4 +5,3 @@
 <template>
     <router-view />
 </template>
-

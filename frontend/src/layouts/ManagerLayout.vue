@@ -19,115 +19,98 @@
           </div>
           <div class="brand-text" v-show="!isSidebarCollapsed">
             <h2>Silingan Coffee</h2>
-            <p class="user-role">Administrator</p>
+            <p class="user-role">Manager</p>
+            <p class="user-branch">{{ branch }}</p>
           </div>
         </div>
       </div>
 
       <nav class="sidebar-nav">
         <router-link
-          to="/admin/dashboard"
+          to="/manager/dashboard"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/dashboard' }"
+          :class="{ active: $route.path === '/manager/dashboard' }"
         >
           <component :is="Home" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Dashboard</span>
         </router-link>
 
         <router-link
-          to="/admin/inventory"
+          to="/manager/inventory"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/inventory' }"
+          :class="{ active: $route.path === '/manager/inventory' }"
         >
           <component :is="Package" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Inventory</span>
         </router-link>
 
         <router-link
-          to="/admin/sales"
+          to="/manager/sales"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/sales' }"
+          :class="{ active: $route.path === '/manager/sales' }"
         >
           <component :is="BarChart3" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Sales</span>
         </router-link>
 
         <router-link
-          to="/admin/employees"
+          to="/manager/schedule"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/employees' }"
-        >
-          <component :is="Users" class="nav-icon" :size="20" />
-          <span v-show="!isSidebarCollapsed">Employees</span>
-        </router-link>
-
-        <router-link
-          to="/admin/schedule"
-          class="nav-item"
-          :class="{ active: $route.path === '/admin/schedule' }"
+          :class="{ active: $route.path === '/manager/schedule' }"
         >
           <component :is="Calendar" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Schedule</span>
         </router-link>
 
         <router-link
-          to="/admin/menu-pricing"
+          to="/manager/menu-pricing"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/menu-pricing' }"
+          :class="{ active: $route.path === '/manager/menu-pricing' }"
         >
           <component :is="Coffee" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Menu & Pricing</span>
         </router-link>
 
         <router-link
-          to="/admin/reports"
+          to="/manager/reports"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/reports' }"
+          :class="{ active: $route.path === '/manager/reports' }"
         >
           <component :is="FileText" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Reports & Analytics</span>
         </router-link>
 
         <router-link
-          to="/admin/backup"
+          to="/manager/backup"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/backup' }"
+          :class="{ active: $route.path === '/manager/backup' }"
         >
           <component :is="Database" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Backup & Restore</span>
         </router-link>
 
         <router-link
-          to="/admin/search"
+          to="/manager/search"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/search' }"
+          :class="{ active: $route.path === '/manager/search' }"
         >
           <component :is="SearchIcon" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Search</span>
         </router-link>
 
         <router-link
-          to="/admin/maintenance"
+          to="/manager/help"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/maintenance' }"
-        >
-          <component :is="Settings" class="nav-icon" :size="20" />
-          <span v-show="!isSidebarCollapsed">Maintenance</span>
-        </router-link>
-
-        <router-link
-          to="/admin/help"
-          class="nav-item"
-          :class="{ active: $route.path === '/admin/help' }"
+          :class="{ active: $route.path === '/manager/help' }"
         >
           <component :is="HelpCircle" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Help</span>
         </router-link>
 
         <router-link
-          to="/admin/about"
+          to="/manager/about"
           class="nav-item"
-          :class="{ active: $route.path === '/admin/about' }"
+          :class="{ active: $route.path === '/manager/about' }"
         >
           <component :is="Info" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">About</span>
@@ -161,13 +144,11 @@ import {
   Home,
   Package,
   BarChart3,
-  Users,
   Calendar,
   Coffee,
   FileText,
   Database,
   Search as SearchIcon,
-  Settings,
   HelpCircle,
   Info,
   LogOut,
@@ -178,6 +159,7 @@ import {
 
 const router = useRouter();
 const isSidebarCollapsed = ref(false);
+const branch = ref(localStorage.getItem("branch") || "");
 
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
@@ -273,6 +255,13 @@ if (savedState !== null) {
   font-size: 14px;
   color: #a69794;
   margin-top: 2px;
+}
+
+.user-branch {
+  font-size: 12px;
+  color: #c49a6c;
+  margin-top: 2px;
+  text-transform: capitalize;
 }
 
 .sidebar-nav {
