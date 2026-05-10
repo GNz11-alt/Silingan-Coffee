@@ -23,7 +23,7 @@
           <span v-show="!isSidebarCollapsed">Dashboard</span>
         </router-link>
         
-        <router-link to="/inventory" class="nav-item" :class="{ active: $route.path === '/inventory' }">
+        <router-link to="/dashboard/inventory" class="nav-item" :class="{ active: $route.path === '/dashboard/inventory' }">
           <component :is="Package" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Inventory</span>
         </router-link>
@@ -33,12 +33,12 @@
           <span v-show="!isSidebarCollapsed">Sales</span>
         </router-link>
         
-        <router-link to="/employees" class="nav-item" :class="{ active: $route.path === '/employees' }">
+        <router-link to="/dashboard/employee" class="nav-item" :class="{ active: $route.path === '/dashboard/employee' }">
           <component :is="Users" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Employees</span>
         </router-link>
         
-        <router-link to="/schedule" class="nav-item" :class="{ active: $route.path === '/schedule' }">
+        <router-link to="/dashboard/schedule" class="nav-item" :class="{ active: $route.path === '/dashboard/schedule' }">
           <component :is="Calendar" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Schedule</span>
         </router-link>
@@ -58,7 +58,7 @@
           <span v-show="!isSidebarCollapsed">Backup & Restore</span>
         </router-link>
         
-        <router-link to="/search" class="nav-item" :class="{ active: $route.path === '/search' }">
+        <router-link to="/dashboard/search" class="nav-item" :class="{ active: $route.path === '/dashboard/search' }">
           <component :is="Search" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Search</span>
         </router-link>
@@ -73,7 +73,7 @@
           <span v-show="!isSidebarCollapsed">Help</span>
         </router-link>
         
-        <router-link to="/about" class="nav-item" :class="{ active: $route.path === '/about' }">
+        <router-link to="/dashboard/about" class="nav-item" :class="{ active: $route.path === '/dashboard/about' }">
           <component :is="Info" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">About</span>
         </router-link>
