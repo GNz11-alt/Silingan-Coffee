@@ -146,10 +146,10 @@ const branches = [
 
 // --- MOCK DATA ---
 const allResults = [
-  { id: '1', type: 'product', title: 'Americano', description: 'Coffee beverage', details: '₱150 - 50 units in stock', status: 'In Stock' },
-  { id: '2', type: 'product', title: 'Cappuccino', description: 'Espresso with steamed milk', details: '₱180 - 45 units in stock', status: 'In Stock' },
-  { id: '3', type: 'product', title: 'Croissant', description: 'Pastry item', details: '₱120 - 8 units in stock', status: 'Low Stock' },
-  { id: '4', type: 'employee', title: 'Maria Santos', description: 'Store Manager', details: 'Management Department - Active', status: 'Active' }
+  { id: '1', type: 'product', title: 'Americano', description: 'Coffee beverage', details: '₱150 - 50 units in stock', status: 'In Stock', branch: 'overall' },
+  { id: '2', type: 'product', title: 'Cappuccino', description: 'Espresso with steamed milk', details: '₱180 - 45 units in stock', status: 'In Stock', branch: 'overall' },
+  { id: '3', type: 'product', title: 'Croissant', description: 'Pastry item', details: '₱120 - 8 units in stock', status: 'Low Stock', branch: 'overall' },
+  { id: '4', type: 'employee', title: 'Maria Xie', description: 'Store Manager', details: 'Management Department - Active · Silingan DLSU', status: 'Active', branch: 'dlsu' }
 ];
 
 // --- COMPUTED ---
@@ -162,7 +162,8 @@ const filteredResults = computed(() => {
   return allResults.filter(r => {
     const matchesQuery = searchQuery.value === '' || r.title.toLowerCase().includes(searchQuery.value.toLowerCase());
     const matchesTab = activeTab.value === 'all' || r.type === activeTab.value;
-    return matchesQuery && matchesTab;
+    const matchesBranch = selectedBranchId.value === 'overall' || r.branch === 'overall' || r.branch === selectedBranchId.value;
+    return matchesQuery && matchesTab && matchesBranch;
   });
 });
 
