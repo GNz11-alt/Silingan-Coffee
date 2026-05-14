@@ -29,14 +29,6 @@
         <ChevronDown :size="13" class="sel-icon" />
       </div>
       <div class="select-wrap">
-        <select v-model="filterType" class="filter-sel">
-          <option value="">All Types</option>
-          <option value="finished">Finished</option>
-          <option value="raw">Raw</option>
-        </select>
-        <ChevronDown :size="13" class="sel-icon" />
-      </div>
-      <div class="select-wrap">
         <select v-model="filterBranch" class="filter-sel">
           <option :value="null">All Branches</option>
           <option v-for="b in branches" :key="b.BranchId" :value="b.BranchId">{{ b.BranchName }}</option>
