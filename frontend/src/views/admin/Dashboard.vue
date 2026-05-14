@@ -213,7 +213,8 @@ const fetchDashboardData = async () => {
 
   if (inventoryData) {
     lowStockCount.value = inventoryData.filter(
-      (item) => item.Quantity <= item.LowStockThreshold,
+      (item) =>
+        item.LowStockThreshold && item.Quantity <= item.LowStockThreshold,
     ).length;
   }
 
@@ -233,7 +234,10 @@ const fetchDashboardData = async () => {
       );
       const hasZeroStock = branchInventory.some((i) => i.Quantity === 0);
       const hasLowStock = branchInventory.some(
-        (i) => i.Quantity <= i.LowStockThreshold && i.Quantity > 0,
+        (i) =>
+          i.LowStockThreshold &&
+          i.Quantity <= i.LowStockThreshold &&
+          i.Quantity > 0,
       );
 
       let status = "good";
@@ -263,7 +267,8 @@ const fetchDashboardData = async () => {
   // Fetch total employees
   const { count } = await supabase
     .from("employee")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .neq("Status", "Archived");
 
   totalEmployees.value = count || 0;
 
