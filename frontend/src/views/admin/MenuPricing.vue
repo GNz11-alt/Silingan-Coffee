@@ -66,8 +66,7 @@
         <div class="menu-card" v-for="item in items" :key="item.ProductId"
           :class="{ 'item-disabled': item._disabled }">
           <div class="card-top">
-            <div class="type-dot" :class="item.ProductType"></div>
-            <span class="type-label">{{ item.ProductType }}</span>
+            <span class="cat-label">{{ item.Category ?? 'Uncategorized' }}</span>
             <span class="branch-label">{{ getBranchName(item.BranchId) }}</span>
           </div>
           <div class="card-body">
@@ -75,7 +74,7 @@
               <Coffee :size="15" class="item-icon" />
               <h4>{{ item.ProductName }}</h4>
             </div>
-            <p class="category-text">{{ item.Category }}</p>
+
           </div>
 
           <div class="recipe-status-area">
@@ -119,20 +118,16 @@
             <label>Product Name *</label>
             <input v-model="form.ProductName" required placeholder="e.g. Iced Latte" />
           </div>
-          <div class="field-row">
-            <div class="field">
-              <label>Product Type *</label>
-              <div class="select-wrap full">
-                <select v-model="form.ProductType" required>
-                  <option value="finished">Finished</option>
-                  <option value="raw">Raw</option>
-                </select>
-                <ChevronDown :size="13" class="sel-icon" />
-              </div>
-            </div>
-            <div class="field">
-              <label>Category</label>
-              <input v-model="form.Category" placeholder="e.g. Cold Coffee" />
+          <div class="field">
+            <label>Category *</label>
+            <div class="select-wrap full">
+              <select v-model="form.Category" required>
+                <option value="">Select category</option>
+                <option value="Beverages">Beverages</option>
+                <option value="Pastries">Pastries</option>
+                <option value="Food">Food</option>
+              </select>
+              <ChevronDown :size="13" class="sel-icon" />
             </div>
           </div>
           <div class="field-row">
@@ -188,7 +183,7 @@
                   <select v-model="ing.rawproductid">
                     <option :value="null">Select raw material</option>
                     <option v-for="rp in rawProducts" :key="rp.rawproductid" :value="rp.rawproductid">
-                      {{ rp.product?.ProductName ?? 'Unknown' }} ({{ rp.unit }})
+                      {{ rp.name }} ({{ rp.unit }})
                     </option>
                   </select>
                   <ChevronDown :size="12" class="sel-icon" />
@@ -259,8 +254,8 @@
             </div>
             <ul class="summary-ingredients">
               <li v-for="r in row.recipes" :key="r.recipeid">
-                <span class="ing-name">{{ r.rawproduct?.product?.ProductName ?? '—' }}</span>
-                <span class="ing-qty">{{ r.quantityneeded }} {{ r.unit }} — raw: {{ r.rawproduct?.unit ?? '' }}</span>
+                <span class="ing-name">{{ r.rawName }}</span>
+                <span class="ing-qty">{{ r.quantityneeded }} {{ r.unit }}</span>
               </li>
             </ul>
           </div>
@@ -287,7 +282,7 @@ const loading     = ref(false);
 
 const searchQuery   = ref('');
 const filterCategory = ref('');
-const filterType    = ref('');
+
 const filterBranch  = ref(null);
 
 // Product modal
@@ -296,8 +291,7 @@ const isEditing  = ref(false);
 const editingId  = ref(null);
 const saving     = ref(false);
 const form       = ref({
-  ProductName: '', ProductType: 'finished',
-  Category: '', Price: null, BranchId: null
+  ProductName: '', Category: '', Price: null, BranchId: null
 });
 
 // Recipe modal
@@ -327,8 +321,6 @@ const filteredGrouped = computed(() => {
   }
   if (filterCategory.value)
     list = list.filter(i => i.Category === filterCategory.value);
-  if (filterType.value)
-    list = list.filter(i => i.ProductType === filterType.value);
   if (filterBranch.value)
     list = list.filter(i => i.BranchId === filterBranch.value);
 
@@ -349,11 +341,11 @@ const fetchBranches = async () => {
 };
 
 const fetchRawProducts = async () => {
-  // rawproduct table stores raw materials with a FK to product for the name
+  // rawproduct is now standalone with name, category, unit, stockquantity
   const { data, error } = await supabase
     .from('rawproduct')
-    .select('rawproductid, productid, unit, reorderlevel, product ( ProductId, ProductName, Category )')
-    .order('rawproductid');
+    .select('rawproductid, name, category, unit, reorderlevel, stockquantity, expirationdate')
+    .order('name');
   if (error) console.error('fetchRawProducts error:', error.message);
   if (data) rawProducts.value = data;
 };
@@ -390,13 +382,12 @@ const fetchMenuItems = async () => {
   loading.value = false;
 };
 
-// Product CRUD
+// Product CRUD 
 const openAddModal = () => {
   isEditing.value = false;
   editingId.value = null;
   form.value = {
-    ProductName: '', ProductType: 'finished',
-    Category: '', Price: null,
+    ProductName: '', Category: '', Price: null,
     BranchId: filterBranch.value
   };
   showModal.value = true;
@@ -407,7 +398,6 @@ const openEditModal = (item) => {
   editingId.value = item.ProductId;
   form.value = {
     ProductName: item.ProductName,
-    ProductType: item.ProductType,
     Category: item.Category ?? '',
     Price: item.Price,
     BranchId: item.BranchId,
@@ -426,7 +416,6 @@ const saveItem = async () => {
 
   const payload = {
     ProductName: form.value.ProductName,
-    ProductType: form.value.ProductType,
     Category: form.value.Category || null,
     Price: form.value.Price ?? null,
     BranchId: form.value.BranchId,
@@ -453,7 +442,7 @@ const deleteItem = async (id) => {
   else await fetchMenuItems();
 };
 
-// Recipe CRUD 
+// Recipe CRUD
 const openRecipeModal = async (item) => {
   activeItem.value = item;
   recipeRows.value = [];
@@ -497,7 +486,7 @@ const saveRecipe = async () => {
   savingRecipe.value = true;
 
   // Delete all existing recipes for this product, then re-insert
-  //simplest approach for add edit remove
+  // simplest approach for add edit remvove
   const { error: delError } = await supabase
     .from('recipe')
     .delete()
@@ -532,29 +521,56 @@ const openAllRecipes = async () => {
   showAllRecipesModal.value = true;
   loadingAllRecipes.value = true;
 
-  const { data, error } = await supabase
+  // fetch all recipes with rawproductid
+  const { data: recipes, error: recipeErr } = await supabase
+    .from('recipe')
+    .select('recipeid, finishedproductid, rawproductid, quantityneeded, unit');
+
+  if (recipeErr) { console.error(recipeErr.message); loadingAllRecipes.value = false; return; }
+
+  // fetch all rawproducts for name lookup
+  const { data: raws } = await supabase
+    .from('rawproduct')
+    .select('rawproductid, name, unit');
+
+  const rawMap = {};
+  (raws ?? []).forEach(r => { rawMap[r.rawproductid] = r; });
+
+  // fetch all products that have at least one recipe
+  const productIds = [...new Set((recipes ?? []).map(r => r.finishedproductid))];
+  if (productIds.length === 0) {
+    allRecipesSummary.value = [];
+    loadingAllRecipes.value = false;
+    return;
+  }
+
+  const { data: products } = await supabase
     .from('product')
-    .select(`
-      ProductId, ProductName, Category, Price,
-      recipe (
-        recipeid, rawproductid, quantityneeded, unit,
-        rawproduct ( rawproductid, unit, product ( ProductName ) )
-      )
-    `)
+    .select('ProductId, ProductName, Category, Price')
+    .in('ProductId', productIds)
     .order('Category')
     .order('ProductName');
 
-  if (!error && data) {
-    allRecipesSummary.value = data.filter(p => p.recipe && p.recipe.length > 0);
-  }
+  // merge — attach recipe rows (with raw name) to each product
+  allRecipesSummary.value = (products ?? []).map(p => ({
+    ...p,
+    recipes: (recipes ?? [])
+      .filter(r => r.finishedproductid === p.ProductId)
+      .map(r => ({
+        ...r,
+        rawName: rawMap[r.rawproductid]?.name ?? '—',
+        rawUnit: rawMap[r.rawproductid]?.unit ?? '',
+      }))
+  }));
+
   loadingAllRecipes.value = false;
 };
 
-// Helpers
+//Helpers 
 const getBranchName = (id) =>
   branches.value.find(b => b.BranchId === id)?.BranchName ?? '—';
 
-// Init 
+//Init 
 onMounted(async () => {
   await Promise.all([fetchBranches(), fetchRawProducts(), fetchMenuItems()]);
 
@@ -613,10 +629,7 @@ onMounted(async () => {
 .item-disabled { opacity: 0.45; filter: grayscale(0.6); }
 
 .card-top { display: flex; align-items: center; gap: 7px; }
-.type-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.type-dot.finished { background: #3b82f6; }
-.type-dot.raw { background: #9ca3af; }
-.type-label { font-size: 11px; font-weight: 700; color: #888; text-transform: capitalize; }
+.cat-label { font-size: 11px; font-weight: 700; color: #C49A6C; background: #FFF9F0; padding: 2px 8px; border-radius: 4px; }
 .branch-label { margin-left: auto; font-size: 11px; color: #bbb; font-weight: 500; }
 
 .card-body { }
