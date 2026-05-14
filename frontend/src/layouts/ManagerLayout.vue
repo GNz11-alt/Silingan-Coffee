@@ -175,6 +175,7 @@ const logout = () => {
   localStorage.removeItem("username");
   localStorage.removeItem("role");
   localStorage.removeItem("branch");
+  localStorage.removeItem("userId");
   router.push("/login");
 };
 

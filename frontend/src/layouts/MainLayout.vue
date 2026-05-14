@@ -18,52 +18,52 @@
       </div>
 
       <nav class="sidebar-nav">
-        <router-link to="/dashboard" class="nav-item" :class="{ active: $route.path === '/dashboard' }">
+        <router-link to="/admin/dashboard" class="nav-item" :class="{ active: $route.path === '/admin/dashboard' }">
           <component :is="Home" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Dashboard</span>
         </router-link>
         
-        <router-link to="/dashboard/inventory" class="nav-item" :class="{ active: $route.path === '/dashboard/inventory' }">
+        <router-link to="/admin/inventory" class="nav-item" :class="{ active: $route.path === '/admin/inventory' }">
           <component :is="Package" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Inventory</span>
         </router-link>
         
-        <router-link to="/sales" class="nav-item" :class="{ active: $route.path === '/sales' }">
+        <router-link to="/admin/sales" class="nav-item" :class="{ active: $route.path === '/admin/sales' }">
           <component :is="BarChart3" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Sales</span>
         </router-link>
         
-        <router-link to="/dashboard/employee" class="nav-item" :class="{ active: $route.path === '/dashboard/employee' }">
+        <router-link to="/admin/employees" class="nav-item" :class="{ active: $route.path === '/admin/employees' }">
           <component :is="Users" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Employees</span>
         </router-link>
         
-        <router-link to="/dashboard/schedule" class="nav-item" :class="{ active: $route.path === '/dashboard/schedule' }">
+        <router-link to="/admin/schedule" class="nav-item" :class="{ active: $route.path === '/admin/schedule' }">
           <component :is="Calendar" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Schedule</span>
         </router-link>
         
-        <router-link to="/menu-pricing" class="nav-item" :class="{ active: $route.path === '/menu-pricing' }">
+        <router-link to="/admin/menu-pricing" class="nav-item" :class="{ active: $route.path === '/admin/menu-pricing' }">
           <component :is="Coffee" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Menu & Pricing</span>
         </router-link>
         
-        <router-link to="/reports" class="nav-item" :class="{ active: $route.path === '/reports' }">
+        <router-link to="/admin/reports" class="nav-item" :class="{ active: $route.path === '/admin/reports' }">
           <component :is="FileText" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Reports & Analytics</span>
         </router-link>
         
-        <router-link to="/backup" class="nav-item" :class="{ active: $route.path === '/backup' }">
+        <router-link to="/admin/backup" class="nav-item" :class="{ active: $route.path === '/admin/backup' }">
           <component :is="Database" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Backup & Restore</span>
         </router-link>
         
-        <router-link to="/dashboard/search" class="nav-item" :class="{ active: $route.path === '/dashboard/search' }">
+        <router-link to="/admin/search" class="nav-item" :class="{ active: $route.path === '/admin/search' }">
           <component :is="Search" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Search</span>
         </router-link>
         
-        <router-link to="/maintenance" class="nav-item" :class="{ active: $route.path === '/maintenance' }">
+        <router-link to="/admin/maintenance" class="nav-item" :class="{ active: $route.path === '/admin/maintenance' }">
           <component :is="Settings" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Maintenance</span>
         </router-link>
@@ -73,7 +73,7 @@
           <span v-show="!isSidebarCollapsed">Help</span>
         </router-link>
         
-        <router-link to="/dashboard/about" class="nav-item" :class="{ active: $route.path === '/dashboard/about' }">
+        <router-link to="/admin/about" class="nav-item" :class="{ active: $route.path === '/admin/about' }">
           <component :is="Info" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">About</span>
         </router-link>
@@ -136,6 +136,7 @@ const showNotifications = () => {
 const logout = () => {
   localStorage.removeItem('isLoggedIn')
   localStorage.removeItem('username')
+  localStorage.removeItem('userId')
   router.push('/login')
 }
 
