@@ -34,3 +34,11 @@ coverage
 
 # Vitest
 __screenshots__/
+
+
+#env
+.env
+
+# Database
+rpc_functions.sql
+Supabase Snippet List Public Schema Columns.csv

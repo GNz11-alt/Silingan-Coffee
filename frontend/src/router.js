@@ -10,6 +10,12 @@ import ManagerLayout from './layouts/ManagerLayout.vue'
 import StaffLayout from './layouts/StaffLayout.vue'
 
 const routes = [
+  // Default redirect to admin dashboard
+  {
+    path: '/dashboard',
+    redirect: '/admin/dashboard'
+  },
+  
   // Public routes
   {
     path: '/',
@@ -184,6 +190,12 @@ const routes = [
         component: () => import('./views/staff/Help.vue')
       },
     ]
+  },
+
+  // Catch-all redirect to admin dashboard
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/admin/dashboard'
   }
 ]
 

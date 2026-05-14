@@ -172,6 +172,7 @@ const handleLogin = async () => {
   localStorage.setItem("username", data.username);
   localStorage.setItem("role", data.role);
   localStorage.setItem("branch", data.branch || "all");
+  localStorage.setItem("userId", data.id);
 
   if (data.role === "admin") {
     router.push("/admin/dashboard");
