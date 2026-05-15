@@ -48,6 +48,12 @@
           <component :is="HelpCircle" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Help</span>
         </router-link>
+
+        <router-link
+          to="/admin/about" class="nav-item" :class="{ active: $route.path === '/admin/about' }">
+          <component :is="Info" class="nav-icon" :size="20" />
+          <span v-show="!isSidebarCollapsed">About</span>
+        </router-link>
       </nav>
 
       <div class="sidebar-bottom">
@@ -75,7 +81,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Home, Package, Calendar, Coffee, ShoppingCart,
-  HelpCircle, LogOut, Bell, ChevronLeft, ChevronRight
+  HelpCircle, LogOut, Bell, ChevronLeft, ChevronRight, Info
 } from 'lucide-vue-next'
 
 const router = useRouter()
