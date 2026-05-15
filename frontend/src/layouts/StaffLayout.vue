@@ -3,12 +3,19 @@
     <aside class="sidebar">
       <div class="sidebar-top">
         <button class="toggle-btn" @click="toggleSidebar">
-          <component :is="isSidebarCollapsed ? ChevronRight : ChevronLeft" :size="20" />
+          <component
+            :is="isSidebarCollapsed ? ChevronRight : ChevronLeft"
+            :size="20"
+          />
         </button>
 
         <div class="brand-section">
           <div class="logo-wrapper">
-            <img src="@/assets/images/logo.png" alt="Silingan Coffee" class="logo" />
+            <img
+              src="@/assets/images/logo.png"
+              alt="Silingan Coffee"
+              class="logo"
+            />
           </div>
           <div class="brand-text" v-show="!isSidebarCollapsed">
             <h2>Silingan Coffee</h2>
@@ -19,38 +26,65 @@
       </div>
 
       <nav class="sidebar-nav">
-        <router-link to="/staff/dashboard" class="nav-item" :class="{ active: $route.path === '/staff/dashboard' }">
+        <router-link
+          to="/staff/dashboard"
+          class="nav-item"
+          :class="{ active: $route.path === '/staff/dashboard' }"
+        >
           <component :is="Home" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Dashboard</span>
         </router-link>
 
-        <router-link to="/staff/pos" class="nav-item" :class="{ active: $route.path === '/staff/pos' }">
+        <router-link
+          to="/staff/pos"
+          class="nav-item"
+          :class="{ active: $route.path === '/staff/pos' }"
+        >
           <component :is="ShoppingCart" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Point of Sale</span>
         </router-link>
 
-        <router-link to="/staff/inventory" class="nav-item" :class="{ active: $route.path === '/staff/inventory' }">
+        <router-link
+          to="/staff/inventory"
+          class="nav-item"
+          :class="{ active: $route.path === '/staff/inventory' }"
+        >
           <component :is="Package" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Inventory</span>
         </router-link>
 
-        <router-link to="/staff/schedule" class="nav-item" :class="{ active: $route.path === '/staff/schedule' }">
+        <router-link
+          to="/staff/schedule"
+          class="nav-item"
+          :class="{ active: $route.path === '/staff/schedule' }"
+        >
           <component :is="Calendar" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">My Schedule</span>
         </router-link>
 
-        <router-link to="/staff/menu" class="nav-item" :class="{ active: $route.path === '/staff/menu' }">
+        <router-link
+          to="/staff/menu"
+          class="nav-item"
+          :class="{ active: $route.path === '/staff/menu' }"
+        >
           <component :is="Coffee" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Menu & Pricing</span>
         </router-link>
 
-        <router-link to="/staff/help" class="nav-item" :class="{ active: $route.path === '/staff/help' }">
+        <router-link
+          to="/staff/help"
+          class="nav-item"
+          :class="{ active: $route.path === '/staff/help' }"
+        >
           <component :is="HelpCircle" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Help</span>
         </router-link>
 
         <router-link
-          to="/admin/about" class="nav-item" :class="{ active: $route.path === '/admin/about' }">
+          to="/staff/about"
+          class="nav-item"
+          :class="{ active: $route.path === '/staff/about' }"
+        >
           <component :is="Info" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">About</span>
         </router-link>
@@ -77,53 +111,66 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
 import {
-  Home, Package, Calendar, Coffee, ShoppingCart,
-  HelpCircle, LogOut, Bell, ChevronLeft, ChevronRight, Info
-} from 'lucide-vue-next'
+  Home,
+  Package,
+  Calendar,
+  Coffee,
+  ShoppingCart,
+  HelpCircle,
+  LogOut,
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+} from "lucide-vue-next";
 
-const router = useRouter()
-const isSidebarCollapsed = ref(false)
-const branch = ref(localStorage.getItem('branch') || '')
+const router = useRouter();
+const isSidebarCollapsed = ref(false);
+const branch = ref(localStorage.getItem("branch") || "");
 
 const toggleSidebar = () => {
-  isSidebarCollapsed.value = !isSidebarCollapsed.value
-  localStorage.setItem('sidebarCollapsed', isSidebarCollapsed.value)
-}
+  isSidebarCollapsed.value = !isSidebarCollapsed.value;
+  localStorage.setItem("sidebarCollapsed", isSidebarCollapsed.value);
+};
 
 const showNotifications = () => {
-  alert('You have 3 new notifications')
-}
+  alert("You have 3 new notifications");
+};
 
 const logout = () => {
-  localStorage.removeItem('isLoggedIn')
-  localStorage.removeItem('username')
-  localStorage.removeItem('role')
-  localStorage.removeItem('branch')
-  localStorage.removeItem('userId')
-  router.push('/login')
-}
+  localStorage.removeItem("isLoggedIn");
+  localStorage.removeItem("username");
+  localStorage.removeItem("role");
+  localStorage.removeItem("branch");
+  localStorage.removeItem("userId");
+  router.push("/login");
+};
 
-const savedState = localStorage.getItem('sidebarCollapsed')
+const savedState = localStorage.getItem("sidebarCollapsed");
 if (savedState !== null) {
-  isSidebarCollapsed.value = savedState === 'true'
+  isSidebarCollapsed.value = savedState === "true";
 }
 </script>
 
 <style scoped>
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
 .dashboard {
   display: flex;
   min-height: 100vh;
-  background: #F8F9FA;
+  background: #f8f9fa;
 }
 
 .sidebar {
   width: 280px;
-  background: #31201D;
+  background: #31201d;
   position: fixed;
   height: 100vh;
   display: flex;
@@ -134,7 +181,9 @@ if (savedState !== null) {
   color: white;
 }
 
-.dashboard.sidebar-collapsed .sidebar { width: 80px; }
+.dashboard.sidebar-collapsed .sidebar {
+  width: 80px;
+}
 
 .sidebar-top {
   padding: 24px 20px;
@@ -149,28 +198,53 @@ if (savedState !== null) {
   background: none;
   border: none;
   cursor: pointer;
-  color: #FFFFFF;
+  color: #ffffff;
   transition: all 0.2s ease;
   z-index: 10;
 }
 
-.brand-section { display: flex; flex-direction: column; gap: 15px; }
+.brand-section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
 
-.logo { width: 32px; height: 32px; filter: invert(1); }
+.logo {
+  width: 32px;
+  height: 32px;
+  filter: invert(1);
+}
 
-.brand-text h2 { font-size: 18px; font-weight: 500; color: #FFFFFF; margin: 0; }
+.brand-text h2 {
+  font-size: 18px;
+  font-weight: 500;
+  color: #ffffff;
+  margin: 0;
+}
 
-.user-role { font-size: 14px; color: #A69794; margin-top: 2px; }
+.user-role {
+  font-size: 14px;
+  color: #a69794;
+  margin-top: 2px;
+}
 
-.user-branch { font-size: 12px; color: #C49A6C; margin-top: 2px; text-transform: capitalize; }
+.user-branch {
+  font-size: 12px;
+  color: #c49a6c;
+  margin-top: 2px;
+  text-transform: capitalize;
+}
 
-.sidebar-nav { flex: 1; padding: 10px 12px; }
+.sidebar-nav {
+  flex: 1;
+  padding: 10px 12px;
+}
 
 .nav-item {
   display: flex;
   align-items: center;
   padding: 12px 16px;
-  color: #FFFFFF;
+  color: #ffffff;
   text-decoration: none;
   transition: all 0.2s ease;
   gap: 16px;
@@ -183,25 +257,32 @@ if (savedState !== null) {
   margin-bottom: 4px;
 }
 
-.nav-item:hover { background: rgba(255, 255, 255, 0.05); }
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
 
 .nav-item.active {
-  background: #C49A6C;
-  color: #2D1B18;
+  background: #c49a6c;
+  color: #2d1b18;
   font-weight: 500;
 }
 
-.nav-icon { stroke-width: 1.8; flex-shrink: 0; }
+.nav-icon {
+  stroke-width: 1.8;
+  flex-shrink: 0;
+}
 
 .sidebar-bottom {
   padding: 16px 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.notification-btn { position: relative; }
+.notification-btn {
+  position: relative;
+}
 
 .notification-badge {
-  background: #E5533D;
+  background: #e5533d;
   color: white;
   font-size: 11px;
   min-width: 18px;
@@ -214,9 +295,17 @@ if (savedState !== null) {
   margin-left: auto;
 }
 
-.logout-btn { margin-top: 10px; }
+.logout-btn {
+  margin-top: 10px;
+}
 
-.main-content { flex: 1; margin-left: 280px; transition: margin-left 0.3s ease; }
+.main-content {
+  flex: 1;
+  margin-left: 280px;
+  transition: margin-left 0.3s ease;
+}
 
-.dashboard.sidebar-collapsed .main-content { margin-left: 80px; }
+.dashboard.sidebar-collapsed .main-content {
+  margin-left: 80px;
+}
 </style>
