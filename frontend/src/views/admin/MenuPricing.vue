@@ -175,7 +175,7 @@
                   <select v-model="ing.rawproductid">
                     <option :value="null">Select raw material</option>
                     <option v-for="rp in rawProducts" :key="rp.rawproductid" :value="rp.rawproductid">
-                      {{ rp.name }} ({{ rp.unit }})
+                      {{ rp.name }} 
                     </option>
                   </select>
                   <ChevronDown :size="12" class="sel-icon" />
