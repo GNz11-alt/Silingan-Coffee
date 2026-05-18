@@ -1,541 +1,444 @@
 <template>
-  <div class="pos-container">
-    <header class="page-header">
-      <div class="header-text">
-        <h1>Point of Sale</h1>
-        <p>Process customer transactions — Cash Only</p>
+  <div class="pos-root">
+
+    <!-- TOP BAR -->
+    <header class="pos-topbar">
+      <div class="topbar-left">
+        <div class="brand-mark">
+          <Coffee :size="20" />
+          <span>Silingan POS</span>
+        </div>
+        <div class="topbar-meta">
+          <span class="meta-branch">{{ branchAddress || branchRecord?.BranchName || 'Main Branch' }}</span>
+          <span class="meta-sep">·</span>
+          <span class="meta-cashier">{{ cashierName }}</span>
+          <span class="meta-sep">·</span>
+          <span class="meta-date">{{ currentDate }}</span>
+        </div>
       </div>
-      <button class="new-sale-btn" @click="openModal">
-        <Plus :size="18" /> New Sale
-      </button>
+      <div class="topbar-right">
+        <button class="history-btn" @click="showHistory = true">
+          <History :size="15" /> Today's Sales
+          <span v-if="transactions.length > 0" class="history-count">{{ transactions.length }}</span>
+        </button>
+      </div>
     </header>
 
-    <!-- Stats -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-top"><span>Today's Revenue</span><DollarSign :size="16" /></div>
-        <div class="stat-value">₱{{ totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-top"><span>Transactions</span><CheckCircle :size="16" /></div>
-        <div class="stat-value">{{ transactions.length }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-top"><span>Average Sale</span><TrendingUp :size="16" /></div>
-        <div class="stat-value">₱{{ avgSale.toFixed(2) }}</div>
-      </div>
-    </div>
+    <!-- MAIN POS LAYOUT -->
+    <div class="pos-layout">
 
-    <!-- Recent Transactions Table -->
-    <div class="table-section">
-      <div class="table-header-row">
-        <h3>Recent Transactions</h3>
-        <span class="table-subtitle">Today's completed orders</span>
-      </div>
-      <div v-if="loadingTransactions" class="loading-state">Loading transactions...</div>
-      <table v-else class="main-table">
-        <thead>
-          <tr>
-            <th>Order ID</th>
-            <th>Date</th>
-            <th>Items</th>
-            <th>Discount</th>
-            <th>Cash Paid</th>
-            <th>Change</th>
-            <th>Total</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="transactions.length === 0">
-            <td colspan="8" class="empty-row">No transactions today.</td>
-          </tr>
-          <tr v-for="tr in transactions" :key="tr.OrderId">
-            <td><span class="id-tag">#{{ tr.OrderId }}</span></td>
-            <td>{{ formatDate(tr.CreatedAt) }}</td>
-            <td>
-              <div v-for="item in tr.orderitem" :key="item.OrderItemId" class="item-line">
-                {{ item.Quantity }}x {{ item.product?.ProductName ?? 'Unknown' }}
-              </div>
-            </td>
-            <td>
-              <span v-if="tr.discount" class="discount-badge">
-                {{ tr.discount.discountname }} ({{ tr.discount.discounttype === 'percentage' ? tr.discount.discountvalue + '%' : '₱' + tr.discount.discountvalue }})
-              </span>
-              <span v-else class="no-discount">—</span>
-            </td>
-            <td>₱{{ (tr.cashpaid ?? 0).toFixed(2) }}</td>
-            <td class="change-cell">₱{{ (tr.changegiven ?? 0).toFixed(2) }}</td>
-            <td class="total-cell">₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}</td>
-            <td><span :class="['status-badge', tr.Status]">{{ tr.Status }}</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <!-- LEFT: Category Sidebar -->
+      <aside class="category-sidebar">
+        <p class="sidebar-label">Category</p>
+        <button
+          v-for="cat in ['All', ...menuCategories]" :key="cat"
+          :class="['cat-btn', activeCategory === cat ? 'active' : '']"
+          @click="activeCategory = cat"
+        >
+          <component :is="getCatIcon(cat)" :size="15" />
+          {{ cat }}
+        </button>
+      </aside>
 
-    <!-- Modal -->
-    <div v-if="isModalOpen" class="modal-backdrop">
-
-      <!-- STEP 1: Process Sale -->
-      <div class="process-sale-dialog" v-if="!showReceiptStep">
-        <header class="dialog-header">
-          <div class="dialog-title-area">
-            <h2>Process Sale</h2>
-            <p>Add items, apply discount, and collect cash</p>
-          </div>
-          <button class="close-dialog" @click="closeModal"><X :size="22" /></button>
-        </header>
-
-        <div class="dialog-body">
-          <!-- LEFT: Product Selection + Cart -->
-          <div class="pane selection-pane">
-            <div class="form-group">
-              <label>Select Product</label>
-              <div class="custom-select-wrapper">
-                <select v-model="selectedItem">
-                  <option :value="null">Choose a menu item</option>
-                  <option v-for="m in menu" :key="m.ProductId" :value="m">
-                    {{ m.ProductName }} — ₱{{ m.Price }}
-                  </option>
-                </select>
-                <ChevronDown class="select-icon" :size="16" />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label>Quantity</label>
-              <input type="number" v-model.number="tempQty" min="1" />
-            </div>
-
-            <button class="add-to-cart-btn" @click="addToCart" :disabled="!selectedItem">
-              <ShoppingCart :size="18" /> Add to Cart
-            </button>
-
-            <!-- Cart -->
-            <div class="cart-box">
-              <h3>Order Summary</h3>
-              <div v-if="cart.length === 0" class="empty-cart-msg">No items in cart</div>
-              <div v-else class="cart-items-list">
-                <div v-for="(item, i) in cart" :key="i" class="cart-line">
-                  <div class="cart-line-info">
-                    <span class="line-name">{{ item.ProductName }}</span>
-                    <span class="line-qty">{{ item.qty }} x ₱{{ item.Price }}</span>
-                  </div>
-                  <div class="cart-line-right">
-                    <span class="line-subtotal">₱{{ (item.qty * item.Price).toFixed(2) }}</span>
-                    <button @click="removeFromCart(i)" class="remove-line"><Trash2 :size="14" /></button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Discount row -->
-              <div class="discount-row" v-if="selectedDiscount">
-                <span class="discount-label">
-                  <Tag :size="13" />
-                  {{ selectedDiscount.discountname }}
-                  ({{ selectedDiscount.discounttype === 'percentage' ? selectedDiscount.discountvalue + '%' : '₱' + selectedDiscount.discountvalue }} off)
-                </span>
-                <span class="discount-amount">-₱{{ discountAmount.toFixed(2) }}</span>
-              </div>
-
-              <div class="cart-total-row">
-                <span>Total Amount:</span>
-                <span class="cart-grand-total">₱{{ finalTotal.toFixed(2) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- RIGHT: Discount + Payment -->
-          <div class="pane payment-pane">
-
-            <!-- Discount Section -->
-            <div class="discount-card">
-              <div class="card-title">
-                <Tag :size="18" class="icon-green" />
-                <span>Apply Discount</span>
-              </div>
-              <p class="card-desc">Optional — select an available discount</p>
-              <div class="custom-select-wrapper" style="margin-top: 14px;">
-                <select v-model="selectedDiscount">
-                  <option :value="null">No discount</option>
-                  <option v-for="d in discounts" :key="d.discountid" :value="d">
-                    {{ d.discountname }} —
-                    {{ d.discounttype === 'percentage' ? d.discountvalue + '% off' : '₱' + d.discountvalue + ' off' }}
-                  </option>
-                </select>
-                <ChevronDown class="select-icon" :size="16" />
-              </div>
-            </div>
-
-            <!-- Cash Payment -->
-            <div class="cash-payment-card">
-              <div class="card-title">
-                <Banknote :size="20" class="icon-gold" />
-                <span>Cash Payment</span>
-              </div>
-              <p class="card-desc">All transactions are cash only</p>
-
-              <div class="form-group" style="margin-top: 20px;">
-                <label>Amount Received (₱)</label>
-                <input type="number" v-model.number="cashReceived" class="cash-input" placeholder="0.00" />
-              </div>
-
-              <div class="calc-box" v-if="finalTotal > 0">
-                <div class="calc-row"><span>Subtotal:</span><span>₱{{ cartTotal.toFixed(2) }}</span></div>
-                <div class="calc-row" v-if="selectedDiscount">
-                  <span>Discount:</span><span class="discount-deduct">-₱{{ discountAmount.toFixed(2) }}</span>
-                </div>
-                <div class="calc-row total-due-row"><span>Total Due:</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
-                <div class="calc-row result-row">
-                  <span>Change:</span>
-                  <span :class="changeAmount < 0 ? 'change-negative' : 'change-amount'">
-                    ₱{{ Math.max(0, changeAmount).toFixed(2) }}
-                  </span>
-                </div>
-              </div>
-
-              <div class="quick-cash-area">
-                <label>Quick Amount</label>
-                <div class="quick-grid">
-                  <button v-for="val in [50, 100, 200, 500, 1000, 2000]" :key="val" @click="cashReceived = val">
-                    ₱{{ val }}
-                  </button>
-                </div>
-              </div>
-            </div>
+      <!-- CENTER: Menu Grid -->
+      <main class="menu-area">
+        <div class="menu-search-row">
+          <div class="menu-search">
+            <Search :size="15" />
+            <input v-model="menuSearch" placeholder="Search menu..." />
           </div>
         </div>
 
-        <footer class="dialog-footer">
-          <button class="cancel-action" @click="closeModal">Cancel</button>
+        <div v-if="loadingMenu" class="menu-loading">
+          <div class="spin"></div> Loading menu...
+        </div>
+        <div v-else-if="filteredMenu.length === 0" class="menu-empty">No items found.</div>
+        <div v-else class="menu-grid">
           <button
-            class="complete-action"
-            :disabled="cart.length === 0 || cashReceived < finalTotal"
-            @click="showReceiptStep = true"
+            v-for="item in filteredMenu" :key="item.ProductId"
+            class="menu-card" :class="{ 'in-cart': isInCart(item.ProductId) }"
+            @click="addToCart(item)"
           >
-            <Check :size="18" /> Preview Receipt
+            <div class="menu-card-img">
+              <Coffee :size="30" class="menu-card-icon" />
+              <span v-if="isInCart(item.ProductId)" class="cart-qty-badge">
+                {{ getCartQty(item.ProductId) }}
+              </span>
+            </div>
+            <div class="menu-card-info">
+              <span class="menu-card-name">{{ item.ProductName }}</span>
+              <span class="menu-card-cat">{{ item.Category }}</span>
+              <span class="menu-card-price">₱{{ item.Price?.toFixed(2) }}</span>
+            </div>
           </button>
-        </footer>
-      </div>
+        </div>
+      </main>
 
-      <!-- STEP 2: Receipt Preview -->
-      <div v-else class="receipt-overlay">
-        <div class="receipt-card">
+      <!-- RIGHT: Cart Panel -->
+      <aside class="cart-panel">
+        <div class="cart-panel-header">
+          <h2>Current Order</h2>
+          <button v-if="cart.length > 0" class="clear-cart-btn" @click="cart = []">
+            <X :size="13" /> Clear
+          </button>
+        </div>
+
+        <div class="cart-items" v-if="cart.length > 0">
+          <div v-for="(item, i) in cart" :key="i" class="cart-item">
+            <div class="ci-info">
+              <span class="ci-name">{{ item.ProductName }}</span>
+              <span class="ci-price">₱{{ item.Price?.toFixed(2) }}</span>
+            </div>
+            <div class="ci-controls">
+              <button class="qty-btn" @click="decreaseQty(i)"><Minus :size="11" /></button>
+              <span class="ci-qty">{{ item.qty }}</span>
+              <button class="qty-btn" @click="increaseQty(i)"><Plus :size="11" /></button>
+              <button class="ci-remove" @click="removeFromCart(i)"><Trash2 :size="13" /></button>
+            </div>
+            <div class="ci-subtotal">₱{{ (item.qty * item.Price).toFixed(2) }}</div>
+          </div>
+        </div>
+
+        <div v-else class="cart-empty">
+          <ShoppingCart :size="34" class="cart-empty-icon" />
+          <p>No items yet</p>
+          <span>Tap a menu item to add</span>
+        </div>
+
+        <!-- Discount -->
+        <div v-if="cart.length > 0" class="cart-discount">
+          <label class="discount-lbl"><Tag :size="12" /> Discount</label>
+          <div class="sel-wrap">
+            <select v-model="selectedDiscount" class="discount-sel">
+              <option :value="null">No discount</option>
+              <option v-for="d in discounts" :key="d.discountid" :value="d">
+                {{ d.discountname }} ({{ d.discounttype === 'percentage' ? d.discountvalue + '%' : '₱' + d.discountvalue }} off)
+              </option>
+            </select>
+            <ChevronDown :size="12" class="sel-icon" />
+          </div>
+        </div>
+
+        <!-- Totals -->
+        <div v-if="cart.length > 0" class="cart-totals">
+          <div class="ct-row"><span>Subtotal</span><span>₱{{ cartTotal.toFixed(2) }}</span></div>
+          <div class="ct-row disc-line" v-if="selectedDiscount">
+            <span>Discount</span><span>-₱{{ discountAmount.toFixed(2) }}</span>
+          </div>
+          <div class="ct-row grand"><span>Total</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
+        </div>
+
+        <button class="checkout-btn" :disabled="cart.length === 0" @click="openPayment">
+          <CreditCard :size="17" /> Proceed to Payment
+        </button>
+      </aside>
+    </div>
+
+    <!-- ── PAYMENT MODAL ── -->
+    <div v-if="showPayment" class="overlay" @click.self="showPayment = false">
+      <div class="payment-modal">
+
+        <!-- Receipt Step -->
+        <div v-if="showReceipt" class="receipt-view">
           <div class="receipt-paper">
             <div class="receipt-header">
-              <div class="coffee-icon-circle"><Coffee :size="24" /></div>
-              <h2>Silingan Coffee</h2>
+              <div class="r-icon-circle"><Coffee :size="20" /></div>
+              <h3>Silingan Coffee</h3>
               <p>{{ branchAddress || branchRecord?.BranchName || 'Main Branch' }}</p>
             </div>
-
-            <div class="r-details">
-              <div class="r-row"><span>Date:</span><span>{{ currentDate }}</span></div>
-              <div class="r-row"><span>Cashier:</span><span>{{ cashierName }}</span></div>
+            <div class="r-meta">
+              <div class="r-row"><span>Date</span><span>{{ currentDate }}</span></div>
+              <div class="r-row"><span>Cashier</span><span>{{ cashierName }}</span></div>
+              <div class="r-row"><span>Payment</span><span>{{ paymentMethod === 'gcash' ? 'GCash' : 'Cash' }}</span></div>
             </div>
-
             <div class="r-divider"></div>
-
-            <div class="r-items-scroll">
+            <div class="r-items">
               <div v-for="item in cart" :key="item.ProductId" class="r-item">
                 <span>{{ item.qty }}x {{ item.ProductName }}</span>
                 <span>₱{{ (item.qty * item.Price).toFixed(2) }}</span>
               </div>
             </div>
-
             <div class="r-divider"></div>
-
             <div class="r-totals">
-              <div class="r-total-row"><span>Subtotal</span><span>₱{{ cartTotal.toFixed(2) }}</span></div>
-              <div class="r-total-row" v-if="selectedDiscount">
+              <div class="r-row"><span>Subtotal</span><span>₱{{ cartTotal.toFixed(2) }}</span></div>
+              <div class="r-row r-disc" v-if="selectedDiscount">
                 <span>Discount ({{ selectedDiscount.discountname }})</span>
-                <span class="r-discount">-₱{{ discountAmount.toFixed(2) }}</span>
+                <span>-₱{{ discountAmount.toFixed(2) }}</span>
               </div>
-              <div class="r-total-row big"><span>Total</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
-              <div class="r-total-row"><span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span></div>
-              <div class="r-total-row change"><span>Change</span><span>₱{{ Math.max(0, changeAmount).toFixed(2) }}</span></div>
+              <div class="r-row r-total"><span>Total</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
+              <template v-if="paymentMethod === 'cash'">
+                <div class="r-row"><span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span></div>
+                <div class="r-row r-change"><span>Change</span><span>₱{{ Math.max(0, changeAmount).toFixed(2) }}</span></div>
+              </template>
+              <div v-else class="r-row r-gcash"><span>GCash</span><span>✓ Paid</span></div>
             </div>
-
-            <div class="r-footer">Thank you for your visit!</div>
+            <div class="r-footer">Thank you for your visit! ☕</div>
           </div>
-
-          <div class="receipt-actions">
-            <button class="back-btn" @click="showReceiptStep = false"><ArrowLeft :size="16" /> Edit Order</button>
-            <button class="confirm-btn" :disabled="saving" @click="finishTransaction">
-              <span v-if="saving">Saving...</span>
-              <span v-else>Confirm &amp; Finalize Sale</span>
+          <div class="receipt-btns">
+            <button class="rbtn-back" @click="showReceipt = false"><ArrowLeft :size="14" /> Edit</button>
+            <button class="rbtn-confirm" :disabled="saving" @click="finishTransaction">
+              {{ saving ? 'Saving...' : 'Confirm & Finalize' }}
             </button>
           </div>
         </div>
-      </div>
 
+        <!-- Payment Step -->
+        <div v-else class="payment-view">
+          <div class="pv-header">
+            <div>
+              <h2>Payment</h2>
+              <p>Total: <strong>₱{{ finalTotal.toFixed(2) }}</strong></p>
+            </div>
+            <button class="pv-close" @click="showPayment = false"><X :size="19" /></button>
+          </div>
+
+          <div class="pm-tabs">
+            <button :class="['pm-tab', paymentMethod === 'cash' ? 'active' : '']" @click="paymentMethod = 'cash'">
+              <Banknote :size="17" /> Cash
+            </button>
+            <button :class="['pm-tab', paymentMethod === 'gcash' ? 'active' : '']" @click="paymentMethod = 'gcash'">
+              <Smartphone :size="17" /> GCash
+            </button>
+          </div>
+
+          <div v-if="paymentMethod === 'cash'" class="cash-fields">
+            <label>Amount Received (₱)</label>
+            <input type="number" v-model.number="cashReceived" class="cash-input" placeholder="0.00" />
+            <div class="quick-amounts">
+              <button v-for="v in quickAmounts" :key="v" class="qa-btn" @click="cashReceived = v">
+                ₱{{ v.toLocaleString() }}
+              </button>
+            </div>
+            <div class="cash-calc" v-if="cashReceived > 0">
+              <div class="cc-row"><span>Total Due</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
+              <div class="cc-row"><span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span></div>
+              <div class="cc-row change-row" :class="changeAmount < 0 ? 'insufficient' : 'sufficient'">
+                <span>Change</span>
+                <span>{{ changeAmount < 0 ? '-₱' + Math.abs(changeAmount).toFixed(2) : '₱' + changeAmount.toFixed(2) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="gcash-fields">
+            <div class="gcash-badge">
+              <Smartphone :size="38" />
+              <p>GCash Payment</p>
+              <span>No change required. Confirm to complete.</span>
+            </div>
+          </div>
+
+          <button
+            class="pv-next"
+            :disabled="paymentMethod === 'cash' && (cashReceived < finalTotal || cashReceived === 0)"
+            @click="showReceipt = true"
+          >
+            Preview Receipt →
+          </button>
+        </div>
+      </div>
     </div>
+
+    <!-- ── HISTORY MODAL ── -->
+    <div v-if="showHistory" class="overlay" @click.self="showHistory = false">
+      <div class="history-modal">
+        <div class="hm-header">
+          <div>
+            <h2>Today's Sales</h2>
+            <p>{{ transactions.length }} transactions · ₱{{ totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }} revenue</p>
+          </div>
+          <button class="pv-close" @click="showHistory = false"><X :size="19" /></button>
+        </div>
+
+        <div class="hm-stats">
+          <div class="hms-card">
+            <span class="hms-label">Revenue</span>
+            <span class="hms-val">₱{{ totalRevenue.toFixed(2) }}</span>
+          </div>
+          <div class="hms-card">
+            <span class="hms-label">Orders</span>
+            <span class="hms-val">{{ transactions.length }}</span>
+          </div>
+          <div class="hms-card">
+            <span class="hms-label">Avg Sale</span>
+            <span class="hms-val">₱{{ avgSale.toFixed(2) }}</span>
+          </div>
+        </div>
+
+        <div v-if="loadingTransactions" class="hm-empty">
+          <div class="spin"></div> Loading...
+        </div>
+        <div v-else-if="transactions.length === 0" class="hm-empty">No transactions today yet.</div>
+        <div v-else class="hm-table-wrap">
+          <table class="hm-table">
+            <thead>
+              <tr>
+                <th>Order</th><th>Time</th><th>Items</th>
+                <th>Payment</th><th>Discount</th><th>Total</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="tr in transactions" :key="tr.OrderId">
+                <td><span class="id-tag">#{{ tr.OrderId }}</span></td>
+                <td class="muted">{{ formatTime(tr.CreatedAt) }}</td>
+                <td>
+                  <div v-for="it in tr.orderitem" :key="it.OrderItemId" class="h-item-line">
+                    {{ it.Quantity }}x {{ it.product?.ProductName ?? '—' }}
+                  </div>
+                </td>
+                <td>
+                  <span :class="['pm-badge', tr.PaymentMethod]">
+                    {{ tr.PaymentMethod === 'gcash' ? 'GCash' : 'Cash' }}
+                  </span>
+                </td>
+                <td>
+                  <span v-if="tr.discount" class="disc-badge">{{ tr.discount.discountname }}</span>
+                  <span v-else class="muted">—</span>
+                </td>
+                <td class="total-col">₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}</td>
+                <td><span :class="['st-badge', tr.Status]">{{ tr.Status }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import {
-  Plus, DollarSign, CheckCircle, TrendingUp, X, ChevronDown,
-  ShoppingCart, Trash2, Banknote, Check, Coffee, ArrowLeft, Tag
+  Coffee, History, Search, ShoppingCart, Plus, Minus, Trash2, X,
+  Tag, ChevronDown, CreditCard, Banknote, Smartphone, ArrowLeft,
+  Cookie, Layers, UtensilsCrossed
 } from 'lucide-vue-next';
 import { supabase } from '@/supabase';
 
-// State 
-const menu = ref([]);
-const discounts = ref([]);
-const transactions = ref([]);
-const loadingTransactions = ref(false);
+const menu = ref([]); const discounts = ref([]); const transactions = ref([]);
+const loadingMenu = ref(false); const loadingTransactions = ref(false);
+const cart = ref([]); const selectedDiscount = ref(null);
+const activeCategory = ref('All'); const menuSearch = ref('');
+const showPayment = ref(false); const showReceipt = ref(false); const showHistory = ref(false);
+const paymentMethod = ref('cash'); const cashReceived = ref(0); const saving = ref(false);
+const currentUser = ref(null); const branchRecord = ref(null);
 
-const isModalOpen = ref(false);
-const showReceiptStep = ref(false);
-const selectedItem = ref(null);
-const tempQty = ref(1);
-const cart = ref([]);
-const cashReceived = ref(0);
-const selectedDiscount = ref(null);
-const saving = ref(false);
-
-// Current user/branch info 
-const currentUser = ref(null);
-const branchRecord = ref(null);
-
-const cashierName = computed(() => currentUser.value?.username ?? localStorage.getItem('username') ?? 'Staff');
-const branchId = computed(() => branchRecord.value?.BranchId ?? null);
+const cashierName  = computed(() => currentUser.value?.username ?? localStorage.getItem('username') ?? 'Staff');
+const branchId     = computed(() => branchRecord.value?.BranchId ?? null);
 const branchAddress = computed(() => branchRecord.value?.Location ?? '');
-const currentDate = new Date().toLocaleDateString('en-PH');
+const currentDate  = new Date().toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
-// Computed
-const cartTotal = computed(() =>
-  cart.value.reduce((s, i) => s + i.Price * i.qty, 0)
-);
-
+const menuCategories = computed(() => [...new Set(menu.value.map(i => i.Category).filter(Boolean))].sort());
+const filteredMenu = computed(() => {
+  let list = menu.value;
+  if (activeCategory.value !== 'All') list = list.filter(i => i.Category === activeCategory.value);
+  if (menuSearch.value) list = list.filter(i => i.ProductName?.toLowerCase().includes(menuSearch.value.toLowerCase()));
+  return list;
+});
+const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.Price * i.qty, 0));
 const discountAmount = computed(() => {
   if (!selectedDiscount.value || cartTotal.value === 0) return 0;
   const d = selectedDiscount.value;
-  if (d.discounttype === 'percentage') {
-    return parseFloat(((cartTotal.value * d.discountvalue) / 100).toFixed(2));
-  }
-  return Math.min(d.discountvalue, cartTotal.value);
+  return d.discounttype === 'percentage'
+    ? parseFloat(((cartTotal.value * d.discountvalue) / 100).toFixed(2))
+    : Math.min(d.discountvalue, cartTotal.value);
+});
+const finalTotal   = computed(() => Math.max(0, cartTotal.value - discountAmount.value));
+const changeAmount = computed(() => cashReceived.value - finalTotal.value);
+const totalRevenue = computed(() => transactions.value.reduce((s, t) => s + (t.FinalAmount ?? 0), 0));
+const avgSale      = computed(() => transactions.value.length ? totalRevenue.value / transactions.value.length : 0);
+const quickAmounts = computed(() => {
+  const t = Math.ceil(finalTotal.value / 50) * 50;
+  return [...new Set([t, 100, 200, 500, 1000, 2000])].sort((a,b)=>a-b).slice(0,6);
 });
 
-const finalTotal = computed(() =>
-  Math.max(0, cartTotal.value - discountAmount.value)
-);
-
-const changeAmount = computed(() => cashReceived.value - finalTotal.value);
-
-const totalRevenue = computed(() =>
-  transactions.value.reduce((s, t) => s + (t.FinalAmount ?? 0), 0)
-);
-
-const avgSale = computed(() =>
-  transactions.value.length ? totalRevenue.value / transactions.value.length : 0
-);
-
-// Data Fetching
 const fetchCurrentUser = async () => {
-  // Login.vue stores user info in localStorage (no Supabase Auth used)
   const username = localStorage.getItem('username');
-  const role = localStorage.getItem('role');
-  const branchSlug = localStorage.getItem('branch'); // e.g. "dlsu", "ateneo"
-
+  const branchSlug = localStorage.getItem('branch');
   if (!username) return;
-
-  // Load user record from users table
-  const { data: userData } = await supabase
-    .from('users')
-    .select('id, username, role, branch')
-    .eq('username', username)
-    .single();
-  if (userData) currentUser.value = userData;
-
-  // Look up the branch record using the branch text slug stored in users.branch
+  const { data: u } = await supabase.from('users').select('id, username, role, branch').eq('username', username).single();
+  if (u) currentUser.value = u;
   if (branchSlug && branchSlug !== 'all') {
-    const { data: branchData } = await supabase
-      .from('branch')
-      .select('BranchId, BranchName, Location')
-      .eq('BranchName', branchSlug)
-      .maybeSingle();
-
-    // Try matching by Location if BranchName didn't match
-    if (!branchData) {
-      const { data: branchByLoc } = await supabase
-        .from('branch')
-        .select('BranchId, BranchName, Location')
-        .ilike('Location', '%' + branchSlug + '%')
-        .maybeSingle();
-      if (branchByLoc) branchRecord.value = branchByLoc;
-    } else {
-      branchRecord.value = branchData;
-    }
+    const { data: bd } = await supabase.from('branch').select('BranchId, BranchName, Location').eq('BranchName', branchSlug).maybeSingle();
+    if (bd) { branchRecord.value = bd; return; }
+    const { data: bl } = await supabase.from('branch').select('BranchId, BranchName, Location').ilike('Location', '%' + branchSlug + '%').maybeSingle();
+    if (bl) branchRecord.value = bl;
   }
 };
-
 const fetchMenu = async () => {
-  const query = supabase
-    .from('product')
-    .select('ProductId, ProductName, ProductType, Category, Price, BranchId')
-    .eq('ProductType', 'finished'); // only sellable products
-
-  // Scope by branch if available
-  if (branchId.value) query.eq('BranchId', branchId.value);
-
-  const { data, error } = await query;
-  if (error) console.error('Error fetching menu:', error.message);
-  else menu.value = data ?? [];
+  loadingMenu.value = true;
+  let q = supabase.from('product').select('ProductId, ProductName, Category, Price, BranchId');
+  if (branchId.value) q = q.eq('BranchId', branchId.value);
+  const { data } = await q.order('Category').order('ProductName');
+  if (data) menu.value = data;
+  loadingMenu.value = false;
 };
-
 const fetchDiscounts = async () => {
-  const { data, error } = await supabase
-    .from('discount')
-    .select('discountid, discountname, discounttype, discountvalue')
-    .order('discountname');
-  if (error) console.error('Error fetching discounts:', error.message);
-  else discounts.value = data ?? [];
+  const { data } = await supabase.from('discount').select('discountid, discountname, discounttype, discountvalue').order('discountname');
+  if (data) discounts.value = data;
 };
-
 const fetchTransactions = async () => {
   loadingTransactions.value = true;
-
-  // Get today's date range
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const query = supabase
-    .from('orders')
-    .select(`
-      OrderId,
-      TotalAmount,
-      DiscountId,
-      DiscountedAmount,
-      FinalAmount,
-      cashpaid,
-      changegiven,
-      PaymentMethod,
-      Status,
-      CreatedAt,
-      discount ( discountid, discountname, discounttype, discountvalue ),
-      orderitem (
-        OrderItemId,
-        Quantity,
-        UnitPrice,
-        Subtotal,
-        ProductId,
-        product ( ProductId, ProductName )
-      )
-    `)
-    .gte('CreatedAt', today.toISOString())
-    .lt('CreatedAt', tomorrow.toISOString())
-    .order('CreatedAt', { ascending: false });
-
-  if (branchId.value) query.eq('BranchId', branchId.value);
-
-  const { data, error } = await query;
-  if (error) console.error('Error fetching transactions:', error.message);
-  else transactions.value = data ?? [];
-
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tom = new Date(today); tom.setDate(tom.getDate()+1);
+  let q = supabase.from('orders').select(`
+    OrderId, TotalAmount, DiscountId, DiscountedAmount, FinalAmount,
+    cashpaid, changegiven, PaymentMethod, Status, CreatedAt,
+    discount ( discountid, discountname, discounttype, discountvalue ),
+    orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
+  `).gte('CreatedAt', today.toISOString()).lt('CreatedAt', tom.toISOString()).order('CreatedAt', { ascending: false });
+  if (branchId.value) q = q.eq('BranchId', branchId.value);
+  const { data } = await q;
+  if (data) transactions.value = data;
   loadingTransactions.value = false;
 };
 
-// Modal Controls
-const openModal = () => {
-  cart.value = [];
-  cashReceived.value = 0;
-  selectedItem.value = null;
-  tempQty.value = 1;
-  selectedDiscount.value = null;
-  showReceiptStep.value = false;
-  isModalOpen.value = true;
+const addToCart = (item) => {
+  const ex = cart.value.find(i => i.ProductId === item.ProductId);
+  if (ex) ex.qty++; else cart.value.push({ ...item, qty: 1 });
 };
+const increaseQty  = (i) => cart.value[i].qty++;
+const decreaseQty  = (i) => { if (cart.value[i].qty > 1) cart.value[i].qty--; else removeFromCart(i); };
+const removeFromCart = (i) => cart.value.splice(i, 1);
+const isInCart     = (id) => cart.value.some(i => i.ProductId === id);
+const getCartQty   = (id) => cart.value.find(i => i.ProductId === id)?.qty ?? 0;
 
-const closeModal = () => {
-  isModalOpen.value = false;
-  showReceiptStep.value = false;
-};
+const openPayment = () => { cashReceived.value = 0; paymentMethod.value = 'cash'; showReceipt.value = false; showPayment.value = true; };
 
-const addToCart = () => {
-  if (!selectedItem.value) return;
-  const existing = cart.value.find(i => i.ProductId === selectedItem.value.ProductId);
-  if (existing) {
-    existing.qty += tempQty.value;
-  } else {
-    cart.value.push({ ...selectedItem.value, qty: tempQty.value });
-  }
-  selectedItem.value = null;
-  tempQty.value = 1;
-};
-
-const removeFromCart = (index) => cart.value.splice(index, 1);
-
-// Save Transaction 
 const finishTransaction = async () => {
-  if (saving.value) return;
-  saving.value = true;
-
+  if (saving.value) return; saving.value = true;
   try {
-    // 1. Insert order row
-    const orderPayload = {
-      PaymentMethod: 'cash',
-      Status: 'completed',
-      TotalAmount: cartTotal.value,
-      DiscountId: selectedDiscount.value?.discountid ?? null,
-      DiscountedAmount: discountAmount.value,
-      FinalAmount: finalTotal.value,
-      cashpaid: cashReceived.value,
-      changegiven: Math.max(0, changeAmount.value),
+    const payload = {
+      PaymentMethod: paymentMethod.value, Status: 'completed',
+      TotalAmount: cartTotal.value, DiscountId: selectedDiscount.value?.discountid ?? null,
+      DiscountedAmount: discountAmount.value, FinalAmount: finalTotal.value,
+      cashpaid: paymentMethod.value === 'cash' ? cashReceived.value : finalTotal.value,
+      changegiven: paymentMethod.value === 'cash' ? Math.max(0, changeAmount.value) : 0,
     };
-
-    // Add BranchId and CashierId if available
-    if (branchId.value) orderPayload.BranchId = branchId.value;
-    if (currentUser.value?.id) orderPayload.CashierId = currentUser.value.id;
-
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert(orderPayload)
-      .select()
-      .single();
-
-    if (orderError) throw new Error(orderError.message);
-
-    // 2. Insert order items
-    const itemRows = cart.value.map(item => ({
-      OrderId: order.OrderId,
-      ProductId: item.ProductId,
-      Quantity: item.qty,
-      UnitPrice: item.Price,
-      Subtotal: item.qty * item.Price,
-    }));
-
-    const { error: itemsError } = await supabase
-      .from('orderitem')
-      .insert(itemRows);
-
-    if (itemsError) throw new Error(itemsError.message);
-
-    // 3. Refresh transaction list
+    if (branchId.value) payload.BranchId = branchId.value;
+    if (currentUser.value?.id) payload.CashierId = currentUser.value.id;
+    const { data: order, error: oErr } = await supabase.from('orders').insert(payload).select().single();
+    if (oErr) throw new Error(oErr.message);
+    const { error: iErr } = await supabase.from('orderitem').insert(
+      cart.value.map(i => ({ OrderId: order.OrderId, ProductId: i.ProductId, Quantity: i.qty, UnitPrice: i.Price, Subtotal: i.qty * i.Price }))
+    );
+    if (iErr) throw new Error(iErr.message);
     await fetchTransactions();
-    closeModal();
-
-  } catch (err) {
-    console.error('Transaction failed:', err.message);
-    alert('Failed to save transaction: ' + err.message);
-  } finally {
-    saving.value = false;
-  }
+    cart.value = []; selectedDiscount.value = null;
+    showPayment.value = false; showReceipt.value = false;
+  } catch (err) { alert('Failed: ' + err.message); }
+  finally { saving.value = false; }
 };
 
-// Helpers 
-const formatDate = (iso) => {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-PH', {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  });
+const getCatIcon = (cat) => {
+  if (cat === 'All') return Layers;
+  const c = cat?.toLowerCase() ?? '';
+  if (c.includes('pastry') || c.includes('pastries') || c.includes('bake')) return Cookie;
+  if (c.includes('food') || c.includes('meal')) return UtensilsCrossed;
+  return Coffee;
 };
+const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '—';
 
-//  Init
 onMounted(async () => {
   await fetchCurrentUser();
   await Promise.all([fetchMenu(), fetchDiscounts(), fetchTransactions()]);
@@ -543,148 +446,165 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.pos-container { padding: 32px; background: #fafafa; min-height: 100vh; font-family: 'Inter', sans-serif; }
+.pos-root { display:flex; flex-direction:column; height:100vh; overflow:hidden; background:#f5f0eb; font-family: 'Inter', sans-serif; }
 
-/* HEADER */
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.header-text h1 { font-size: 26px; color: #31201D; margin: 0; }
-.header-text p { color: #888; font-size: 14px; margin: 4px 0 0; }
-.new-sale-btn { background: #31201D; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
-.new-sale-btn:hover { background: #4a3330; }
+/* TOPBAR */
+.pos-topbar { display:flex; justify-content:space-between; align-items:center; padding:0 24px; height:54px; background:#31201D; color:white; flex-shrink:0; }
+.topbar-left { display:flex; align-items:center; gap:20px; }
+.brand-mark { display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; }
+.topbar-meta { font-size:12px; color:rgba(255,255,255,0.5); display:flex; align-items:center; gap:8px; }
+.meta-branch { color:rgba(255,255,255,0.8); font-weight:600; }
+.meta-sep { opacity:0.3; }
+.history-btn { display:flex; align-items:center; gap:7px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:white; padding:7px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:0.2s; position:relative; }
+.history-btn:hover { background:rgba(255,255,255,0.2); }
+.history-count { background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:20px; }
 
-/* STATS */
-.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 32px; }
-.stat-card { background: white; padding: 24px; border-radius: 12px; border: 1px solid #eee; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-.stat-top { display: flex; justify-content: space-between; color: #666; font-size: 14px; font-weight: 600; }
-.stat-value { font-size: 32px; font-weight: 800; color: #31201D; margin: 8px 0 0; }
+/* LAYOUT */
+.pos-layout { display:grid; grid-template-columns:156px 1fr 330px; flex:1; overflow:hidden; }
 
-/* TABLE */
-.table-section { background: white; border-radius: 12px; border: 1px solid #eee; padding: 24px; }
-.table-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.table-header-row h3 { margin: 0; font-size: 18px; color: #31201D; }
-.table-subtitle { font-size: 13px; color: #999; }
-.main-table { width: 100%; border-collapse: collapse; }
-.main-table th { text-align: left; padding: 12px; color: #666; font-size: 13px; font-weight: 600; border-bottom: 2px solid #f5f5f5; }
-.main-table td { padding: 14px 12px; border-bottom: 1px solid #f9f9f9; font-size: 14px; vertical-align: top; }
-.id-tag { background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-weight: 600; font-size: 12px; }
-.item-line { font-size: 13px; line-height: 1.8; }
-.change-cell { color: #16a34a; font-weight: 600; }
-.total-cell { font-weight: 800; color: #31201D; }
-.empty-row { text-align: center; color: #bbb; padding: 40px !important; }
-.loading-state { text-align: center; color: #bbb; padding: 40px; }
-.discount-badge { background: #dcfce7; color: #15803d; font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
-.no-discount { color: #ccc; }
-.status-badge { font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
-.status-badge.completed { background: #dcfce7; color: #15803d; }
-.status-badge.pending { background: #fef9c3; color: #a16207; }
-.status-badge.cancelled { background: #fee2e2; color: #dc2626; }
+/* CATEGORY SIDEBAR */
+.category-sidebar { background:#2a1b18; padding:18px 10px; display:flex; flex-direction:column; gap:5px; overflow-y:auto; }
+.sidebar-label { font-size:10px; color:rgba(255,255,255,0.28); text-transform:uppercase; letter-spacing:0.12em; margin:0 0 8px 4px; }
+.cat-btn { display:flex; align-items:center; gap:8px; padding:10px 12px; background:transparent; border:none; border-radius:9px; color:rgba(255,255,255,0.5); font-size:13px; font-weight:600; cursor:pointer; text-align:left; font-family:inherit; transition:0.15s; width:100%; }
+.cat-btn:hover { background:rgba(255,255,255,0.08); color:white; }
+.cat-btn.active { background:#C49A6C; color:white; }
 
-/* MODAL */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(3px); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.process-sale-dialog { background: white; width: 1020px; max-width: 96vw; max-height: 92vh; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; }
+/* MENU AREA */
+.menu-area { padding:18px; overflow-y:auto; background:#f5f0eb; display:flex; flex-direction:column; gap:14px; }
+.menu-search { display:flex; align-items:center; gap:9px; background:white; border:1px solid #e8e0d5; border-radius:10px; padding:9px 14px; max-width:320px; }
+.menu-search input { flex:1; border:none; outline:none; font-size:14px; background:transparent; font-family:inherit; }
+.menu-search svg { color:#bbb; }
+.menu-loading,.menu-empty { display:flex; align-items:center; gap:12px; justify-content:center; padding:60px; color:#bbb; font-size:14px; }
+.menu-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(145px,1fr)); gap:12px; }
+.menu-card { background:white; border:2px solid transparent; border-radius:13px; padding:0; cursor:pointer; font-family:inherit; transition:all 0.15s; overflow:hidden; text-align:left; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+.menu-card:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,0.1); border-color:#C49A6C; }
+.menu-card.in-cart { border-color:#31201D; background:#fdfaf7; }
+.menu-card-img { background:#f9f4ef; height:96px; display:flex; align-items:center; justify-content:center; position:relative; }
+.menu-card-icon { color:#C49A6C; opacity:0.65; }
+.cart-qty-badge { position:absolute; top:7px; right:7px; background:#31201D; color:white; font-size:11px; font-weight:700; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.menu-card-info { padding:9px 11px 11px; }
+.menu-card-name { display:block; font-size:13px; font-weight:700; color:#31201D; line-height:1.3; margin-bottom:2px; }
+.menu-card-cat { display:block; font-size:11px; color:#bbb; margin-bottom:5px; }
+.menu-card-price { display:block; font-size:15px; font-weight:800; color:#31201D; }
 
-.dialog-header { padding: 22px 32px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-.dialog-title-area h2 { margin: 0; font-size: 22px; color: #31201D; }
-.dialog-title-area p { margin: 4px 0 0; color: #888; font-size: 14px; }
-.close-dialog { background: none; border: none; color: #ccc; cursor: pointer; transition: 0.2s; }
-.close-dialog:hover { color: #31201D; }
+/* CART PANEL */
+.cart-panel { background:white; border-left:1px solid #ede8e2; display:flex; flex-direction:column; overflow:hidden; }
+.cart-panel-header { display:flex; justify-content:space-between; align-items:center; padding:16px 18px; border-bottom:1px solid #f0ebe4; flex-shrink:0; }
+.cart-panel-header h2 { font-size:16px; font-weight:700; color:#31201D; margin:0; }
+.clear-cart-btn { display:flex; align-items:center; gap:5px; background:#fee2e2; border:none; color:#dc2626; font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px; cursor:pointer; font-family:inherit; }
+.cart-items { flex:1; overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; gap:9px; }
+.cart-item { background:#fdfaf7; border:1px solid #ede8e2; border-radius:9px; padding:9px 11px; display:flex; flex-direction:column; gap:5px; }
+.ci-info { display:flex; justify-content:space-between; }
+.ci-name { font-size:13px; font-weight:700; color:#31201D; }
+.ci-price { font-size:12px; color:#bbb; }
+.ci-controls { display:flex; align-items:center; gap:7px; }
+.qty-btn { width:24px; height:24px; border-radius:5px; border:1px solid #e8e0d5; background:white; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#31201D; transition:0.15s; }
+.qty-btn:hover { background:#31201D; color:white; border-color:#31201D; }
+.ci-qty { font-size:13px; font-weight:700; color:#31201D; min-width:18px; text-align:center; }
+.ci-remove { margin-left:auto; background:none; border:none; color:#dc2626; cursor:pointer; padding:3px; }
+.ci-subtotal { font-size:13px; font-weight:800; color:#31201D; text-align:right; }
+.cart-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ccc; gap:7px; padding:40px 20px; }
+.cart-empty-icon { opacity:0.18; }
+.cart-empty p { font-size:14px; font-weight:600; margin:0; color:#bbb; }
+.cart-empty span { font-size:12px; color:#ddd; }
+.cart-discount { padding:10px 14px; border-top:1px solid #f0ebe4; flex-shrink:0; }
+.discount-lbl { font-size:12px; font-weight:600; color:#888; display:flex; align-items:center; gap:5px; margin-bottom:7px; }
+.sel-wrap { position:relative; }
+.discount-sel { width:100%; appearance:none; padding:8px 30px 8px 11px; border:1px solid #e8e0d5; border-radius:8px; font-size:13px; background:white; outline:none; cursor:pointer; font-family:inherit; }
+.sel-icon { position:absolute; right:9px; top:50%; transform:translateY(-50%); color:#999; pointer-events:none; }
+.cart-totals { padding:10px 14px; border-top:1px solid #f0ebe4; display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+.ct-row { display:flex; justify-content:space-between; font-size:13px; color:#666; }
+.ct-row.disc-line { color:#16a34a; }
+.ct-row.grand { font-size:17px; font-weight:800; color:#31201D; padding-top:8px; border-top:1px solid #f0ebe4; margin-top:3px; }
+.checkout-btn { margin:10px 14px 14px; display:flex; align-items:center; justify-content:center; gap:9px; background:#31201D; color:white; border:none; padding:14px; border-radius:11px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.2s; flex-shrink:0; }
+.checkout-btn:hover:not(:disabled) { background:#4a3330; }
+.checkout-btn:disabled { opacity:0.4; cursor:not-allowed; }
 
-.dialog-body { display: grid; grid-template-columns: 1fr 1fr; flex: 1; overflow: hidden; }
-.pane { padding: 28px 32px; overflow-y: auto; }
-.selection-pane { border-right: 1px solid #f0f0f0; }
-.payment-pane { background: #fdfaf8; display: flex; flex-direction: column; gap: 20px; }
+/* OVERLAY */
+.overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; backdrop-filter:blur(4px); }
 
-/* FORMS */
-.form-group { margin-bottom: 18px; }
-.form-group label { display: block; font-size: 13px; font-weight: 700; color: #31201D; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
-.custom-select-wrapper { position: relative; }
-.custom-select-wrapper select,
-.form-group input[type="number"] {
-  width: 100%; padding: 11px 16px; border: 1px solid #ddd; border-radius: 10px;
-  background: white; font-size: 15px; outline: none; appearance: none;
-  transition: border-color 0.2s; box-sizing: border-box;
-}
-.custom-select-wrapper select:focus,
-.form-group input[type="number"]:focus { border-color: #31201D; }
-.select-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #999; pointer-events: none; }
-
-.add-to-cart-btn {
-  width: 100%; background: #a8a8a8; color: white; border: none; padding: 13px;
-  border-radius: 10px; font-weight: 700; cursor: pointer; display: flex;
-  align-items: center; justify-content: center; gap: 10px; transition: 0.2s; font-size: 15px;
-}
-.add-to-cart-btn:not(:disabled) { background: #31201D; }
-.add-to-cart-btn:not(:disabled):hover { background: #4a3330; }
-
-/* CART */
-.cart-box { margin-top: 24px; background: white; border: 1px solid #eee; border-radius: 12px; padding: 20px; }
-.cart-box h3 { font-size: 15px; margin: 0 0 14px; color: #31201D; }
-.empty-cart-msg { color: #bbb; font-size: 14px; text-align: center; padding: 20px 0; }
-.cart-items-list { max-height: 180px; overflow-y: auto; }
-.cart-line { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dotted #eee; align-items: center; }
-.line-name { display: block; font-weight: 600; font-size: 14px; }
-.line-qty { font-size: 12px; color: #999; }
-.cart-line-right { display: flex; align-items: center; gap: 10px; }
-.line-subtotal { font-weight: 700; font-size: 14px; }
-.remove-line { background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px; }
-.discount-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dotted #eee; font-size: 13px; color: #15803d; }
-.discount-label { display: flex; align-items: center; gap: 6px; }
-.discount-amount { font-weight: 700; }
-.cart-total-row { display: flex; justify-content: space-between; padding-top: 14px; margin-top: 4px; font-size: 17px; font-weight: 800; border-top: 1px solid #eee; }
-.cart-grand-total { color: #31201D; }
-
-/* DISCOUNT CARD */
-.discount-card { background: white; border-radius: 14px; border: 1px solid #d1fae5; padding: 20px; }
-.card-title { display: flex; align-items: center; gap: 10px; font-weight: 800; color: #15803d; font-size: 15px; }
-.icon-green { color: #16a34a; }
-.card-desc { font-size: 13px; color: #6b7280; margin: 4px 0 0; }
-
-/* PAYMENT CARD */
-.cash-payment-card { background: white; border-radius: 14px; border: 1px solid #ffe4cc; padding: 20px; box-shadow: 0 4px 12px rgba(133, 77, 14, 0.05); }
-.icon-gold { color: #d97706; }
-
-.cash-input { font-size: 24px !important; font-weight: 700 !important; text-align: right; color: #31201D; }
-
-.calc-box { margin-top: 20px; background: #f9f9f9; border-radius: 10px; padding: 18px; }
-.calc-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px; color: #666; }
-.total-due-row { font-weight: 700; color: #31201D; }
-.discount-deduct { color: #16a34a; font-weight: 600; }
-.result-row { border-top: 1px solid #eee; padding-top: 12px; margin-top: 8px; font-size: 17px; font-weight: 800; color: #31201D; }
-.change-amount { font-size: 22px; color: #16a34a; }
-.change-negative { font-size: 22px; color: #ef4444; }
-
-.quick-cash-area { margin-top: 20px; }
-.quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
-.quick-grid button { padding: 11px 8px; background: white; border: 1px solid #e5e5e5; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 13px; }
-.quick-grid button:hover { border-color: #31201D; color: #31201D; background: #fdfaf8; }
-
-/* FOOTER */
-.dialog-footer { padding: 20px 32px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 16px; flex-shrink: 0; }
-.cancel-action { background: #f5f5f5; border: none; padding: 13px 26px; border-radius: 10px; cursor: pointer; font-weight: 600; }
-.complete-action { background: #31201D; color: white; border: none; padding: 13px 28px; border-radius: 10px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
-.complete-action:disabled { opacity: 0.35; cursor: not-allowed; }
-.complete-action:not(:disabled):hover { background: #4a3330; }
+/* PAYMENT MODAL */
+.payment-modal { background:white; border-radius:20px; width:460px; max-width:95vw; max-height:92vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.22); }
+.payment-view,.receipt-view { padding:26px 30px; }
+.pv-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; }
+.pv-header h2 { font-size:21px; font-weight:700; color:#31201D; margin:0 0 3px; }
+.pv-header p { font-size:13px; color:#888; margin:0; }
+.pv-header strong { color:#31201D; }
+.pv-close { background:none; border:none; color:#ccc; cursor:pointer; padding:4px; }
+.pm-tabs { display:flex; gap:8px; margin-bottom:22px; background:#f5f0eb; padding:4px; border-radius:12px; }
+.pm-tab { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:11px; border:none; border-radius:9px; background:transparent; font-size:14px; font-weight:600; cursor:pointer; color:#888; font-family:inherit; transition:0.2s; }
+.pm-tab.active { background:white; color:#31201D; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+.cash-fields { display:flex; flex-direction:column; gap:14px; }
+.cash-fields label { font-size:13px; font-weight:600; color:#31201D; }
+.cash-input { width:100%; padding:13px 15px; border:2px solid #e8e0d5; border-radius:11px; font-size:26px; font-weight:700; text-align:right; outline:none; color:#31201D; box-sizing:border-box; font-family:inherit; transition:border-color 0.2s; }
+.cash-input:focus { border-color:#31201D; }
+.quick-amounts { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+.qa-btn { padding:9px; background:white; border:1px solid #e8e0d5; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.15s; color:#31201D; }
+.qa-btn:hover { border-color:#31201D; background:#fdfaf7; }
+.cash-calc { background:#f9f4ef; border-radius:11px; padding:14px; display:flex; flex-direction:column; gap:7px; }
+.cc-row { display:flex; justify-content:space-between; font-size:13px; color:#555; }
+.change-row { font-size:16px; font-weight:800; padding-top:9px; border-top:1px solid #e8e0d5; margin-top:3px; }
+.change-row.sufficient { color:#16a34a; }
+.change-row.insufficient { color:#ef4444; }
+.gcash-fields { }
+.gcash-badge { background:linear-gradient(135deg,#0064E0 0%,#00A3FF 100%); border-radius:14px; padding:30px; text-align:center; color:white; }
+.gcash-badge svg { opacity:0.9; margin-bottom:10px; }
+.gcash-badge p { font-size:17px; font-weight:700; margin:0 0 5px; }
+.gcash-badge span { font-size:13px; opacity:0.8; }
+.pv-next { width:100%; margin-top:18px; padding:14px; background:#31201D; color:white; border:none; border-radius:11px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.2s; }
+.pv-next:hover:not(:disabled) { background:#4a3330; }
+.pv-next:disabled { opacity:0.4; cursor:not-allowed; }
 
 /* RECEIPT */
-.receipt-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(4px); }
-.receipt-card { background: white; width: 400px; padding: 28px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
-.receipt-paper { background: #fffcf9; border: 1px solid #eee; padding: 24px; border-radius: 12px; font-family: 'Courier New', monospace; }
-.receipt-header { text-align: center; margin-bottom: 18px; }
-.receipt-header h2 { margin: 8px 0 2px; font-size: 18px; }
-.receipt-header p { margin: 0; color: #888; font-size: 12px; }
-.coffee-icon-circle { background: #31201D; color: white; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
-.r-details { margin-bottom: 4px; }
-.r-row, .r-item, .r-total-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
-.r-divider { border-top: 1px dashed #ccc; margin: 14px 0; }
-.r-items-scroll { max-height: 140px; overflow-y: auto; }
-.r-total-row.big { font-weight: 800; font-size: 15px; color: #31201D; }
-.r-total-row.change { color: #16a34a; font-weight: 800; padding-top: 12px; border-top: 1px solid #eee; }
-.r-discount { color: #16a34a; }
-.r-footer { text-align: center; margin-top: 16px; font-size: 12px; color: #aaa; }
+.receipt-paper { background:#fffcf9; border:1px solid #ede8e2; border-radius:12px; padding:22px; font-family:'Courier New',monospace; }
+.receipt-header { text-align:center; margin-bottom:14px; }
+.r-icon-circle { background:#31201D; color:white; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 9px; }
+.receipt-header h3 { margin:0 0 2px; font-size:15px; }
+.receipt-header p { margin:0; font-size:11px; color:#888; }
+.r-meta { margin-bottom:2px; }
+.r-row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+.r-divider { border-top:1px dashed #ccc; margin:11px 0; }
+.r-items { }
+.r-item { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+.r-totals { }
+.r-total { font-weight:800; font-size:13px; color:#31201D; }
+.r-change { color:#16a34a; font-weight:700; }
+.r-gcash { color:#0064E0; font-weight:700; }
+.r-disc { color:#16a34a; }
+.r-footer { text-align:center; margin-top:12px; font-size:11px; color:#aaa; }
+.receipt-btns { display:flex; gap:9px; margin-top:18px; }
+.rbtn-back { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#f5f0eb; border:none; padding:11px; border-radius:10px; font-weight:600; cursor:pointer; font-family:inherit; font-size:14px; }
+.rbtn-confirm { flex:2; background:#31201D; color:white; border:none; padding:11px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; transition:0.2s; }
+.rbtn-confirm:hover:not(:disabled) { background:#4a3330; }
+.rbtn-confirm:disabled { opacity:0.5; cursor:not-allowed; }
 
-.receipt-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
-.back-btn { background: #f5f5f5; border: none; padding: 13px; border-radius: 10px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.confirm-btn { background: #31201D; color: white; border: none; padding: 14px; border-radius: 10px; font-weight: 800; cursor: pointer; text-align: center; transition: 0.2s; }
-.confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.confirm-btn:not(:disabled):hover { background: #4a3330; }
+/* HISTORY MODAL */
+.history-modal { background:white; border-radius:20px; width:880px; max-width:95vw; max-height:88vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+.hm-header { display:flex; justify-content:space-between; align-items:flex-start; padding:22px 26px; border-bottom:1px solid #f0ebe4; flex-shrink:0; }
+.hm-header h2 { font-size:19px; font-weight:700; color:#31201D; margin:0 0 3px; }
+.hm-header p { font-size:13px; color:#888; margin:0; }
+.hm-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#f0ebe4; flex-shrink:0; }
+.hms-card { background:white; padding:14px 22px; }
+.hms-label { display:block; font-size:11px; color:#888; margin-bottom:3px; text-transform:uppercase; letter-spacing:0.04em; }
+.hms-val { font-size:20px; font-weight:800; color:#31201D; }
+.hm-empty { padding:50px; text-align:center; color:#bbb; font-size:14px; display:flex; align-items:center; gap:12px; justify-content:center; }
+.hm-table-wrap { overflow-y:auto; flex:1; }
+.hm-table { width:100%; border-collapse:collapse; }
+.hm-table th { text-align:left; padding:10px 15px; background:#fdfaf7; color:#888; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid #f0ebe4; position:sticky; top:0; }
+.hm-table td { padding:11px 15px; border-bottom:1px solid #f9f4ef; font-size:13px; vertical-align:top; }
+.hm-table tr:hover td { background:#fdfaf7; }
+.id-tag { background:#f0ebe4; padding:3px 7px; border-radius:4px; font-family:monospace; font-weight:700; font-size:12px; color:#31201D; }
+.muted { color:#bbb; font-size:12px; }
+.h-item-line { line-height:1.7; }
+.pm-badge { font-size:12px; font-weight:700; padding:2px 8px; border-radius:20px; }
+.pm-badge.cash {font-size:14px; color:#a16207; }
+.pm-badge.gcash { font-size:14px; color:#1d4ed8; }
+.disc-badge { font-size:14px; color:#15803d; padding:2px 8px; border-radius:20px; font-weight:600; }
+.total-col { font-weight:800; color:#31201D; }
+.st-badge { font-size:14px; font-weight:600; padding:2px 9px; border-radius:20px; }
+.st-badge.completed { color:#15803d; }
+.st-badge.pending { background:#fef9c3; color:#a16207; }
+.st-badge.cancelled { background:#fee2e2; color:#dc2626; }
+.spin { width:17px; height:17px; border:2px solid #eee; border-top-color:#C49A6C; border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
 </style>
