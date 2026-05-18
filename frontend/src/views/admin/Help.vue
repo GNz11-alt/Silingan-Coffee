@@ -123,7 +123,7 @@
             </div>
             <div class="status-row">
               <span class="status-label">Last Backup</span>
-              <span class="status-val">2 hours ago</span>
+              <span class="status-val">{{ lastBackupStatus }}</span>
             </div>
             <div class="status-row">
               <span class="status-label">Version</span>
@@ -168,7 +168,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Users,
   Phone, Mail, MessageCircle, BookOpen, Video, MessageSquare
 } from 'lucide-vue-next'
-
+const lastBackupStatus = ref("—");
 const searchQuery = ref('')
 
 const faqs = ref([
