@@ -97,7 +97,16 @@
       <!-- ── TAB 2: CURRENT SCHEDULE ─────────────────────────── -->
       <div v-if="activeTab === 'schedule'">
         <div class="filter-bar d-flex flex-wrap gap-2 align-items-center mb-3">
+          <select
+            v-model="schedViewMode"
+            class="form-select fc-brand"
+            style="width: 150px"
+          >
+            <option value="table">Table View</option>
+            <option value="calendar">Calendar View</option>
+          </select>
           <input
+            v-if="schedViewMode === 'table'"
             v-model="schedSearch"
             type="text"
             class="form-control fc-brand"
@@ -105,12 +114,14 @@
             placeholder="Search employee…"
           />
           <input
+            v-if="schedViewMode === 'table'"
             v-model="schedDateFilter"
             type="date"
             class="form-control fc-brand"
             style="width: 180px"
           />
           <select
+            v-if="schedViewMode === 'table'"
             v-model="schedBranchFilter"
             class="form-select fc-brand"
             style="width: 200px"
@@ -121,6 +132,7 @@
             </option>
           </select>
           <select
+            v-if="schedViewMode === 'table'"
             v-model="schedStatusFilter"
             class="form-select fc-brand"
             style="width: 150px"
@@ -130,12 +142,13 @@
             <option value="Completed">Completed</option>
             <option value="Cancelled">Cancelled</option>
           </select>
-          <button class="btn btn-ghost btn-sm" @click="clearSchedFilters">
+          <button v-if="schedViewMode === 'table'" class="btn btn-ghost btn-sm" @click="clearSchedFilters">
             Clear
           </button>
         </div>
 
-        <div class="table-wrap">
+        <!-- TABLE VIEW -->
+        <div v-if="schedViewMode === 'table'" class="table-wrap">
           <table class="sched-table">
             <thead>
               <tr>
@@ -199,6 +212,49 @@
             </tbody>
           </table>
         </div>
+
+        <!-- CALENDAR VIEW -->
+        <div v-if="schedViewMode === 'calendar'">
+          <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
+            <button class="btn btn-ghost btn-sm" @click="monthOffset -= 1">
+              <i class="bi bi-chevron-left"></i> Previous
+            </button>
+            <span style="min-width: 200px; text-align: center; font-weight: 600; font-size: 1.1rem">
+              {{ monthYearLabel }}
+            </span>
+            <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">Today</button>
+            <button class="btn btn-ghost btn-sm" @click="monthOffset += 1">
+              Next <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+
+          <div class="calendar-container">
+            <div class="calendar-header">
+              <div class="calendar-day-header" v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="day">
+                {{ day }}
+              </div>
+            </div>
+            <div class="calendar-grid">
+              <div
+                v-for="day in monthDays"
+                :key="day.dateStr"
+                class="calendar-day"
+                :class="{ 'is-today': day.isToday, 'is-other-month': day.isOtherMonth }"
+              >
+                <div class="day-number">
+                  {{ day.dayOfMonth }}
+                  <span v-if="day.isToday" class="today-badge">Today</span>
+                </div>
+                <div class="day-shifts">
+                  <div v-for="shift in day.shifts" :key="shift.id" class="shift-badge" :style="{ background: avatarColor(shift.employeeId) }">
+                    <div class="shift-badge-time">{{ shift.startTime }}</div>
+                    <div class="shift-badge-name">{{ shift.initials }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ── TAB 3: CHANGE INQUIRIES ─────────────────────────── -->
@@ -229,13 +285,13 @@
                 <span class="badge-status badge-pending">pending</span>
                 <button
                   class="btn-action approve"
-                  @click="inq.status = 'Approved'"
+                  @click="updateInquiryStatus(inq, 'Approved')"
                 >
                   Approve
                 </button>
                 <button
                   class="btn-action reject"
-                  @click="inq.status = 'Denied'"
+                  @click="updateInquiryStatus(inq, 'Denied')"
                 >
                   Deny
                 </button>
@@ -443,6 +499,8 @@ const schedSearch = ref("");
 const schedDateFilter = ref("");
 const schedBranchFilter = ref("");
 const schedStatusFilter = ref("");
+const schedViewMode = ref("table"); // "table" or "calendar"
+const monthOffset = ref(0); // 0 = current month, -1 = last month, +1 = next month
 const showModal = ref(false);
 const showDeleteConfirm = ref(false);
 const isEditing = ref(false);
@@ -499,6 +557,53 @@ const filteredSchedules = computed(() => {
   });
 });
 
+// Calendar view computed properties
+const monthStart = computed(() => {
+  const now = new Date();
+  const month = now.getMonth() + monthOffset.value;
+  const year = now.getFullYear() + Math.floor(month / 12);
+  return new Date(year, month % 12, 1);
+});
+
+const monthYearLabel = computed(() => {
+  return monthStart.value.toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "long",
+  });
+});
+
+const monthDays = computed(() => {
+  const days = [];
+  const start = monthStart.value;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Start from Monday of the week containing the 1st
+  const startDate = new Date(start);
+  const dayOfWeek = startDate.getDay();
+  startDate.setDate(startDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const isToday = d.getTime() === today.getTime();
+    const isOtherMonth = d.getMonth() !== start.getMonth();
+
+    // Find shifts for this day
+    const shiftsForDay = schedules.value.filter((s) => s.shiftDate === dateStr);
+
+    days.push({
+      dateStr,
+      dayOfMonth: d.getDate(),
+      isToday,
+      isOtherMonth,
+      shifts: shiftsForDay,
+    });
+  }
+  return days;
+});
+
 const fetchBranches = async () => {
   const { data } = await supabase.from("branch").select("BranchId, BranchName");
   if (data)
@@ -542,9 +647,8 @@ const fetchAvailability = async () => {
     availability.value = data.map((a) => ({
       id: a.availabilityid,
       employeeId: a.employeeid,
-      employeeName: `${a.employee?.FirstName} ${a.employee?.LastName}`,
-      initials:
-        `${a.employee?.FirstName?.[0]}${a.employee?.LastName?.[0]}`.toUpperCase(),
+      employeeName: a.employee ? `${a.employee.FirstName || ''} ${a.employee.LastName || ''}`.trim() : 'Unknown',
+      initials: a.employee ? `${(a.employee.FirstName?.[0] || '')}${(a.employee.LastName?.[0] || '')}`.toUpperCase() || '?' : '?',
       role: "—",
       availableDate: a.availabledate,
       startTime: a.starttime,
@@ -567,9 +671,8 @@ const fetchChangeInquiries = async () => {
     changeInquiries.value = data.map((c) => ({
       id: c.inquiryid,
       employeeId: c.employeeid,
-      employeeName: `${c.employee?.FirstName} ${c.employee?.LastName}`,
-      initials:
-        `${c.employee?.FirstName?.[0]}${c.employee?.LastName?.[0]}`.toUpperCase(),
+      employeeName: c.employee ? `${c.employee.FirstName || ''} ${c.employee.LastName || ''}`.trim() : 'Unknown',
+      initials: c.employee ? `${(c.employee.FirstName?.[0] || '')}${(c.employee.LastName?.[0] || '')}`.toUpperCase() || '?' : '?',
       role: "—",
       requestDate: c.requestdate,
       reason: c.reason,
@@ -591,9 +694,8 @@ const fetchSchedules = async () => {
     schedules.value = data.map((s) => ({
       id: s.ScheduleId,
       employeeId: s.EmployeeId,
-      employeeName: `${s.employee?.FirstName} ${s.employee?.LastName}`,
-      initials:
-        `${s.employee?.FirstName?.[0]}${s.employee?.LastName?.[0]}`.toUpperCase(),
+      employeeName: s.employee ? `${s.employee.FirstName || ''} ${s.employee.LastName || ''}`.trim() : 'Unknown',
+      initials: s.employee ? `${(s.employee.FirstName?.[0] || '')}${(s.employee.LastName?.[0] || '')}`.toUpperCase() || '?' : '?',
       role: s.Role,
       shiftDate: s.ShiftDate,
       startTime: s.StartTime,
@@ -700,12 +802,21 @@ const deleteSchedule = async () => {
   showDeleteConfirm.value = false;
 };
 
-const updateAvailStatus = (avail, status) => {
-  avail.status = status;
-  showToast(
-    `Availability ${status === "Confirmed" ? "approved" : "rejected"}.`,
-    "success",
-  );
+const updateAvailStatus = async (avail, status) => {
+  const { error } = await supabase
+    .from('availability')
+    .update({ status })
+    .eq('availabilityid', avail.id);
+
+  if (error) {
+    showToast('Failed to update availability.', 'error');
+  } else {
+    avail.status = status;
+    showToast(
+      `Availability ${status === "Confirmed" ? "approved" : "rejected"}.`,
+      "success",
+    );
+  }
 };
 
 const clearSchedFilters = () => {
@@ -1179,5 +1290,126 @@ onMounted(async () => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ── CALENDAR VIEW ───────────────────────────────────────── */
+.calendar-container {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.calendar-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: #f9f5f3;
+  border-bottom: 2px solid var(--border);
+}
+
+.calendar-day-header {
+  padding: 0.75rem;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  border-right: 1px solid var(--border);
+}
+
+.calendar-day-header:last-child {
+  border-right: none;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  background: #fff;
+}
+
+.calendar-day {
+  min-height: 120px;
+  padding: 0.75rem;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: #fff;
+  transition: all 0.2s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-day:nth-child(7n) {
+  border-right: none;
+}
+
+.calendar-day:nth-last-child(-n+7) {
+  border-bottom: none;
+}
+
+.calendar-day:hover {
+  background: #f9fafb;
+}
+
+.calendar-day.is-today {
+  background: #f5f0eb;
+  border: 2px solid var(--brand-primary);
+  position: relative;
+}
+
+.calendar-day.is-other-month {
+  background: #fafbfc;
+  opacity: 0.5;
+}
+
+.day-number {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.today-badge {
+  display: inline-block;
+  background: var(--brand-primary);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: auto;
+}
+
+.day-shifts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.shift-badge {
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.shift-badge-time {
+  font-size: 0.65rem;
+  opacity: 0.9;
+}
+
+.shift-badge-name {
+  font-weight: 700;
+  font-size: 0.7rem;
+  margin-left: auto;
 }
 </style>
