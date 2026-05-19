@@ -22,7 +22,14 @@
         <Calendar :size="16" />
         My Schedule
       </button>
-      <!-- Set Availability moved to button + modal -->
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'availability' }"
+        @click="activeTab = 'availability'"
+      >
+        <Clock :size="16" />
+        Set Availability
+      </button>
       <button
         class="tab-btn"
         :class="{ active: activeTab === 'inquiries' }"
@@ -34,25 +41,19 @@
       </button>
     </div>
 
-    <div class="tab-toolbar">
-      <div></div>
-      <button class="btn-avail" @click="showAvailModal = true">
-        <Clock :size="16" />
-        Set Availability
-      </button>
-    </div>
-
     <!-- ── TAB: MY SCHEDULE ─────────────────────────────────────── -->
     <div v-if="activeTab === 'my-schedule'" class="tab-content">
       <!-- Month Navigator -->
-      <div class="month-navigator">
-        <button class="nav-btn" @click="shiftMonth(-1)" title="Previous month">
-          <ChevronLeft :size="22" />
+      <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
+        <button class="btn btn-ghost btn-sm" @click="monthOffset -= 1" title="Previous month">
+          <ChevronLeft :size="18" />
         </button>
-        <span class="month-label">{{ monthYearLabel }}</span>
-        <button class="today-btn" @click="shiftMonth(0)">Today</button>
-        <button class="nav-btn" @click="shiftMonth(1)" title="Next month">
-          <ChevronRight :size="22" />
+        <span style="min-width: 200px; text-align: center; font-weight: 600; font-size: 1.1rem">
+          {{ monthYearLabel }}
+        </span>
+        <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">Today</button>
+        <button class="btn btn-ghost btn-sm" @click="monthOffset += 1" title="Next month">
+          <ChevronRight :size="18" />
         </button>
       </div>
 
@@ -74,36 +75,30 @@
 
           <!-- Calendar Grid -->
           <div class="calendar-grid">
-            <div 
-              v-for="day in monthDays" 
-              :key="day.dateStr" 
-              class="calendar-day" 
-              :class="{ 
-                'is-today': day.isToday, 
-                'is-other-month': day.isOtherMonth,
-                'has-shift': day.hasShift
+            <div
+              v-for="day in monthDays"
+              :key="day.dateStr"
+              class="calendar-day"
+              :class="{
+                'is-today': day.isToday,
+                'is-other-month': day.isOtherMonth
               }"
             >
               <div class="day-number">
                 {{ day.dayOfMonth }}
                 <span v-if="day.isToday" class="today-badge">Today</span>
               </div>
-              
-              <div class="day-events">
-                <!-- Your Shift -->
-                <div v-if="day.myShift" class="event my-shift">
-                  <div class="event-time">{{ day.myShift.TimeIn }}</div>
-                  <div class="event-label">{{ day.myShift.Position }}</div>
-                </div>
 
-                <!-- Other Employees (summary) -->
-                <div v-if="day.otherShifts && day.otherShifts.length > 0" class="event-summary">
-                  <div v-if="day.otherShifts.length === 1" class="event other-shift">
-                    <div class="event-name">{{ day.otherShifts[0].Name }}</div>
-                  </div>
-                  <div v-else class="event-count">
-                    +{{ day.otherShifts.length }} more
-                  </div>
+              <div class="day-shifts">
+                <div
+                  v-for="shift in day.shifts"
+                  :key="shift.id"
+                  class="shift-badge"
+                  :class="{ 'shift-badge--mine': shift.isMine }"
+                  :style="{ background: shift.color }"
+                >
+                  <div class="shift-badge-time">{{ shift.startTime }}</div>
+                  <div class="shift-badge-name">{{ shift.label }}</div>
                 </div>
               </div>
             </div>
@@ -134,56 +129,19 @@
             </div>
           </div>
         </div>
-
-        <!-- My Availability Requests -->
-        <div class="section">
-          <div class="section-header">
-            <div>
-              <h3>My Availability Requests</h3>
-              <p class="section-subtitle">Your submitted availability</p>
-            </div>
-            <select v-model="availFilter" class="filter-select">
-              <option value="all">All</option>
-              <option value="Pending">Pending</option>
-              <option value="Approved">Approved</option>
-              <option value="Rejected">Rejected</option>
-            </select>
-          </div>
-          <div v-if="loadingAvail" class="loading-state">
-            <div class="spinner"></div>
-          </div>
-          <div v-else-if="filteredAvailability.length === 0" class="empty-state">
-            <Inbox :size="32" />
-            <p>No requests yet.</p>
-          </div>
-          <div v-else class="requests-list">
-            <div v-for="req in filteredAvailability" :key="req.AvailabilityId" class="request-item">
-              <div class="request-header">
-                <div>
-                  <div class="request-date">{{ formatShiftDate(req.Date) }}</div>
-                  <div class="request-time">{{ req.TimeIn }} – {{ req.TimeOut }} • <span :class="availTypeClass(req.Type)">{{ req.Type }}</span></div>
-                </div>
-                <span class="status-badge" :class="statusClass(req.Status)">{{ req.Status }}</span>
-              </div>
-              <p v-if="req.Notes" class="request-notes">{{ req.Notes }}</p>
-              <div class="request-date-small">{{ formatDate(req.CreatedAt) }}</div>
-            </div>
-          </div>
-      </div>
     </div>
 
-    <!-- ── SET AVAILABILITY MODAL ────────────────────────────────── -->
-    <div v-if="showAvailModal" class="modal-backdrop" @click.self="showAvailModal = false">
-      <div class="modal-dialog">
-          <div class="modal-header">
-            <h3><Clock :size="20" /> Set Availability</h3>
-            <button class="modal-close" @click="showAvailModal = false">
-              <X :size="20" />
-            </button>
-          </div>
-          <div class="modal-body">
-            <p class="modal-subtitle">Let your manager know when you're available</p>
-            <form class="availability-form">
+    <!-- ── TAB: SET AVAILABILITY ─────────────────────────────────── -->
+    <div v-if="activeTab === 'availability'" class="tab-content">
+      <div class="two-column-layout">
+        <!-- Left: Submit form -->
+        <div class="column">
+          <div class="section">
+            <div class="section-header">
+              <h3>Set Availability</h3>
+              <p class="section-subtitle">Let your manager know when you're available</p>
+            </div>
+            <form class="availability-form" @submit.prevent>
               <div class="form-group">
                 <label>Date</label>
                 <input type="date" v-model="availForm.Date" :min="todayISO" />
@@ -199,29 +157,57 @@
                 </div>
               </div>
               <div class="form-group">
-                <label>Type</label>
-                <select v-model="availForm.Type">
-                  <option value="Available">Available</option>
-                  <option value="Unavailable">Unavailable</option>
-                  <option value="Preferred">Preferred</option>
-                </select>
-              </div>
-              <div class="form-group">
                 <label>Notes <span class="optional">(optional)</span></label>
                 <textarea rows="3" v-model="availForm.Notes" placeholder="Any notes for the manager…"></textarea>
               </div>
+              <button type="button" class="btn-primary w-full" @click="submitAvailability" :disabled="savingAvail">
+                <span v-if="savingAvail">
+                  <div class="spinner-small"></div>
+                </span>
+                <Send v-else :size="16" />
+                Submit Availability
+              </button>
             </form>
           </div>
-          <div class="modal-footer">
-            <button class="btn-cancel" @click="showAvailModal = false">Cancel</button>
-            <button class="btn-primary" @click="submitAvailability" :disabled="savingAvail">
-              <span v-if="savingAvail">
-                <div class="spinner-small"></div>
-              </span>
-              <Send v-else :size="16" />
-              Submit Availability
-            </button>
+        </div>
+
+        <!-- Right: My Availability History -->
+        <div class="column">
+          <div class="section">
+            <div class="section-header">
+              <div>
+                <h3>My Availability Requests</h3>
+                <p class="section-subtitle">Your submitted availability</p>
+              </div>
+              <select v-model="availFilter" class="filter-select">
+                <option value="all">All</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+            <div v-if="loadingAvail" class="loading-state">
+              <div class="spinner"></div>
+            </div>
+            <div v-else-if="filteredAvailability.length === 0" class="empty-state">
+              <Inbox :size="32" />
+              <p>No requests yet.</p>
+            </div>
+            <div v-else class="requests-list">
+              <div v-for="req in filteredAvailability" :key="req.AvailabilityId" class="request-item">
+                <div class="request-header">
+                  <div>
+                    <div class="request-date">{{ formatShiftDate(req.Date) }}</div>
+                    <div class="request-time">{{ req.startTime }} – {{ req.endTime }}</div>
+                  </div>
+                  <span class="status-badge" :class="statusClass(req.Status)">{{ req.Status }}</span>
+                </div>
+                <p v-if="req.Notes" class="request-notes">{{ req.Notes }}</p>
+                <div class="request-date-small">{{ formatDate(req.CreatedAt) }}</div>
+              </div>
+            </div>
           </div>
+        </div>
       </div>
     </div>
 
@@ -370,9 +356,6 @@ export default {
     return {
       activeTab: 'my-schedule',
 
-      // Modal
-      showAvailModal: false,
-
       // Employee info
       employeeId: null,
       currentEmployee: null,
@@ -382,6 +365,7 @@ export default {
       mySchedules: [],
       allEmployeeSchedules: [],  // All schedules for the month to show other employees
       monthOffset: 0,             // 0 = current month, -1 = last month, +1 = next month
+      avatarColors: ['#2D5A7B', '#2D7B4F', '#7B6B2D', '#5A2D7B', '#7B2D5A', '#B8533A'],
 
       // Availability tab
       loadingAvail: false,
@@ -392,7 +376,6 @@ export default {
         Date: '',
         TimeIn: '08:00',
         TimeOut: '17:00',
-        Type: 'Available',
         Notes: ''
       },
 
@@ -445,7 +428,7 @@ export default {
       const monthStart = this.monthStart
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      
+
       // Start from Monday of the week containing the 1st of the month
       const startDate = new Date(monthStart)
       const dayOfWeek = startDate.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
@@ -458,21 +441,26 @@ export default {
         const isToday = d.getTime() === today.getTime()
         const isOtherMonth = d.getMonth() !== monthStart.getMonth()
 
-        // Find my shift for this day
-        const myShift = this.mySchedules.find(s => s.WorkDate === dateStr)
-        
-        // Find other employees' shifts for this day
+        // Collect all shifts for this day
         const allShiftsForDay = this.allEmployeeSchedules.filter(s => s.WorkDate === dateStr)
-        const otherShifts = allShiftsForDay.filter(s => s.EmployeeId !== this.employeeId)
+        const shifts = allShiftsForDay.map(s => {
+          const isMine = s.EmployeeId === this.employeeId
+          return {
+            id: s.EmployeeId + dateStr,
+            employeeId: s.EmployeeId,
+            startTime: s.TimeIn,
+            label: isMine ? 'Me' : (s.Name?.split(' ').map(n => n[0]).join('').toUpperCase() || ''),
+            isMine,
+            color: isMine ? '#5d4037' : this.avatarColors[s.EmployeeId % this.avatarColors.length]
+          }
+        })
 
         days.push({
           dateStr,
           dayOfMonth: d.getDate(),
           isToday,
           isOtherMonth,
-          myShift,
-          otherShifts,
-          hasShift: !!myShift || otherShifts.length > 0
+          shifts
         })
       }
       return days
@@ -641,7 +629,15 @@ export default {
           .eq('employeeid', this.employeeId)
           .order('availabledate', { ascending: false })
         if (error) throw error
-        this.myAvailability = data || []
+        this.myAvailability = (data || []).map(a => ({
+          AvailabilityId: a.availabilityid,
+          Date: a.availabledate,
+          TimeIn: a.starttime,
+          TimeOut: a.endtime,
+          Notes: a.notes,
+          Status: a.status,
+          CreatedAt: a.createdat
+        }))
       } catch (err) {
         console.error('loadAvailability:', err)
       } finally {
@@ -659,7 +655,14 @@ export default {
           .eq('employeeid', this.employeeId)
           .order('inquiryid', { ascending: false })
         if (error) throw error
-        this.myInquiries = data || []
+        this.myInquiries = (data || []).map(c => ({
+          InquiryId: c.inquiryid,
+          RequestType: 'Shift Change',
+          ShiftDate: c.requestdate,
+          Reason: c.reason,
+          Status: c.status,
+          CreatedAt: c.createdat
+        }))
       } catch (err) {
         console.error('loadInquiries:', err)
       } finally {
@@ -681,18 +684,16 @@ export default {
         const { error } = await supabase
           .from('availability')
           .insert({
-            EmployeeId: this.employeeId,
-            Date: this.availForm.Date,
-            TimeIn: this.availForm.TimeIn,
-            TimeOut: this.availForm.TimeOut,
-            Type: this.availForm.Type,
-            Notes: this.availForm.Notes,
-            Status: 'Pending'
+            employeeid: this.employeeId,
+            availabledate: this.availForm.Date,
+            starttime: this.availForm.TimeIn,
+            endtime: this.availForm.TimeOut,
+            notes: this.availForm.Notes,
+            status: 'Pending'
           })
         if (error) throw error
         this.showToast('Availability submitted successfully!', 'success')
-        this.availForm = { Date: '', TimeIn: '08:00', TimeOut: '17:00', Type: 'Available', Notes: '' }
-        this.showAvailModal = false
+        this.availForm = { Date: '', TimeIn: '08:00', TimeOut: '17:00', Notes: '' }
         await this.loadAvailability()
       } catch (err) {
         console.error('submitAvailability:', err)
@@ -733,15 +734,6 @@ export default {
       }
     },
 
-    shiftMonth(offset) {
-      if (offset === 0) {
-        // Reset to current month
-        this.monthOffset = 0
-      } else {
-        this.monthOffset += offset
-      }
-    },
-
     formatShiftDate(dateStr) {
       if (!dateStr) return '—'
       return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', {
@@ -774,15 +766,6 @@ export default {
         'Under Review': 'status-review'
       }
       return map[status] || 'status-inactive'
-    },
-
-    availTypeClass(type) {
-      const map = {
-        Available: 'available-type',
-        Unavailable: 'unavailable-type',
-        Preferred: 'preferred-type'
-      }
-      return map[type] || ''
     },
 
     showToast(message, type = 'success') {
@@ -919,101 +902,26 @@ export default {
   }
 }
 
-/* ── Week Navigator ────────────────────────────────────────────── */
-.month-navigator {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: white;
-  border: 2px solid #5d4037;
-  border-radius: 8px;
-  cursor: pointer;
-  color: #5d4037;
-  transition: all 0.2s;
-  font-weight: 600;
-}
-
-.nav-btn:hover {
-  background: #5d4037;
-  color: white;
-  box-shadow: 0 2px 8px rgba(93, 64, 55, 0.2);
-}
-
-.month-label {
-  font-weight: 600;
-  color: #1f2937;
-  min-width: 180px;
-  text-align: center;
-  font-size: 1.1rem;
-}
-
-.today-link {
-  font-weight: 600;
-  color: #5d4037;
-  font-size: 0.9rem;
-  cursor: pointer;
-  padding: 0.65rem 1.25rem;
-  border: 2px solid #5d4037;
-  border-radius: 8px;
-  background: white;
-  transition: all 0.2s;
-}
-
-.today-link:hover {
-  background: #5d4037;
-  color: white;
-  box-shadow: 0 2px 8px rgba(93, 64, 55, 0.2);
-}
-
-.today-btn {
-  font-weight: 600;
-  color: #5d4037;
-  font-size: 0.9rem;
-  cursor: pointer;
-  padding: 0.65rem 1.25rem;
-  border: 2px solid #5d4037;
-  border-radius: 8px;
-  background: white;
-  transition: all 0.2s;
-}
-
-.today-btn:hover {
-  background: #5d4037;
-  color: white;
-  box-shadow: 0 2px 8px rgba(93, 64, 55, 0.2);
-}
-
 /* ── Calendar Grid ────────────────────────────────────────────── */
 .calendar-container {
-  background: white;
+  background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
-  margin-bottom: 2rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .calendar-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: #f9fafb;
+  background: #f9f5f3;
   border-bottom: 2px solid #e5e7eb;
 }
 
 .calendar-day-header {
-  padding: 1rem;
+  padding: 0.75rem;
   text-align: center;
-  font-weight: 600;
+  font-weight: 700;
   color: #1f2937;
   font-size: 0.9rem;
   border-right: 1px solid #e5e7eb;
@@ -1027,7 +935,7 @@ export default {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 0;
-  background: white;
+  background: #fff;
 }
 
 .calendar-day {
@@ -1035,11 +943,11 @@ export default {
   padding: 0.75rem;
   border-right: 1px solid #e5e7eb;
   border-bottom: 1px solid #e5e7eb;
-  background: white;
+  background: #fff;
   transition: all 0.2s;
   position: relative;
-  cursor: pointer;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .calendar-day:nth-child(7n) {
@@ -1065,16 +973,11 @@ export default {
   opacity: 0.5;
 }
 
-.calendar-day.has-shift {
-  background: #fffbf7;
-}
-
 .day-number {
-  font-weight: 600;
+  font-weight: 700;
   color: #1f2937;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   margin-bottom: 0.5rem;
-  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1083,73 +986,46 @@ export default {
 .today-badge {
   display: inline-block;
   background: #5d4037;
-  color: white;
+  color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-left: 4px;
-  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: auto;
 }
 
-.day-events {
+.day-shifts {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  font-size: 0.8rem;
+  flex: 1;
 }
 
-.event {
+.shift-badge {
   padding: 0.4rem 0.5rem;
   border-radius: 4px;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.my-shift {
-  background: #5d4037;
-  color: white;
+  color: #fff;
   font-weight: 600;
-}
-
-.event-time {
-  font-size: 0.75rem;
-  opacity: 0.9;
-}
-
-.event-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.other-shift {
-  background: #e8d4d0;
-  color: #4e342e;
-  font-weight: 500;
-  font-size: 0.75rem;
-}
-
-.event-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.event-summary {
+  font-size: 0.7rem;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 0.3rem;
 }
 
-.event-count {
-  padding: 0.3rem 0.5rem;
-  background: #f3e5e0;
-  color: #5d4037;
-  border-radius: 3px;
-  font-size: 0.75rem;
-  font-weight: 600;
+.shift-badge-time {
+  font-size: 0.65rem;
+  opacity: 0.9;
+}
+
+.shift-badge-name {
+  font-weight: 700;
+  font-size: 0.7rem;
+  margin-left: auto;
+}
+
+.shift-badge--mine {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
 }
 
 .btn-avail {
@@ -1394,21 +1270,6 @@ export default {
   margin-top: 0.25rem;
 }
 
-.available-type {
-  color: #059669;
-  font-weight: 600;
-}
-
-.unavailable-type {
-  color: #dc2626;
-  font-weight: 600;
-}
-
-.preferred-type {
-  color: #5d4037;
-  font-weight: 600;
-}
-
 .request-notes,
 .inquiry-reason {
   font-size: 0.9rem;
@@ -1570,6 +1431,18 @@ export default {
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #1f2937;
+  padding: 0.45rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.btn-ghost:hover {
+  background: #f0ebe8;
 }
 
 .w-full {
@@ -1789,16 +1662,6 @@ export default {
     white-space: nowrap;
   }
 
-  .month-navigator {
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .month-label {
-    font-size: 1rem;
-    min-width: 150px;
-  }
-
   .calendar-day {
     min-height: 100px;
     padding: 0.5rem;
@@ -1810,13 +1673,13 @@ export default {
     margin-bottom: 0.3rem;
   }
 
-  .event {
+  .shift-badge {
     padding: 0.3rem 0.4rem;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
   }
 
-  .event-time {
-    font-size: 0.65rem;
+  .shift-badge-time {
+    font-size: 0.6rem;
   }
 
   .calendar-day-header {
