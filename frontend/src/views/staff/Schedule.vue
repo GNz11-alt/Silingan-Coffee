@@ -32,6 +32,14 @@
       </button>
       <button
         class="tab-btn"
+        :class="{ active: activeTab === 'history' }"
+        @click="activeTab = 'history'"
+      >
+        <Clock :size="16" />
+        History
+      </button>
+      <button
+        class="tab-btn"
         :class="{ active: activeTab === 'inquiries' }"
         @click="activeTab = 'inquiries'"
       >
@@ -182,8 +190,8 @@
               <select v-model="availFilter" class="filter-select">
                 <option value="all">All</option>
                 <option value="Pending">Pending</option>
-                <option value="Approved">Approved</option>
-                <option value="Rejected">Rejected</option>
+                <option value="Confirmed">Approved</option>
+                <option value="Cancelled">Rejected</option>
               </select>
             </div>
             <div v-if="loadingAvail" class="loading-state">
@@ -206,6 +214,38 @@
                 <div class="request-date-small">{{ formatDate(req.CreatedAt) }}</div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: HISTORY ─────────────────────────────────────────── -->
+    <div v-if="activeTab === 'history'" class="tab-content">
+      <div class="section">
+        <div class="section-header">
+          <div>
+            <h3>Availability History</h3>
+            <p class="section-subtitle">Your past approved and rejected availability requests</p>
+          </div>
+        </div>
+        <div v-if="loadingAvail" class="loading-state">
+          <div class="spinner"></div>
+        </div>
+        <div v-else-if="resolvedAvailability.length === 0" class="empty-state">
+          <Inbox :size="32" />
+          <p>No resolved requests yet.</p>
+        </div>
+        <div v-else class="requests-list">
+          <div v-for="req in resolvedAvailability" :key="req.AvailabilityId" class="request-item">
+            <div class="request-header">
+              <div>
+                <div class="request-date">{{ formatShiftDate(req.Date) }}</div>
+                <div class="request-time">{{ req.startTime }} – {{ req.endTime }}</div>
+              </div>
+              <span class="status-badge" :class="statusClass(req.Status)">{{ displayStatus(req.Status) }}</span>
+            </div>
+            <p v-if="req.Notes" class="request-notes">{{ req.Notes }}</p>
+            <div class="request-date-small">{{ formatDate(req.CreatedAt) }}</div>
           </div>
         </div>
       </div>
@@ -479,6 +519,10 @@ export default {
       return this.myAvailability.filter(a => a.Status === this.availFilter)
     },
 
+    resolvedAvailability() {
+      return this.myAvailability.filter(a => a.Status === 'Confirmed' || a.Status === 'Cancelled')
+    },
+
     filteredInquiries() {
       if (this.inquiryFilter === 'all') return this.myInquiries
       return this.myInquiries.filter(i => i.Status === this.inquiryFilter)
@@ -578,6 +622,8 @@ export default {
           .from('schedule')
           .select('*, branch!inner("BranchName"), employee!inner(EmployeeId, FirstName, LastName)')
           .eq('EmployeeId', this.employeeId)
+          .neq('Status', 'Cancelled')
+          .neq('Status', 'Archived')
           .order('ShiftDate', { ascending: false })
         if (error) throw error
         this.mySchedules = (data || []).map(s => ({
@@ -602,6 +648,8 @@ export default {
         const { data, error } = await supabase
           .from('schedule')
           .select('*, branch!inner("BranchName"), employee!inner(EmployeeId, FirstName, LastName)')
+          .neq('Status', 'Cancelled')
+          .neq('Status', 'Archived')
           .order('ShiftDate', { ascending: true })
         if (error) throw error
         this.allEmployeeSchedules = (data || []).map(s => ({
@@ -632,8 +680,8 @@ export default {
         this.myAvailability = (data || []).map(a => ({
           AvailabilityId: a.availabilityid,
           Date: a.availabledate,
-          TimeIn: a.starttime,
-          TimeOut: a.endtime,
+          TimeIn: a.starttime?.slice(0, 5),
+          TimeOut: a.endtime?.slice(0, 5),
           Notes: a.notes,
           Status: a.status,
           CreatedAt: a.createdat
@@ -761,11 +809,22 @@ export default {
     statusClass(status) {
       const map = {
         Pending: 'status-pending',
+        Confirmed: 'status-approved',
         Approved: 'status-approved',
+        Cancelled: 'status-rejected',
         Rejected: 'status-rejected',
         'Under Review': 'status-review'
       }
       return map[status] || 'status-inactive'
+    },
+
+    displayStatus(status) {
+      const map = {
+        Pending: 'Pending',
+        Confirmed: 'Approved',
+        Cancelled: 'Rejected',
+      }
+      return map[status] || status
     },
 
     showToast(message, type = 'success') {

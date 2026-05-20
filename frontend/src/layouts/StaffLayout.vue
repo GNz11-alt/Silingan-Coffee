@@ -72,6 +72,15 @@
         </router-link>
 
         <router-link
+          to="/staff/search"
+          class="nav-item"
+          :class="{ active: $route.path === '/staff/search' }"
+        >
+          <component :is="SearchIcon" class="nav-icon" :size="20" />
+          <span v-show="!isSidebarCollapsed">Search</span>
+        </router-link>
+
+        <router-link
           to="/staff/backup"
           class="nav-item"
           :class="{ active: $route.path === '/staff/backup' }"
@@ -135,6 +144,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
+  Search as SearchIcon,
 } from "lucide-vue-next";
 
 const router = useRouter();
