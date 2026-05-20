@@ -37,8 +37,70 @@
       <!-- ── TAB 1: AVAILABILITY ─────────────────────────────── -->
       <div v-if="activeTab === 'availability'">
         <div class="section-title mb-3">Employee Availability</div>
-        <div v-if="availability.length" class="avail-list">
-          <div v-for="avail in availability" :key="avail.id" class="avail-row">
+        <div v-if="pendingOrFading.length" class="avail-list">
+          <TransitionGroup name="fade-slide">
+            <div v-for="avail in pendingOrFading" :key="avail.id" class="avail-row" :class="{ 'is-fading': fadingIds.has(avail.id) }">
+              <div class="avail-left">
+                <div
+                  class="emp-avatar"
+                  :style="{ background: avatarColor(avail.employeeId) }"
+                >
+                  {{ avail.initials }}
+                </div>
+                <div>
+                  <div class="avail-name">
+                    {{ avail.employeeName }}
+                    <span class="avail-role">{{ avail.role }}</span>
+                  </div>
+                  <div class="avail-meta">
+                    <i class="bi bi-calendar3"></i>
+                    {{ formatDate(avail.availableDate) }} &nbsp;<i
+                      class="bi bi-clock"
+                    ></i>
+                    {{ avail.startTime }} – {{ avail.endTime }}
+                  </div>
+                  <div v-if="avail.notes" class="avail-notes">
+                    {{ avail.notes }}
+                  </div>
+                </div>
+              </div>
+              <div class="avail-right">
+                <span
+                  v-if="avail.status === 'Confirmed'"
+                  class="badge-status badge-active"
+                  >approved</span
+                >
+                <template v-else-if="avail.status === 'Pending'">
+                  <span class="badge-status badge-pending">pending</span>
+                  <button
+                    class="btn-action approve"
+                    @click="updateAvailStatus(avail, 'Confirmed')"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    class="btn-action reject"
+                    @click="updateAvailStatus(avail, 'Cancelled')"
+                  >
+                    Reject
+                  </button>
+                </template>
+                <span v-else class="badge-status badge-inactive">rejected</span>
+              </div>
+            </div>
+          </TransitionGroup>
+        </div>
+        <div v-else class="empty-state text-center py-5">
+          <i class="bi bi-calendar-x fs-1 text-muted"></i>
+          <p class="mt-3 text-muted">No pending availability requests.</p>
+        </div>
+      </div>
+
+      <!-- ── TAB 2: HISTORY ──────────────────────────────────── -->
+      <div v-if="activeTab === 'history'">
+        <div class="section-title mb-3">Availability History</div>
+        <div v-if="resolvedAvail.length" class="avail-list">
+          <div v-for="avail in resolvedAvail" :key="avail.id" class="avail-row">
             <div class="avail-left">
               <div
                 class="emp-avatar"
@@ -69,28 +131,13 @@
                 class="badge-status badge-active"
                 >approved</span
               >
-              <template v-else-if="avail.status === 'Pending'">
-                <span class="badge-status badge-pending">pending</span>
-                <button
-                  class="btn-action approve"
-                  @click="updateAvailStatus(avail, 'Confirmed')"
-                >
-                  Approve
-                </button>
-                <button
-                  class="btn-action reject"
-                  @click="updateAvailStatus(avail, 'Cancelled')"
-                >
-                  Reject
-                </button>
-              </template>
               <span v-else class="badge-status badge-inactive">rejected</span>
             </div>
           </div>
         </div>
         <div v-else class="empty-state text-center py-5">
-          <i class="bi bi-calendar-x fs-1 text-muted"></i>
-          <p class="mt-3 text-muted">No availability submissions yet.</p>
+          <i class="bi bi-clock-history fs-1 text-muted"></i>
+          <p class="mt-3 text-muted">No resolved availability requests yet.</p>
         </div>
       </div>
 
@@ -486,6 +533,7 @@ const isLoading = ref(true);
 const activeTab = ref("availability");
 const tabs = [
   { key: "availability", label: "Availability Requests" },
+  { key: "history", label: "History" },
   { key: "schedule", label: "Current Schedule" },
   { key: "change", label: "Change Inquiries" },
 ];
@@ -536,6 +584,18 @@ const form = ref(emptyForm());
 
 const pendingCount = computed(
   () => availability.value.filter((a) => a.status === "Pending").length,
+);
+
+const resolvedAvail = computed(() =>
+  availability.value.filter((a) => a.status === "Confirmed" || a.status === "Cancelled"),
+);
+
+const fadingIds = ref(new Set());
+
+const pendingOrFading = computed(() =>
+  availability.value.filter(
+    (a) => a.status === "Pending" || fadingIds.value.has(a.id),
+  ),
 );
 
 const filteredSchedules = computed(() => {
@@ -683,8 +743,8 @@ const fetchAvailability = async () => {
         initials: emp?.initials || '?',
         role: "—",
         availableDate: a.availabledate,
-        startTime: a.starttime,
-        endTime: a.endtime,
+        startTime: a.starttime?.slice(0, 5),
+        endTime: a.endtime?.slice(0, 5),
         notes: a.notes,
         status: a.status || "Pending",
       };
@@ -744,8 +804,8 @@ const fetchSchedules = async () => {
       initials: s.employee ? `${(s.employee.FirstName?.[0] || '')}${(s.employee.LastName?.[0] || '')}`.toUpperCase() || '?' : '?',
       role: s.Role,
       shiftDate: s.ShiftDate,
-      startTime: s.StartTime,
-      endTime: s.EndTime,
+      startTime: s.StartTime?.slice(0, 5),
+      endTime: s.EndTime?.slice(0, 5),
       branchId: s.BranchId,
       status: s.Status,
     }));
@@ -885,6 +945,12 @@ const updateAvailStatus = async (avail, status) => {
   } else {
     showToast(`Availability rejected.`, "success");
   }
+
+  // Start 20-second fade-out before removing from pending view
+  fadingIds.value = new Set([...fadingIds.value, avail.id]);
+  setTimeout(() => {
+    fadingIds.value = new Set([...fadingIds.value].filter(id => id !== avail.id));
+  }, 20000);
 };
 
 const clearSchedFilters = () => {
@@ -1006,7 +1072,7 @@ onMounted(async () => {
   border-bottom-color: var(--brand-primary);
 }
 .tab-badge {
-  background: var(--brand-primary);
+  background: #7b1d1d;
   color: #fff;
   font-size: 0.65rem;
   padding: 0.1rem 0.4rem;
@@ -1487,5 +1553,30 @@ onMounted(async () => {
   font-weight: 700;
   font-size: 0.7rem;
   margin-left: auto;
+}
+
+.is-fading {
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.5s ease;
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.fade-slide-move {
+  transition: transform 0.4s ease;
 }
 </style>

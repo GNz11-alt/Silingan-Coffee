@@ -20,24 +20,11 @@
             class="selector-button"
             @click.stop="toggleDropdown"
           >
-            <span v-if="selectedBranchId === 'overall'" class="overall-tag">Overall</span>
             <span class="selected-text">{{ selectedBranchName }}</span>
             <ChevronDown :size="16" :class="{ 'rotate': isDropdownOpen }" />
           </button>
 
           <div v-if="isDropdownOpen" class="dropdown-menu">
-            <div
-              class="dropdown-item"
-              :class="{ 'selected': selectedBranchId === 'overall' }"
-              @click="selectBranch('overall')"
-            >
-              <div class="item-content">
-                <span class="overall-tag">Overall</span>
-                <span class="branch-name">All Branches</span>
-              </div>
-              <Check v-if="selectedBranchId === 'overall'" :size="16" />
-            </div>
-
             <div
               v-for="branch in branches"
               :key="branch.id"
@@ -63,8 +50,8 @@
       <div class="card-header">
         <SearchIcon class="search-icon-tan" :size="20" />
         <div>
-          <h3>Universal Search</h3>
-          <p>Search for products, employees, sales, and more</p>
+          <h3>Search</h3>
+          <p>Search for menu items, inventory, and more</p>
         </div>
       </div>
       <div class="search-input-row">
@@ -73,7 +60,7 @@
             ref="searchInputRef"
             v-model="search.query.value"
             type="text"
-            placeholder="Type to search across all data... (Ctrl+K)"
+            placeholder="Type to search... (Ctrl+K)"
             @focus="autocompleteOpen = true"
             @blur="onInputBlur"
             @keydown="onInputKeydown"
@@ -142,8 +129,8 @@
 
     <div v-else class="empty-state">
       <SearchIcon :size="40" class="empty-icon" />
-      <p class="empty-title">Search across all data</p>
-      <p class="empty-hint">Type a query above to search products, employees, sales, and raw materials.</p>
+      <p class="empty-title">Search menu items and inventory</p>
+      <p class="empty-hint">Type a query above to search products and raw materials.</p>
     </div>
 
     <SearchFilters
@@ -310,7 +297,6 @@ onUnmounted(() => {
 .branch-info { display: flex; flex-direction: column; }
 .branch-name { font-weight: 600; color: #31201D; font-size: 14px; }
 .branch-location { font-size: 11px; color: #888; line-height: 1.2; }
-.overall-tag { background: #FFF4E5; color: #C49A6C; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; border: 1px solid #F1E6D2; margin-right: 6px; }
 .status-pill-small { background: #31201D; color: white; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; }
 
 .universal-search-card { background: white; border: 1px solid #F1E6D2; border-radius: 12px; padding: 20px; margin-bottom: 24px; }

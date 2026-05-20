@@ -457,7 +457,7 @@ const fetchArchivedSchedules = async () => {
     .select(
       "ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, ArchivedAt, ArchivedBy, employee(FirstName, LastName)",
     )
-    .eq("Status", "Cancelled")
+    .eq("Status", "Archived")
     .order("ShiftDate", { ascending: false });
   if (data) {
     archivedSchedules.value = data.map((s) => ({
