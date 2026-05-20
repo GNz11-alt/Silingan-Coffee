@@ -1,11 +1,26 @@
 <template>
   <div class="backup-content">
     <div class="backup-header">
-      <h1>Backup & Restore</h1>
-      <p class="backup-message">
-        View and restore archived items - Nothing is permanently deleted,
-        everything is safely backed up
-      </p>
+      <div class="backup-header-left">
+        <h1>Backup & Restore</h1>
+        <p class="backup-message">
+          View and restore archived items - Nothing is permanently deleted,
+          everything is safely backed up
+        </p>
+      </div>
+      <button
+        v-if="canRestore"
+        class="btn-backup-now"
+        :disabled="isBackingUp"
+        @click="handleBackupNow"
+      >
+        <span
+          v-if="isBackingUp"
+          class="spinner-border spinner-border-sm me-1"
+        ></span>
+        <i v-else class="bi bi-cloud-arrow-down me-2"></i>
+        Back Up Now
+      </button>
     </div>
 
     <div class="stat-grid">
@@ -99,7 +114,6 @@
           </div>
         </div>
 
-        <!-- Loading -->
         <div v-if="isLoading" class="text-center py-5">
           <div
             class="spinner-border spinner-border-sm text-secondary"
@@ -108,7 +122,6 @@
           <p class="mt-2 text-muted small">Loading archived records...</p>
         </div>
 
-        <!-- Table -->
         <div v-else-if="filteredItems.length" class="table-wrap">
           <table class="backup-table">
             <thead>
@@ -119,7 +132,7 @@
                 <th>Details</th>
                 <th>Archived Date</th>
                 <th>Archived By</th>
-                <th>Actions</th>
+                <th v-if="canRestore">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -135,7 +148,7 @@
                 <td class="col-details">{{ item.details }}</td>
                 <td class="col-date">{{ formatDate(item.archivedDate) }}</td>
                 <td class="col-by">{{ item.archivedBy }}</td>
-                <td>
+                <td v-if="canRestore">
                   <button class="btn-restore" @click="confirmRestore(item)">
                     <i class="bi bi-arrow-counterclockwise me-1"></i>Restore
                   </button>
@@ -145,7 +158,6 @@
           </table>
         </div>
 
-        <!-- Empty -->
         <div v-else class="empty-state">
           <component
             :is="Database"
@@ -174,12 +186,20 @@
           indefinitely for record-keeping and compliance<br />
           • <strong>Audit trail</strong> - All archive and restore actions are
           logged with user and timestamp<br />
-          • <strong>Restore access</strong> - You have permission to restore
-          archived items<br />
+          • <strong>Restore access</strong> -
+          <span v-if="canRestore"
+            >You have permission to restore archived items</span
+          >
+          <span v-else>Only managers and administrators can restore items</span
+          ><br />
           • <strong>Search & Filter</strong> - Use the search bar and type
           filter to quickly find specific archived items<br />
           • <strong>All users can view</strong> - Everyone has read access to
           archived items for transparency<br />
+          <template v-if="canRestore">
+            • <strong>Back Up Now</strong> - Downloads a full JSON snapshot of
+            all archived records to your device<br />
+          </template>
         </p>
       </div>
     </div>
@@ -229,6 +249,51 @@
       </div>
     </Teleport>
 
+    <!-- ── BACKUP CONFIRM MODAL ────────────────────────────── -->
+    <Teleport to="body">
+      <div
+        v-if="showBackupModal"
+        class="modal-overlay"
+        @click.self="showBackupModal = false"
+      >
+        <div class="modal-box">
+          <div class="modal-header-row">
+            <h6 class="mb-0">Confirm Backup</h6>
+            <button class="btn-close-x" @click="showBackupModal = false">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <p class="mt-3 mb-1 small">
+            This will download a full JSON snapshot of all
+            <strong>live and archived</strong> records (inventory, employees,
+            sales, and schedules) to your device.
+          </p>
+          <p class="text-muted" style="font-size: 12px">
+            File: <code>silingan-backup-{{ todayString }}.json</code>
+          </p>
+          <div class="d-flex gap-2 justify-content-end mt-4">
+            <button
+              class="btn btn-outline-secondary btn-sm"
+              @click="showBackupModal = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="btn-backup-confirm"
+              :disabled="isBackingUp"
+              @click="doBackup"
+            >
+              <span
+                v-if="isBackingUp"
+                class="spinner-border spinner-border-sm me-1"
+              ></span>
+              <i v-else class="bi bi-cloud-arrow-down me-1"></i>Back Up Now
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- ── TOAST ───────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="toast.show" class="toast-wrap" :class="toast.type">
@@ -251,24 +316,33 @@ import { ref, computed, onMounted } from "vue";
 import { Database, Package, Users, File, Calendar } from "lucide-vue-next";
 import { supabase } from "@/supabase.js";
 
+// ── Current user ───────────────────────────────────────────
+const currentUser = localStorage.getItem("username") || "Unknown";
+const currentRole = localStorage.getItem("role") || "staff";
+const canRestore = computed(
+  () => currentRole === "admin" || currentRole === "manager",
+);
+
 // ── State ──────────────────────────────────────────────────
 const isLoading = ref(false);
+const isBackingUp = ref(false);
 const search = ref("");
 const filterType = ref("");
-const branches = ref([]);
 
 const archivedEmployees = ref([]);
 const archivedSchedules = ref([]);
-// Inventory and Sales use local data in this project — add Supabase fetch calls here once connected
 const archivedInventory = ref([]);
 const archivedSales = ref([]);
 
 const showRestoreModal = ref(false);
+const showBackupModal = ref(false);
 const restoring = ref(false);
 const restoreTarget = ref(null);
 const toast = ref({ show: false, message: "", type: "success" });
 
-// ── Archive ID (A001, A002…) ───────────────────────────────
+const todayString = new Date().toISOString().slice(0, 10);
+
+// ── Archive ID ─────────────────────────────────────────────
 const buildArchiveId = (i) => `A${String(i + 1).padStart(3, "0")}`;
 
 // ── Unified list ───────────────────────────────────────────
@@ -282,9 +356,9 @@ const allItems = computed(() => {
       details:
         [e.position, e.department].filter(Boolean).join(" - ") ||
         "Archived employee",
-      archivedDate: e.dateHired,
-      archivedBy: "Admin",
-      _raw: e,
+      archivedDate: e.archivedAt || e.dateHired,
+      archivedBy: e.archivedBy || currentUser,
+      _raw: { id: e.id },
       _table: "employee",
     });
   });
@@ -297,9 +371,9 @@ const allItems = computed(() => {
         [s.role, s.shiftDate ? formatDate(s.shiftDate) : ""]
           .filter(Boolean)
           .join(" · ") || "Archived schedule",
-      archivedDate: s.shiftDate,
-      archivedBy: "Manager",
-      _raw: s,
+      archivedDate: s.archivedAt || s.shiftDate,
+      archivedBy: s.archivedBy || currentUser,
+      _raw: { id: s.id },
       _table: "schedule",
     });
   });
@@ -310,8 +384,8 @@ const allItems = computed(() => {
       name: i.name,
       details: i.details || "Archived product",
       archivedDate: i.archivedDate,
-      archivedBy: i.archivedBy || "Admin",
-      _raw: i,
+      archivedBy: i.archivedBy || currentUser,
+      _raw: { id: i.id },
       _table: "inventory",
     });
   });
@@ -322,8 +396,8 @@ const allItems = computed(() => {
       name: s.name || `Sale Transaction #${s.id}`,
       details: s.details || "Archived transaction",
       archivedDate: s.archivedDate,
-      archivedBy: s.archivedBy || "Cashier",
-      _raw: s,
+      archivedBy: s.archivedBy || currentUser,
+      _raw: { id: s.id },
       _table: "sales",
     });
   });
@@ -333,28 +407,6 @@ const allItems = computed(() => {
     archiveId: buildArchiveId(idx),
   }));
 });
-
-const fetchArchivedInventory = async () => {
-  const { data } = await supabase
-    .from("inventory")
-    .select(
-      "InventoryId, Status, UpdatedAt, product(ProductName, Category, Price, BranchId, branch(BranchName))",
-    )
-    .eq("Status", "Archived")
-    .order("InventoryId", { ascending: true });
-
-  if (data) {
-    archivedInventory.value = data.map((i) => ({
-      id: i.InventoryId,
-      name: i.product?.ProductName ?? "—",
-      details: `${i.product?.Category ?? "—"} · ₱${i.product?.Price ?? 0} · ${i.product?.branch?.BranchName ?? "—"}`,
-      archivedDate: i.UpdatedAt,
-      archivedBy: "Admin",
-      _raw: { id: i.InventoryId },
-      _table: "inventory",
-    }));
-  }
-};
 
 const totalArchived = computed(() => allItems.value.length);
 
@@ -373,17 +425,11 @@ const filteredItems = computed(() =>
 );
 
 // ── Fetch ──────────────────────────────────────────────────
-const fetchBranches = async () => {
-  const { data } = await supabase.from("branch").select("BranchId, BranchName");
-  if (data)
-    branches.value = data.map((b) => ({ id: b.BranchId, name: b.BranchName }));
-};
-
 const fetchArchivedEmployees = async () => {
   const { data } = await supabase
     .from("employee")
     .select(
-      "EmployeeId, FirstName, LastName, Email, Position, Department, HourlyRate, DateHired, BranchAssigned, Status",
+      "EmployeeId, FirstName, LastName, Email, Position, Department, HourlyRate, DateHired, BranchAssigned, Status, ArchivedAt, ArchivedBy",
     )
     .eq("Status", "Archived")
     .order("EmployeeId", { ascending: true });
@@ -399,31 +445,56 @@ const fetchArchivedEmployees = async () => {
       dateHired: e.DateHired,
       branchId: e.BranchAssigned,
       status: e.Status,
+      archivedAt: e.ArchivedAt,
+      archivedBy: e.ArchivedBy,
     }));
   }
 };
 
 const fetchArchivedSchedules = async () => {
   const { data } = await supabase
-    .from('schedule')
-    .select('ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, employee(FirstName, LastName)')
-    .eq('Status', 'Cancelled')
-    .order('ShiftDate', { ascending: false })
-
+    .from("schedule")
+    .select(
+      "ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, ArchivedAt, ArchivedBy, employee(FirstName, LastName)",
+    )
+    .eq("Status", "Cancelled")
+    .order("ShiftDate", { ascending: false });
   if (data) {
-    archivedSchedules.value = data.map(s => ({
+    archivedSchedules.value = data.map((s) => ({
       id: s.ScheduleId,
       employeeId: s.EmployeeId,
-      employeeName: `${s.employee?.FirstName ?? ''} ${s.employee?.LastName ?? ''}`.trim(),
+      employeeName:
+        `${s.employee?.FirstName ?? ""} ${s.employee?.LastName ?? ""}`.trim(),
       role: s.Role,
       shiftDate: s.ShiftDate,
       startTime: s.StartTime,
       endTime: s.EndTime,
       branchId: s.BranchId,
       status: s.Status,
-    }))
+      archivedAt: s.ArchivedAt,
+      archivedBy: s.ArchivedBy,
+    }));
   }
-}
+};
+
+const fetchArchivedInventory = async () => {
+  const { data } = await supabase
+    .from("inventory")
+    .select(
+      "InventoryId, Status, UpdatedAt, ArchivedBy, product(ProductName, Category, Price, BranchId, branch(BranchName))",
+    )
+    .eq("Status", "Archived")
+    .order("InventoryId", { ascending: true });
+  if (data) {
+    archivedInventory.value = data.map((i) => ({
+      id: i.InventoryId,
+      name: i.product?.ProductName ?? "—",
+      details: `${i.product?.Category ?? "—"} · ₱${i.product?.Price ?? 0} · ${i.product?.branch?.BranchName ?? "—"}`,
+      archivedDate: i.UpdatedAt,
+      archivedBy: i.ArchivedBy || currentUser,
+    }));
+  }
+};
 
 const fetchArchivedSales = async () => {
   const { data } = await supabase
@@ -433,16 +504,13 @@ const fetchArchivedSales = async () => {
     )
     .eq("Status", "void")
     .order("OrderId", { ascending: true });
-
   if (data) {
     archivedSales.value = data.map((s) => ({
       id: s.OrderId,
       name: `Order #${s.OrderId}`,
       details: `₱${s.FinalAmount} · ${s.branch?.BranchName ?? "—"}`,
       archivedDate: s.ArchivedAt || s.CreatedAt,
-      archivedBy: s.ArchivedBy || "Cashier",
-      _raw: { id: s.OrderId },
-      _table: "sales",
+      archivedBy: s.ArchivedBy || currentUser,
     }));
   }
 };
@@ -450,13 +518,124 @@ const fetchArchivedSales = async () => {
 const loadAll = async () => {
   isLoading.value = true;
   await Promise.all([
-    fetchBranches(),
     fetchArchivedEmployees(),
     fetchArchivedSchedules(),
     fetchArchivedInventory(),
     fetchArchivedSales(),
   ]);
   isLoading.value = false;
+};
+
+// ── Compute backup size from snapshot ─────────────────────
+const computeSnapshotSizeMb = (snapshot) => {
+  const bytes = new Blob([JSON.stringify(snapshot)]).size;
+  return parseFloat((bytes / (1024 * 1024)).toFixed(2));
+};
+
+// ── Backup ─────────────────────────────────────────────────
+const handleBackupNow = () => {
+  showBackupModal.value = true;
+};
+
+const doBackup = async () => {
+  isBackingUp.value = true;
+  const currentUser = localStorage.getItem("username") || "Unknown"; // add this line
+
+  try {
+    const [
+      { data: liveInventory },
+      { data: liveEmployees },
+      { data: liveSales },
+      { data: liveSchedules },
+    ] = await Promise.all([
+      supabase
+        .from("inventory")
+        .select(
+          "InventoryId, Status, UpdatedAt, product(ProductName, Category, Price, BranchId, branch(BranchName))",
+        )
+        .eq("Status", "Active"),
+      supabase
+        .from("employee")
+        .select(
+          "EmployeeId, FirstName, LastName, Email, Position, Department, HourlyRate, DateHired, BranchAssigned, Status",
+        )
+        .eq("Status", "Active"),
+      supabase
+        .from("orders")
+        .select("OrderId, FinalAmount, Status, CreatedAt, branch(BranchName)")
+        .eq("Status", "completed"),
+      supabase
+        .from("schedule")
+        .select(
+          "ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, employee(FirstName, LastName)",
+        )
+        .eq("Status", "Scheduled"),
+    ]);
+
+    const snapshot = {
+      exportedAt: new Date().toISOString(),
+      exportedBy: currentUser,
+      totals: {
+        live: {
+          inventory: liveInventory?.length ?? 0,
+          employees: liveEmployees?.length ?? 0,
+          sales: liveSales?.length ?? 0,
+          schedules: liveSchedules?.length ?? 0,
+        },
+        archived: {
+          inventory: archivedInventory.value.length,
+          employees: archivedEmployees.value.length,
+          sales: archivedSales.value.length,
+          schedules: archivedSchedules.value.length,
+        },
+      },
+      live: {
+        inventory: liveInventory ?? [],
+        employees: liveEmployees ?? [],
+        sales: liveSales ?? [],
+        schedules: liveSchedules ?? [],
+      },
+      archived: {
+        inventory: archivedInventory.value,
+        employees: archivedEmployees.value,
+        sales: archivedSales.value,
+        schedules: archivedSchedules.value,
+      },
+    };
+
+    // ── Trigger browser download ───────────────────────────
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `silingan-backup-${todayString}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // ── Log to backup_logs so Maintenance history picks it up
+    const sizeMb = computeSnapshotSizeMb(snapshot);
+    await supabase.from("backup_logs").insert({
+      type: "Manual",
+      size_mb: sizeMb,
+      status: "Success",
+      backed_up_by: currentUser,
+    });
+
+    showToast("Backup file downloaded successfully.", "success");
+  } catch {
+    // Log the failure too so the history is accurate
+    await supabase.from("backup_logs").insert({
+      type: "Manual",
+      status: "Failed",
+      backed_up_by: currentUser,
+    });
+    showToast("Backup failed. Please try again.", "error");
+  } finally {
+    isBackingUp.value = false;
+    showBackupModal.value = false;
+  }
 };
 
 // ── Restore ────────────────────────────────────────────────
@@ -467,12 +646,13 @@ const confirmRestore = (item) => {
 
 const doRestore = async () => {
   restoring.value = true;
+  const currentUser = localStorage.getItem("username") || "Unknown";
   const item = restoreTarget.value;
 
   if (item._table === "employee") {
     const { error } = await supabase
       .from("employee")
-      .update({ Status: "Active" })
+      .update({ Status: "Active", ArchivedAt: null, ArchivedBy: null })
       .eq("EmployeeId", item._raw.id);
     if (error) showToast("Failed to restore employee.", "error");
     else {
@@ -482,7 +662,7 @@ const doRestore = async () => {
   } else if (item._table === "schedule") {
     const { error } = await supabase
       .from("schedule")
-      .update({ Status: "Scheduled" })
+      .update({ Status: "Scheduled", ArchivedAt: null, ArchivedBy: null })
       .eq("ScheduleId", item._raw.id);
     if (error) showToast("Failed to restore schedule.", "error");
     else {
@@ -492,9 +672,8 @@ const doRestore = async () => {
   } else if (item._table === "inventory") {
     const { error } = await supabase
       .from("inventory")
-      .update({ Status: "Active" })
+      .update({ Status: "Active", ArchivedBy: null })
       .eq("InventoryId", item._raw.id);
-
     if (error) showToast("Failed to restore inventory item.", "error");
     else {
       showToast(`${item.name} restored successfully.`, "success");
@@ -505,17 +684,11 @@ const doRestore = async () => {
       .from("orders")
       .update({ Status: "completed", ArchivedAt: null, ArchivedBy: null })
       .eq("OrderId", item._raw.id);
-
     if (error) showToast("Failed to restore sale.", "error");
     else {
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedSales();
     }
-  } else {
-    showToast(
-      `${item.name} noted (table not yet connected to Supabase).`,
-      "success",
-    );
   }
 
   restoring.value = false;
@@ -564,9 +737,14 @@ onMounted(loadAll);
 
 /* ── Header ─────────────────────────────────── */
 .backup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 28px;
+  flex-wrap: wrap;
 }
-.backup-header h1 {
+.backup-header-left h1 {
   font-size: 28px;
   font-weight: 600;
   color: #212529;
@@ -575,6 +753,33 @@ onMounted(loadAll);
 .backup-message {
   font-size: 14px;
   color: #6c757d;
+  margin: 0;
+}
+
+.btn-backup-now {
+  background: #532f15;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+  align-self: center;
+}
+.btn-backup-now:hover:not(:disabled) {
+  background: #3d2210;
+  transform: translateY(-1px);
+}
+.btn-backup-now:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 /* ── Stat Grid ──────────────────────────────── */
@@ -648,7 +853,6 @@ onMounted(loadAll);
   margin: 0;
 }
 
-/* ── Filters ────────────────────────────────── */
 .archived-filters {
   display: flex;
   align-items: center;
@@ -685,7 +889,6 @@ onMounted(loadAll);
 .search-input::placeholder {
   color: #adb5bd;
 }
-
 .type-select-wrap {
   position: relative;
 }
@@ -715,7 +918,6 @@ onMounted(loadAll);
   pointer-events: none;
 }
 
-/* ── Table ──────────────────────────────────── */
 .table-wrap {
   overflow-x: auto;
   margin: 0 -20px;
@@ -749,7 +951,6 @@ onMounted(loadAll);
 .backup-table tr:hover td {
   background: #fafafa;
 }
-
 .col-id {
   font-size: 12px;
   color: #6c757d;
@@ -774,7 +975,6 @@ onMounted(loadAll);
   white-space: nowrap;
 }
 
-/* ── Type badges ────────────────────────────── */
 .type-badge {
   display: inline-flex;
   align-items: center;
@@ -801,7 +1001,6 @@ onMounted(loadAll);
   color: #e65100;
 }
 
-/* ── Restore button ─────────────────────────── */
 .btn-restore {
   background: #fff;
   border: 1px solid #dee2e6;
@@ -822,7 +1021,6 @@ onMounted(loadAll);
   background: #fdf3ec;
 }
 
-/* ── Empty state ────────────────────────────── */
 .empty-state {
   text-align: center;
   padding: 40px 20px;
@@ -836,7 +1034,6 @@ onMounted(loadAll);
   margin: 0;
 }
 
-/* ── Info panel ─────────────────────────────── */
 .backup-info {
   background: #fdfbf3;
   border-radius: 12px;
@@ -862,7 +1059,6 @@ onMounted(loadAll);
   margin: 0;
 }
 
-/* ── Modal ──────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -917,7 +1113,27 @@ onMounted(loadAll);
   cursor: not-allowed;
 }
 
-/* ── Toast ──────────────────────────────────── */
+.btn-backup-confirm {
+  background: #532f15;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.15s;
+}
+.btn-backup-confirm:hover:not(:disabled) {
+  background: #3d2210;
+}
+.btn-backup-confirm:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .toast-wrap {
   position: fixed;
   bottom: 24px;
