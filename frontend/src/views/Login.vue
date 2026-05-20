@@ -19,37 +19,6 @@
       </div>
 
       <form @submit.prevent="handleLogin" class="login-form">
-        <!-- Branch Dropdown -->
-        <div class="form-group">
-          <div class="input-group">
-            <span class="input-icon">
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-              </svg>
-            </span>
-            <select
-              v-model="branch"
-              required
-              :class="{ placeholder: branch === '' }"
-            >
-              <option value="" disabled hidden>Select a branch...</option>
-              <option value="dlsu">De La Salle University</option>
-              <option value="ateneo">Ateneo de Manila University</option>
-              <option value="batangas">Batangas City</option>
-              <option value="lipa">Lipa City</option>
-              <option value="cubao">Cubao Expo</option>
-            </select>
-          </div>
-        </div>
-
         <!-- Username -->
         <div class="form-group">
           <div class="input-group">
@@ -123,7 +92,6 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "@/supabase.js";
 
-const branch = ref("");
 const username = ref("");
 const password = ref("");
 const isLoading = ref(false);
@@ -141,7 +109,6 @@ const handleLogin = async () => {
 
   isLoading.value = true;
 
-  // First check credentials without branch
   let { data, error } = await supabase
     .from("users")
     .select("*")
@@ -156,23 +123,16 @@ const handleLogin = async () => {
     return;
   }
 
-  // If not admin, branch is required
-  if (data.role !== "admin" && !branch.value) {
-    errorMessage.value = "Please select a branch.";
-    return;
-  }
-
-  // If not admin, verify branch matches
-  if (data.role !== "admin" && data.branch !== branch.value) {
-    errorMessage.value = "Invalid credentials or user not found.";
-    return;
-  }
-
   localStorage.setItem("isLoggedIn", "true");
   localStorage.setItem("username", data.username);
   localStorage.setItem("role", data.role);
   localStorage.setItem("branch", data.branch || "all");
   localStorage.setItem("userId", data.id);
+
+  await supabase
+    .from("users")
+    .update({ last_active: new Date().toISOString() })
+    .eq("id", data.id);
 
   if (data.role === "admin") {
     router.push("/admin/dashboard");

@@ -13,7 +13,7 @@
           <span class="stat-label">System Health</span>
           <component :is="CheckCircle" :size="22" class="stat-icon green" />
         </div>
-        <div class="stat-value green">{{ systemHealth }}</div>
+        <div class="stat-value green">{{ stats.health_label }}</div>
         <div class="stat-sub">All systems operational</div>
       </div>
 
@@ -22,8 +22,8 @@
           <span class="stat-label">Uptime</span>
           <component :is="Clock" :size="22" class="stat-icon" />
         </div>
-        <div class="stat-value">{{ uptime }}</div>
-        <div class="stat-sub">{{ uptimeSub }}</div>
+        <div class="stat-value">{{ stats.uptime_percent }}%</div>
+        <div class="stat-sub">{{ stats.uptime_label }}</div>
       </div>
 
       <div class="stat-card">
@@ -31,8 +31,8 @@
           <span class="stat-label">Active Users</span>
           <component :is="Users" :size="22" class="stat-icon" />
         </div>
-        <div class="stat-value">{{ activeUsers }}/{{ totalUsers }}</div>
-        <div class="stat-sub">employees online</div>
+        <div class="stat-value">{{ totalUsers }}</div>
+        <div class="stat-sub">registered users</div>
       </div>
 
       <div class="stat-card">
@@ -60,7 +60,12 @@
 
     <!-- ── TAB: OVERVIEW ───────────────────────────────────── -->
     <div v-if="activeTab === 'overview'" class="tab-content">
-      <div class="two-col">
+      <div v-if="isLoadingStats" class="text-center py-4">
+        <div class="spinner-border spinner-border-sm text-secondary"></div>
+        <p class="mt-2 text-muted small">Loading system stats...</p>
+      </div>
+
+      <div v-else class="two-col">
         <!-- System Resources -->
         <div class="panel">
           <div class="panel-header">
@@ -70,9 +75,9 @@
           <div class="resource-list">
             <div class="resource-row">
               <span class="resource-label">Storage Usage</span>
-              <span class="resource-value"
-                >{{ storage.used }}GB / {{ storage.total }}GB</span
-              >
+              <span class="resource-value">
+                {{ stats.storage_used_gb }}GB / {{ stats.storage_total_gb }}GB
+              </span>
             </div>
             <div class="progress-bar-wrap">
               <div
@@ -83,14 +88,14 @@
 
             <div class="resource-row mt-3">
               <span class="resource-label">Memory Usage</span>
-              <span class="resource-value">{{ memoryPercent }}%</span>
+              <span class="resource-value">{{ stats.memory_percent }}%</span>
             </div>
             <div class="progress-bar-wrap">
               <div
                 class="progress-bar"
                 :style="{
-                  width: memoryPercent + '%',
-                  background: memoryPercent > 80 ? '#dc3545' : '#532f15',
+                  width: stats.memory_percent + '%',
+                  background: stats.memory_percent > 80 ? '#dc3545' : '#532f15',
                 }"
               ></div>
             </div>
@@ -114,7 +119,7 @@
             </div>
             <div class="security-row">
               <span class="security-label">Last Security Scan</span>
-              <span class="security-val">{{ lastScan }}</span>
+              <span class="security-val">{{ lastScanLabel }}</span>
             </div>
             <div class="security-row">
               <span class="security-label">Failed Login Attempts</span>
@@ -146,56 +151,60 @@
           <span v-else>Run Now</span>
         </button>
       </div>
-    </div>
 
-    <!-- ── TAB: BACKUP ─────────────────────────────────────── -->
-    <div v-if="activeTab === 'backup'" class="tab-content">
-      <div class="panel">
+      <!-- Backup History (read-only — backups created in Backup & Restore module) -->
+      <div class="panel mt-3">
         <div class="panel-header">
           <component :is="Database" :size="18" class="panel-icon" />
-          <h5>Database Backup</h5>
+          <h5>Backup History</h5>
         </div>
         <p class="panel-sub">
-          Create and manage database backups for Silingan Coffee system.
+          Backups are created from the Backup &amp; Restore module. This panel
+          shows the log.
         </p>
 
-        <div class="backup-actions">
-          <button class="btn-primary" @click="runBackup" :disabled="backingUp">
-            <component :is="Download" :size="16" />
-            <span v-if="backingUp">Backing up...</span>
-            <span v-else>Create Backup Now</span>
-          </button>
+        <div v-if="isLoadingBackups" class="text-center py-4">
+          <div class="spinner-border spinner-border-sm text-secondary"></div>
         </div>
 
-        <div class="backup-history mt-4">
-          <div class="history-title">Backup History</div>
-          <table class="history-table">
-            <thead>
-              <tr>
-                <th>Date & Time</th>
-                <th>Type</th>
-                <th>Size</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="b in backupHistory" :key="b.id">
-                <td>{{ b.date }}</td>
-                <td>{{ b.type }}</td>
-                <td>{{ b.size }}</td>
-                <td>
-                  <span
-                    class="badge"
-                    :class="
-                      b.status === 'Success' ? 'badge-active' : 'badge-inactive'
-                    "
-                    >{{ b.status }}</span
-                  >
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <table v-else class="history-table">
+          <thead>
+            <tr>
+              <th>Date &amp; Time</th>
+              <th>Type</th>
+              <th>Size</th>
+              <th>Backed Up By</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="b in backupHistory" :key="b.id">
+              <td>{{ b.date }}</td>
+              <td>{{ b.type }}</td>
+              <td>{{ b.size }}</td>
+              <td>{{ b.backedUpBy }}</td>
+              <td>
+                <span
+                  class="badge"
+                  :class="
+                    b.status === 'Success' ? 'badge-active' : 'badge-inactive'
+                  "
+                >
+                  {{ b.status }}
+                </span>
+              </td>
+            </tr>
+            <tr v-if="!backupHistory.length">
+              <td
+                colspan="4"
+                class="text-center text-muted py-4"
+                style="font-size: 13px"
+              >
+                No backups yet.
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -204,12 +213,16 @@
       <div class="panel">
         <div class="panel-header">
           <component :is="Users" :size="18" class="panel-icon" />
-          <h5>Active User Sessions</h5>
+          <h5>Registered Users</h5>
         </div>
+        <p class="panel-sub">
+          All users registered in the system. Active session tracking is not yet
+          implemented.
+        </p>
 
-        <div v-if="isLoadingSessions" class="text-center py-4">
+        <div v-if="isLoadingUsers" class="text-center py-4">
           <div class="spinner-border spinner-border-sm text-secondary"></div>
-          <p class="mt-2 text-muted small">Loading sessions...</p>
+          <p class="mt-2 text-muted small">Loading users...</p>
         </div>
 
         <table v-else class="history-table">
@@ -218,23 +231,30 @@
               <th>Username</th>
               <th>Role</th>
               <th>Branch</th>
-              <th>Status</th>
+              <th>Last Active</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="u in userSessions" :key="u.id">
+            <tr v-for="u in userList" :key="u.id">
               <td>{{ u.username }}</td>
               <td>{{ u.role }}</td>
-              <td>{{ u.branch }}</td>
-              <td><span class="badge badge-active">Online</span></td>
+              <td>{{ u.branch ?? "—" }}</td>
+              <td>
+                <span
+                  class="active-badge"
+                  :class="lastActiveClass(u.last_active)"
+                >
+                  {{ u.lastActivePretty ?? "Never" }}
+                </span>
+              </td>
             </tr>
-            <tr v-if="!userSessions.length">
+            <tr v-if="!userList.length">
               <td
-                colspan="4"
+                colspan="3"
                 class="text-center text-muted py-4"
                 style="font-size: 13px"
               >
-                No active sessions.
+                No users found.
               </td>
             </tr>
           </tbody>
@@ -246,59 +266,66 @@
     <div v-if="activeTab === 'settings'" class="tab-content">
       <div class="panel">
         <div class="panel-header">
-          <component :is="Settings" :size="18" class="panel-icon" />
+          <component :is="SettingsIcon" :size="18" class="panel-icon" />
           <h5>System Settings</h5>
         </div>
-        <div class="settings-list">
-          <div class="setting-row">
-            <div>
-              <div class="setting-label">System Timezone</div>
-              <div class="setting-sub">
-                All timestamps will use this timezone
-              </div>
-            </div>
-            <select v-model="settings.timezone" class="setting-select">
-              <option value="Asia/Manila">Asia/Manila (PHT)</option>
-              <option value="UTC">UTC</option>
-            </select>
-          </div>
-          <div class="setting-row">
-            <div>
-              <div class="setting-label">Automatic Backups</div>
-              <div class="setting-sub">
-                Automatically backup the database daily
-              </div>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" v-model="settings.autoBackup" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="setting-row">
-            <div>
-              <div class="setting-label">Maintenance Mode</div>
-              <div class="setting-sub">
-                Restrict access to admins only during maintenance
-              </div>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" v-model="settings.maintenanceMode" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
+
+        <div v-if="isLoadingSettings" class="text-center py-4">
+          <div class="spinner-border spinner-border-sm text-secondary"></div>
         </div>
-        <div class="d-flex justify-content-end mt-3">
-          <button
-            class="btn-primary"
-            @click="saveSettings"
-            :disabled="savingSettings"
-          >
-            <span
-              v-if="savingSettings"
-              class="spinner-border spinner-border-sm me-1"
-            ></span>
-            Save Settings
-          </button>
+
+        <div v-else>
+          <div class="settings-list">
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">System Timezone</div>
+                <div class="setting-sub">
+                  All timestamps will use this timezone
+                </div>
+              </div>
+              <select v-model="settings.timezone" class="setting-select">
+                <option value="Asia/Manila">Asia/Manila (PHT)</option>
+                <option value="UTC">UTC</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Automatic Backups</div>
+                <div class="setting-sub">
+                  Automatically backup the database daily
+                </div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" v-model="settings.autoBackup" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-label">Maintenance Mode</div>
+                <div class="setting-sub">
+                  Restrict access to admins only during maintenance
+                </div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" v-model="settings.maintenanceMode" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="d-flex justify-content-end mt-3">
+            <button
+              class="btn-primary"
+              @click="saveSettings"
+              :disabled="savingSettings"
+            >
+              <span
+                v-if="savingSettings"
+                class="spinner-border spinner-border-sm me-1"
+              ></span>
+              Save Settings
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -310,7 +337,12 @@
           <component :is="CheckSquare" :size="18" class="panel-icon" />
           <h5>Maintenance Tasks</h5>
         </div>
-        <div class="tasks-list">
+
+        <div v-if="isLoadingTasks" class="text-center py-4">
+          <div class="spinner-border spinner-border-sm text-secondary"></div>
+        </div>
+
+        <div v-else class="tasks-list">
           <div class="task-row" v-for="task in tasks" :key="task.id">
             <div class="task-info">
               <div class="task-name">{{ task.name }}</div>
@@ -330,6 +362,13 @@
                 <span v-else>Run</span>
               </button>
             </div>
+          </div>
+          <div
+            v-if="!tasks.length"
+            class="text-center text-muted py-4"
+            style="font-size: 13px"
+          >
+            No tasks found.
           </div>
         </div>
       </div>
@@ -363,53 +402,61 @@ import {
   HardDrive,
   Shield,
   AlertTriangle,
-  Download,
-  Settings,
+  Settings as SettingsIcon,
   CheckSquare,
 } from "lucide-vue-next";
-
-// ── Stat cards ─────────────────────────────────────────────
-const systemHealth = ref("Excellent");
-const uptime = ref("99.8%");
-const uptimeSub = ref("15 days, 4 hours");
-const activeUsers = ref(0);
-const totalUsers = ref(0);
-const lastBackupStatus = ref("—");
-const lastBackupTime = ref("—");
-
-// ── Resources ──────────────────────────────────────────────
-const storage = ref({ used: 2.4, total: 10 });
-const memoryPercent = ref(68);
-const storagePercent = computed(
-  () => (storage.value.used / storage.value.total) * 100,
-);
-
-// ── Security ───────────────────────────────────────────────
-const lastScan = ref("Today 10:30 AM");
-const failedLogins = ref(0);
-
-// ── Optimization ───────────────────────────────────────────
-const showOptimizationAlert = ref(false);
-const lastOptimization = ref("—");
-const optimizing = ref(false);
 
 // ── Tabs ───────────────────────────────────────────────────
 const activeTab = ref("overview");
 const tabs = [
   { key: "overview", label: "Overview" },
-  { key: "backup", label: "Backup" },
   { key: "sessions", label: "User Sessions" },
   { key: "settings", label: "Settings" },
   { key: "tasks", label: "Tasks" },
 ];
 
-// ── Backup ─────────────────────────────────────────────────
-const backingUp = ref(false);
-const backupHistory = ref([]);
+// ── Loading flags ──────────────────────────────────────────
+const isLoadingStats = ref(false);
+const isLoadingUsers = ref(false);
+const isLoadingBackups = ref(false);
+const isLoadingSettings = ref(false);
+const isLoadingTasks = ref(false);
 
-// ── Sessions ───────────────────────────────────────────────
-const isLoadingSessions = ref(false);
-const userSessions = ref([]);
+// ── System stats (from system_stats table, row id=1) ───────
+const stats = ref({
+  health_label: "—",
+  uptime_percent: 0,
+  uptime_label: "—",
+  storage_used_gb: 0,
+  storage_total_gb: 0,
+  memory_percent: 0,
+});
+
+const storagePercent = computed(() => {
+  if (!stats.value.storage_total_gb) return 0;
+  return (stats.value.storage_used_gb / stats.value.storage_total_gb) * 100;
+});
+
+// ── Security ───────────────────────────────────────────────
+// Firewall and SSL are infrastructure-level; shown as static Active/Valid.
+// lastScanLabel is derived from the stats row updated_at.
+const lastScanLabel = ref("—");
+const failedLogins = ref(0);
+
+// ── Users / sessions ───────────────────────────────────────
+// No sessions table yet — we show the full user list instead.
+const totalUsers = ref(0);
+const userList = ref([]);
+
+// ── Backup history (read-only, populated from backup_logs) ─
+const backupHistory = ref([]);
+const lastBackupStatus = ref("—");
+const lastBackupTime = ref("—");
+
+// ── Optimization alert (driven by maintenance_tasks) ───────
+const showOptimizationAlert = ref(false);
+const lastOptimization = ref("—");
+const optimizing = ref(false);
 
 // ── Settings ───────────────────────────────────────────────
 const savingSettings = ref(false);
@@ -443,6 +490,13 @@ const formatDate = (iso) => {
   });
 };
 
+const lastActiveClass = (iso) => {
+  if (!iso) return "status-never";
+  const hours = (Date.now() - new Date(iso).getTime()) / 3600000;
+  if (hours >= 3) return "status-inactive";
+  return "status-active";
+};
+
 const timeAgo = (iso) => {
   if (!iso) return "Never";
   const diff = Date.now() - new Date(iso).getTime();
@@ -455,25 +509,33 @@ const timeAgo = (iso) => {
   return `${days} day${days > 1 ? "s" : ""} ago`;
 };
 
-// ── Fetch: users ───────────────────────────────────────────
-const fetchUsers = async () => {
+
+
+// ── Fetch: system stats ────────────────────────────────────
+const fetchStats = async () => {
+  isLoadingStats.value = true;
   const { data, error } = await supabase
-    .from("users")
-    .select("id, username, role, branch");
+    .from("system_stats")
+    .select("*")
+    .eq("id", 1)
+    .single();
+  isLoadingStats.value = false;
 
   if (error) {
-    showToast("Failed to load users.", "error");
+    showToast("Failed to load system stats.", "error");
     return;
   }
 
-  totalUsers.value = data.length;
-  activeUsers.value = Math.floor(data.length * 0.4);
-  userSessions.value = data.map((u) => ({
-    id: u.id,
-    username: u.username,
-    role: u.role,
-    branch: u.branch,
-  }));
+  stats.value = {
+    health_label: data.health_label,
+    uptime_percent: data.uptime_percent,
+    uptime_label: data.uptime_label,
+    storage_used_gb: data.storage_used_gb,
+    storage_total_gb: data.storage_total_gb,
+    memory_percent: data.memory_percent,
+  };
+
+  lastScanLabel.value = timeAgo(data.updated_at);
 };
 
 // ── Fetch: failed logins (last 24 h) ──────────────────────
@@ -487,13 +549,41 @@ const fetchFailedLogins = async () => {
   if (!error) failedLogins.value = count ?? 0;
 };
 
+// ── Fetch: users ───────────────────────────────────────────
+const fetchUsers = async () => {
+  isLoadingUsers.value = true;
+
+  const [{ data, error }, { count }] = await Promise.all([
+    supabase.from("users").select("id, username, role, branch, last_active"),
+    supabase
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .gte("last_active", new Date(Date.now() - 15 * 60000).toISOString()),
+  ]);
+
+  isLoadingUsers.value = false;
+
+  if (error) {
+    showToast("Failed to load users.", "error");
+    return;
+  }
+
+  totalUsers.value = count ?? 0;
+  userList.value = data.map((u) => ({
+    ...u,
+    lastActivePretty: timeAgo(u.last_active),
+  }));
+};
+
 // ── Fetch: backup history ──────────────────────────────────
 const fetchBackupHistory = async () => {
+  isLoadingBackups.value = true;
   const { data, error } = await supabase
     .from("backup_logs")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(20);
+  isLoadingBackups.value = false;
 
   if (error) {
     showToast("Failed to load backup history.", "error");
@@ -504,7 +594,8 @@ const fetchBackupHistory = async () => {
     id: b.id,
     date: formatDate(b.created_at),
     type: b.type,
-    size: `${b.size_mb} MB`,
+    size: b.size_mb != null ? `${b.size_mb} MB` : "—",
+    backedUpBy: b.backed_up_by ?? "—",
     status: b.status,
   }));
 
@@ -516,11 +607,13 @@ const fetchBackupHistory = async () => {
 
 // ── Fetch: settings ────────────────────────────────────────
 const fetchSettings = async () => {
+  isLoadingSettings.value = true;
   const { data, error } = await supabase
     .from("system_settings")
     .select("*")
     .eq("id", 1)
     .single();
+  isLoadingSettings.value = false;
 
   if (error) {
     showToast("Failed to load settings.", "error");
@@ -534,10 +627,12 @@ const fetchSettings = async () => {
 
 // ── Fetch: tasks ───────────────────────────────────────────
 const fetchTasks = async () => {
+  isLoadingTasks.value = true;
   const { data, error } = await supabase
     .from("maintenance_tasks")
     .select("*")
     .order("id");
+  isLoadingTasks.value = false;
 
   if (error) {
     showToast("Failed to load tasks.", "error");
@@ -553,7 +648,6 @@ const fetchTasks = async () => {
     _last_run_at: t.last_run_at,
   }));
 
-  // Drive the optimization alert from the actual DB timestamp
   const optTask = tasks.value.find((t) => t.name === "Optimize Database");
   if (optTask) {
     const daysSince = optTask._last_run_at
@@ -585,36 +679,6 @@ const runOptimization = async () => {
   showOptimizationAlert.value = false;
   showToast("Database optimization completed successfully.");
   await fetchTasks();
-};
-
-// ── Action: create backup ──────────────────────────────────
-const runBackup = async () => {
-  backingUp.value = true;
-
-  const { data, error } = await supabase
-    .from("backup_logs")
-    .insert({ type: "Manual", size_mb: 24.5, status: "Success" })
-    .select()
-    .single();
-
-  backingUp.value = false;
-
-  if (error) {
-    showToast("Backup failed.", "error");
-    return;
-  }
-
-  backupHistory.value.unshift({
-    id: data.id,
-    date: formatDate(data.created_at),
-    type: data.type,
-    size: `${data.size_mb} MB`,
-    status: data.status,
-  });
-
-  lastBackupStatus.value = "Success";
-  lastBackupTime.value = "Just now";
-  showToast("Backup created successfully.");
 };
 
 // ── Action: save settings ──────────────────────────────────
@@ -668,16 +732,13 @@ const runTask = async (task) => {
 };
 
 // ── On mount ───────────────────────────────────────────────
-onMounted(async () => {
-  isLoadingSessions.value = true;
-  await Promise.all([
-    fetchUsers(),
-    fetchFailedLogins(),
-    fetchBackupHistory(),
-    fetchSettings(),
-    fetchTasks(),
-  ]);
-  isLoadingSessions.value = false;
+onMounted(() => {
+  fetchStats();
+  fetchFailedLogins();
+  fetchUsers();
+  fetchBackupHistory();
+  fetchSettings();
+  fetchTasks();
 });
 </script>
 
@@ -749,7 +810,6 @@ onMounted(async () => {
 .tab-bar {
   display: flex;
   gap: 0.25rem;
-  border-bottom: 2px solid #e5e0dd;
   background: #fff;
   border-radius: 10px 10px 0 0;
   padding: 0 16px;
@@ -815,7 +875,6 @@ onMounted(async () => {
   color: #6b6b6b;
   margin-bottom: 16px;
 }
-
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -945,6 +1004,26 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
+.active-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.status-active {
+  background: #d4edda;
+  color: #155724;
+}
+.status-inactive {
+  background: #fff3cd;
+  color: #856404;
+}
+.status-never {
+  background: #f8d7da;
+  color: #721c24;
+}
+
 /* ── Backup ───────────────────────────────────────────────── */
 .backup-actions {
   margin-bottom: 8px;
@@ -1032,18 +1111,6 @@ onMounted(async () => {
   font-size: 12px;
   color: #6b6b6b;
   margin-top: 2px;
-}
-.setting-input {
-  width: 80px;
-  padding: 6px 10px;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  font-size: 14px;
-  text-align: center;
-  outline: none;
-}
-.setting-input:focus {
-  border-color: #532f15;
 }
 .setting-select {
   padding: 6px 10px;
@@ -1179,6 +1246,7 @@ onMounted(async () => {
   background: #f8d7da;
   color: #58151c;
 }
+
 @keyframes slideUp {
   from {
     transform: translateY(16px);
