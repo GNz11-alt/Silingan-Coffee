@@ -3,9 +3,12 @@
 
     <!-- Page Header -->
     <div class="page-header">
-      <div>
+      <div class="ph-left">
         <h1>Inventory Management</h1>
         <p>Managing inventory for <strong>{{ selectedBranchName || 'All Branches' }}</strong></p>
+      </div>
+      <div class="ph-right">
+        <span class="system-badge">EOQ + FEFO Batch Tracking</span>
       </div>
     </div>
 
@@ -15,9 +18,7 @@
       <div class="select-wrap">
         <select v-model="selectedBranchId" class="branch-dropdown">
           <option :value="null">All Branches</option>
-          <option v-for="b in branches" :key="b.BranchId" :value="b.BranchId">
-            {{ b.BranchName }}
-          </option>
+          <option v-for="b in branches" :key="b.BranchId" :value="b.BranchId">{{ b.BranchName }}</option>
         </select>
         <ChevronDown :size="14" class="sel-icon" />
       </div>
@@ -26,109 +27,127 @@
     <!-- Stats -->
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-icon"><Package :size="26" /></div>
+        <div class="stat-icon"><Package :size="24" /></div>
         <div class="stat-info">
           <h3>Total Items</h3>
           <p class="stat-value">{{ allBranchStats.total }}</p>
-          <span class="stat-label">across all branches</span>
+          <span class="stat-label">tracked materials</span>
         </div>
       </div>
       <div class="stat-card warning">
-        <div class="stat-icon warn"><AlertCircle :size="26" /></div>
+        <div class="stat-icon warn"><AlertCircle :size="24" /></div>
         <div class="stat-info">
           <h3>Low Stock</h3>
           <p class="stat-value">{{ allBranchStats.low }}</p>
-          <span class="stat-label">need restocking</span>
+          <span class="stat-label">below reorder point</span>
         </div>
       </div>
       <div class="stat-card danger">
-        <div class="stat-icon danger-icon"><XCircle :size="26" /></div>
+        <div class="stat-icon danger-icon"><XCircle :size="24" /></div>
         <div class="stat-info">
           <h3>Out of Stock</h3>
           <p class="stat-value">{{ allBranchStats.out }}</p>
           <span class="stat-label">zero quantity</span>
         </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon expiry-icon"><CalendarX :size="26" /></div>
+      <div class="stat-card expiring-card">
+        <div class="stat-icon expiry-icon"><CalendarX :size="24" /></div>
         <div class="stat-info">
           <h3>Expiring Soon</h3>
           <p class="stat-value">{{ allBranchStats.expiring }}</p>
-          <span class="stat-label">within 7 days</span>
+          <span class="stat-label">batches within 7 days</span>
         </div>
       </div>
     </div>
 
-    <!-- Branch Overview Cards -->
-    <div v-if="!selectedBranchId" class="branch-overview">
-      <h3 class="overview-title">Branch Overview</h3>
-      <div class="branch-cards">
-        <div v-for="b in branchSummaries" :key="b.BranchId" class="branch-card"
-          @click="selectedBranchId = b.BranchId">
-          <div class="branch-card-header">
-            <span class="branch-name">{{ b.BranchName }}</span>
-            <span class="branch-total">{{ b.total }} items</span>
-          </div>
-          <div class="branch-card-stats">
-            <span v-if="b.out > 0" class="bs-out">{{ b.out }} out of stock</span>
-            <span v-if="b.low > 0" class="bs-low">{{ b.low }} low stock</span>
-            <span v-if="b.out === 0 && b.low === 0" class="bs-good">All good</span>
-          </div>
+    <!-- FEFO Alert -->
+    <div v-if="expiringBatches.length > 0" class="fefo-alert">
+      <div class="fefo-header">
+        <div class="fefo-title-row">
+          <CalendarX :size="16" />
+          <h3>FEFO Alert — Use These First</h3>
+          <span class="fefo-badge">First Expired, First Out</span>
         </div>
+        <p class="fefo-sub">These batches expire soonest. Use them before opening newer stock to minimize waste.</p>
       </div>
-    </div>
-
-    <!-- Low Stock Alert -->
-    <div v-if="lowStockItems.length > 0" class="alert-section">
-      <div class="alert-header">
-        <AlertTriangle :size="18" />
-        <h3>Stock Alert</h3>
-      </div>
-      <p class="alert-subtitle">These items need attention:</p>
-      <div class="low-stock-list">
-        <div v-for="item in lowStockItems.slice(0, 6)" :key="item.rawproductid" class="low-stock-item">
-          <div class="item-details">
-            <span class="item-name">{{ item.name }}</span>
-            <span class="item-stock">
-              {{ item.stockquantity }} {{ item.unit }} remaining
-              <span v-if="item.reorderlevel">(reorder at {{ item.reorderlevel }})</span>
+      <div class="fefo-list">
+        <div v-for="batch in expiringBatches.slice(0, 5)" :key="batch.rawtransactionid" class="fefo-row">
+          <div class="fefo-item-info">
+            <span class="fefo-name">{{ batch.rawproduct?.name ?? '—' }}</span>
+            <span class="fefo-batch">{{ batch.batchLabel }} · {{ batch.quantity }} {{ batch.rawproduct?.unit }}</span>
+          </div>
+          <div class="fefo-expiry-info">
+            <span :class="['fefo-days', getDaysUntilExpiry(batch.expirationdate) < 0 ? 'expired' : getDaysUntilExpiry(batch.expirationdate) <= 3 ? 'critical' : 'warning']">
+              {{ getDaysUntilExpiry(batch.expirationdate) < 0 ? 'EXPIRED'
+                : getDaysUntilExpiry(batch.expirationdate) === 0 ? 'Expires today'
+                : `${getDaysUntilExpiry(batch.expirationdate)}d left` }}
             </span>
+            <span class="fefo-date">{{ formatDate(batch.expirationdate) }}</span>
           </div>
-          <div class="item-alert-actions">
-            <span :class="['low-stock-badge', item.stockquantity <= 0 ? 'out' : 'low']">
-              {{ item.stockquantity <= 0 ? 'Out of Stock' : 'Low Stock' }}
-            </span>
-            <button class="restock-quick-btn" @click="openRestockModal(item)">
-              <Plus :size="12" /> Restock
-            </button>
-          </div>
+          <button v-if="getDaysUntilExpiry(batch.expirationdate) < 0" class="expire-btn" @click="markBatchExpired(batch)">
+            Mark Used/Discard
+          </button>
         </div>
-        <p v-if="lowStockItems.length > 6" class="more-alerts">
-          +{{ lowStockItems.length - 6 }} more items need attention
-        </p>
+        <p v-if="expiringBatches.length > 5" class="more-alerts">+{{ expiringBatches.length - 5 }} more batches expiring soon</p>
       </div>
     </div>
 
-    <!-- Inventory Table -->
-    <div class="inventory-section">
+    <!-- EOQ Smart Reorder -->
+    <div v-if="eoqItems.length > 0" class="eoq-panel">
+      <div class="eoq-header">
+        <div class="eoq-title-row">
+          <TrendingUp :size="16" />
+          <h3>Smart Reorder Suggestions</h3>
+          <span class="eoq-badge">EOQ Model</span>
+        </div>
+        <p class="eoq-sub">Items at or below reorder point. Order suggested quantity to optimize cost.</p>
+      </div>
+      <div class="eoq-list">
+        <div v-for="item in eoqItems.slice(0, 4)" :key="item.rawproductid" class="eoq-row">
+          <div class="eoq-item-info">
+            <span class="eoq-name">{{ item.name }}</span>
+            <span class="eoq-stock">{{ item.stockquantity }} {{ item.unit }} remaining</span>
+          </div>
+          <div class="eoq-suggestion">
+            <span class="eoq-label">Order:</span>
+            <span class="eoq-qty">{{ calculateEOQ(item) }} {{ item.unit }}</span>
+          </div>
+          <button class="eoq-restock-btn" @click="openRestockWithEOQ(item)">Add Stock →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-row">
+      <button :class="['tab-btn', activeTab === 'items' ? 'active' : '']" @click="activeTab = 'items'">
+        <Package :size="14" /> Items Overview
+      </button>
+      <button :class="['tab-btn', activeTab === 'batches' ? 'active' : '']" @click="handleBatchTab">
+        <Layers :size="14" /> Batch Tracker
+        <span v-if="expiringBatches.length > 0" class="tab-alert-dot">{{ expiringBatches.length }}</span>
+      </button>
+    </div>
+
+    <!-- ══ ITEMS TAB ══ -->
+    <div v-if="activeTab === 'items'" class="inventory-section">
       <div class="section-header">
         <div>
           <h2>Raw Materials & Supplies</h2>
-          <p class="section-subtitle">{{ selectedBranchName || 'All Branches' }} · {{ filteredItems.length }} items</p>
+          <p class="section-subtitle">{{ filteredItems.length }} items</p>
         </div>
         <div class="header-actions">
           <button class="btn-secondary-outline" @click="openRestockModal(null)">
-            <RefreshCw :size="14" /> Add Stock
+            <RefreshCw :size="13" /> Add Stock
           </button>
           <button class="btn-primary" @click="openNewItemModal">
-            <Plus :size="14" /> Add New Item
+            <Plus :size="13" /> Add New Item
           </button>
         </div>
       </div>
 
       <div class="filters-bar">
         <div class="search-box">
-          <Search :size="15" />
+          <Search :size="14" />
           <input type="text" v-model="searchQuery" placeholder="Search items..." />
         </div>
         <div class="select-wrap sm">
@@ -144,92 +163,189 @@
             <option value="good">In Stock</option>
             <option value="low">Low Stock</option>
             <option value="out">Out of Stock</option>
-            <option value="expiring">Expiring Soon</option>
           </select>
           <ChevronDown :size="13" class="sel-icon" />
         </div>
       </div>
 
-      <div v-if="isLoading" class="loading-state">
-        <div class="spinner"></div> Loading inventory...
-      </div>
+      <div v-if="isLoading" class="loading-state"><div class="spinner"></div> Loading...</div>
       <div v-else class="table-container">
         <table class="inventory-table">
           <thead>
             <tr>
               <th>Item</th>
               <th>Category</th>
-              <th>Stock Qty</th>
+              <th>Total Stock</th>
               <th>Unit</th>
-              <th>Reorder Level</th>
-              <th>Expiry Date</th>
+              <th>Reorder Point</th>
+              <th>EOQ Suggest</th>
+              <th>Batches</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in filteredItems" :key="item.rawproductid">
+            <tr v-for="item in filteredItems" :key="item.rawproductid" :class="{ 'row-alert': getStatus(item) !== 'good' }">
               <td>
                 <div class="product-info">
                   <Package :size="14" class="product-icon" />
-                  <strong>{{ item.name }}</strong>
+                  <strong class="item-name-text">{{ item.name }}</strong>
+                </div>
+                <span class="sku-label">SKU-{{ String(item.rawproductid).padStart(4, '0') }}</span>
+              </td>
+              <td class="td-text">{{ item.category ?? '—' }}</td>
+              <td>
+                <div class="stock-cell">
+                  <span :class="['qty-val', getStatus(item)]">{{ item.stockquantity ?? 0 }}</span>
+                  <div class="stock-bar-wrap" v-if="item.reorderlevel">
+                    <div class="stock-bar"
+                      :style="{ width: Math.min(100, ((item.stockquantity / (item.reorderlevel * 3)) * 100)) + '%' }"
+                      :class="getStatus(item)"></div>
+                  </div>
                 </div>
               </td>
-              <td class="muted">{{ item.category ?? '—' }}</td>
+              <td class="td-text">{{ item.unit }}</td>
+              <td class="td-text">{{ item.reorderlevel ?? '—' }}</td>
               <td>
-                <span :class="['qty-val', getStatus(item)]">{{ item.stockquantity ?? 0 }}</span>
+                <span v-if="item.reorderlevel" class="eoq-chip">{{ calculateEOQ(item) }} {{ item.unit }}</span>
+                <span v-else class="td-text">—</span>
               </td>
-              <td class="muted">{{ item.unit }}</td>
-              <td class="muted">{{ item.reorderlevel ?? '—' }}</td>
               <td>
-                <span v-if="item.expirationdate"
-                  :class="['expiry-val', getExpiryStatus(item.expirationdate)]">
-                  {{ formatDate(item.expirationdate) }}
-                </span>
-                <span v-else class="muted">—</span>
+                <div class="batch-summary" @click="openBatchDetail(item)">
+                  <span class="batch-count">
+                    {{ getBatchCountForItem(item.rawproductid) }} batch{{ getBatchCountForItem(item.rawproductid) !== 1 ? 'es' : '' }}
+                  </span>
+                  <span v-if="getExpiringBatchCount(item.rawproductid) > 0" class="batch-expiring-warn">
+                    {{ getExpiringBatchCount(item.rawproductid) }} expiring
+                  </span>
+                </div>
               </td>
               <td>
                 <span :class="['status-badge', getStatus(item)]">{{ getStatusText(item) }}</span>
               </td>
               <td class="actions-cell">
-                <button class="icon-btn restock" @click="openRestockModal(item)" title="Add Stock">
-                  <RefreshCw :size="13" />
-                </button>
-                <button class="icon-btn delete" @click="confirmDelete(item)" title="Delete">
-                  <Trash2 :size="13" />
-                </button>
+                <button class="icon-btn restock" @click="openRestockModal(item)" title="Add Stock"><RefreshCw :size="14" /></button>
+                <button class="icon-btn batches" @click="openBatchDetail(item)" title="View Batches"><Layers :size="14" /></button>
+                <button class="icon-btn delete" @click="confirmDelete(item)" title="Remove"><Trash2 :size="14" /></button>
               </td>
             </tr>
             <tr v-if="!filteredItems.length">
-              <td colspan="8" class="empty-row">No items found.</td>
+              <td colspan="9" class="empty-row">No items found.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- ── ADD NEW ITEM MODAL (brand new raw material) ── -->
+    <!-- ══ BATCH TRACKER TAB ══ -->
+    <div v-if="activeTab === 'batches'" class="inventory-section">
+      <div class="section-header">
+        <div>
+          <h2>Batch Tracker</h2>
+          <p class="section-subtitle">FEFO order — earliest expiring shown first · {{ allBatches.length }} active batches</p>
+        </div>
+        <div class="fefo-legend">
+          <span class="fl-item"><span class="fl-dot expired"></span>Expired</span>
+          <span class="fl-item"><span class="fl-dot critical"></span>≤3 days</span>
+          <span class="fl-item"><span class="fl-dot warning"></span>≤7 days</span>
+          <span class="fl-item"><span class="fl-dot ok"></span>Safe</span>
+        </div>
+      </div>
+
+      <div class="filters-bar">
+        <div class="search-box">
+          <Search :size="14" />
+          <input type="text" v-model="batchSearch" placeholder="Search by item name or batch ID..." />
+        </div>
+        <div class="select-wrap sm">
+          <select v-model="batchFilterExpiry" class="filter-select">
+            <option value="">All Batches</option>
+            <option value="expired">Expired</option>
+            <option value="critical">Critical (≤3 days)</option>
+            <option value="warning">Warning (≤7 days)</option>
+            <option value="ok">Safe</option>
+          </select>
+          <ChevronDown :size="13" class="sel-icon" />
+        </div>
+      </div>
+
+      <div v-if="loadingBatches" class="loading-state"><div class="spinner"></div> Loading batches...</div>
+      <div v-else-if="fetchBatchError" class="error-state">
+        <AlertCircle :size="18" /> {{ fetchBatchError }}
+        <button class="retry-btn" @click="fetchBatches">Retry</button>
+      </div>
+      <div v-else class="table-container">
+        <table class="inventory-table">
+          <thead>
+            <tr>
+              <th>Batch ID</th>
+              <th>Item</th>
+              <th>SKU</th>
+              <th>Batch Qty</th>
+              <th>Received</th>
+              <th>Expiry Date</th>
+              <th>Days Left</th>
+              <th>FEFO Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="batch in filteredBatches" :key="batch.rawtransactionid"
+              :class="['batch-row', getBatchExpiryClass(batch.expirationdate)]">
+              <td><span class="batch-id-tag">{{ batch.batchLabel }}</span></td>
+              <td>
+                <strong class="item-name-text">{{ batch.rawproduct?.name ?? '—' }}</strong>
+              </td>
+              <td><span class="sku-label" style="margin:0">SKU-{{ String(batch.rawproductid).padStart(4, '0') }}</span></td>
+              <td>
+                <span class="qty-val" :class="getBatchExpiryClass(batch.expirationdate)">{{ batch.quantity }}</span>
+                <span class="td-text"> {{ batch.rawproduct?.unit }}</span>
+              </td>
+              <td class="td-text">{{ formatDate(batch.createdat) }}</td>
+              <td>
+                <span :class="['expiry-val', getBatchExpiryClass(batch.expirationdate)]">
+                  {{ batch.expirationdate ? formatDate(batch.expirationdate) : '—' }}
+                </span>
+              </td>
+              <td>
+                <span :class="['days-chip', getBatchExpiryClass(batch.expirationdate)]">{{ getDaysLabel(batch.expirationdate) }}</span>
+              </td>
+              <td>
+                <span :class="['fefo-status-badge', getBatchExpiryClass(batch.expirationdate)]">{{ getFEFOLabel(batch.expirationdate) }}</span>
+              </td>
+              <td class="actions-cell">
+                <button class="icon-btn delete" @click="confirmDeleteBatch(batch)" title="Mark used/discard"><Trash2 :size="14" /></button>
+              </td>
+            </tr>
+            <tr v-if="filteredBatches.length === 0">
+              <td colspan="9" class="empty-row">No batches found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ ADD NEW ITEM MODAL ══ -->
     <div v-if="showNewItemModal" class="modal" @click.self="closeNewItemModal">
       <div class="modal-content">
         <div class="modal-header">
           <div>
             <h2>Add New Item</h2>
-            <p class="modal-sub">Register a new raw material or supply</p>
+            <p class="modal-sub">Register a new raw material — a unique SKU will be assigned</p>
           </div>
           <button class="close-btn" @click="closeNewItemModal">×</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
             <label>Item Name *</label>
-            <input type="text" v-model="newItemForm.name"
-              placeholder="e.g. Whole Milk, Arabica Beans, Paper Cups" />
+            <input type="text" v-model="newItemForm.name" placeholder="e.g. Whole Milk, Arabica Beans, Paper Cups 16oz" />
             <span v-if="newItemErrors.name" class="field-error">{{ newItemErrors.name }}</span>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label>Category</label>
               <select v-model="newItemForm.category">
-                <option value="">Select Category</option>
+                <option value="">Select</option>
                 <option value="Coffee Beans">Coffee Beans</option>
                 <option value="Dairy">Dairy</option>
                 <option value="Syrup">Syrup</option>
@@ -243,38 +359,43 @@
             <div class="form-group">
               <label>Unit *</label>
               <select v-model="newItemForm.unit">
-                <option value="g">g (grams)</option>
-                <option value="kg">kg (kilograms)</option>
-                <option value="ml">ml (milliliters)</option>
-                <option value="l">l (liters)</option>
-                <option value="pcs">pcs (pieces)</option>
-                <option value="oz">oz (ounces)</option>
-                <option value="tbsp">tbsp</option>
-                <option value="tsp">tsp</option>
+                <option value="g">g</option>
+                <option value="kg">kg</option>
+                <option value="ml">ml</option>
+                <option value="l">l</option>
+                <option value="pcs">pcs</option>
+                <option value="oz">oz</option>
               </select>
               <span v-if="newItemErrors.unit" class="field-error">{{ newItemErrors.unit }}</span>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Initial Stock Quantity</label>
-              <input type="number" v-model.number="newItemForm.stockquantity" min="0"
-                placeholder="0" />
+              <label>Reorder Point <span class="label-hint">— alert threshold</span></label>
+              <input type="number" v-model.number="newItemForm.reorderlevel" min="0" placeholder="e.g. 500" />
             </div>
             <div class="form-group">
-              <label>Reorder Level</label>
-              <input type="number" v-model.number="newItemForm.reorderlevel" min="0"
-                placeholder="Alert when below this" />
+              <label>Lead Time (days) <span class="label-hint">— for EOQ</span></label>
+              <input type="number" v-model.number="newItemForm.leadTimeDays" min="1" placeholder="2" />
             </div>
           </div>
-          <div class="form-group">
-            <label>Expiration Date <span class="optional">(optional)</span></label>
-            <input type="date" v-model="newItemForm.expirationdate" />
+
+          <div class="divider-label">Initial Stock Batch</div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Initial Quantity</label>
+              <input type="number" v-model.number="newItemForm.stockquantity" min="0" placeholder="0" />
+            </div>
+            <div class="form-group">
+              <label>Expiration Date <span class="optional">(if applicable)</span></label>
+              <input type="date" v-model="newItemForm.expirationdate" />
+            </div>
           </div>
 
           <div class="info-box">
-            <Info :size="14" />
-            <span>This registers a <strong>new item</strong> in your inventory. To add more stock to an existing item, use <strong>Add Stock</strong> instead.</span>
+            <Info :size="13" />
+            <span>A unique <strong>SKU</strong> will be auto-assigned. Each time you add stock, a new <strong>batch</strong> is created with its own expiry date — enabling FEFO tracking.</span>
           </div>
 
           <div class="modal-actions">
@@ -287,79 +408,145 @@
       </div>
     </div>
 
-    <!-- ── ADD STOCK MODAL (restock existing item) ── -->
+    <!-- ══ ADD STOCK MODAL ══ -->
     <div v-if="showRestockModal" class="modal" @click.self="closeRestockModal">
-      <div class="modal-content" style="max-width:480px">
+      <div class="modal-content restock-modal">
         <div class="modal-header">
           <div>
             <h2>Add Stock</h2>
-            <p class="modal-sub">Log incoming supplies</p>
+            <p class="modal-sub">Each delivery creates a new tracked batch with its own expiry date</p>
           </div>
           <button class="close-btn" @click="closeRestockModal">×</button>
         </div>
         <div class="modal-body">
 
-          <!-- If no item pre-selected, show dropdown to pick one -->
-          <div v-if="!restockTarget" class="form-group">
-            <label>Select Item *</label>
-            <div class="select-wrap full">
-              <select v-model="restockSelectedId" class="filter-select">
-                <option :value="null">Choose an existing item...</option>
-                <option v-for="i in allRawItems" :key="i.rawproductid" :value="i.rawproductid">
-                  {{ i.name }} — current: {{ i.stockquantity }} {{ i.unit }}
-                </option>
-              </select>
-              <ChevronDown :size="13" class="sel-icon" />
+          <!-- STEP 1: Item picker (no pre-selection) -->
+          <div v-if="!restockTarget && !restockSelectedId" class="step-block">
+            <p class="step-label"><span class="step-num">1</span> Select an item to restock</p>
+            <div class="item-picker-grid">
+              <button
+                v-for="i in allRawItems" :key="i.rawproductid"
+                class="item-picker-card"
+                :class="{ selected: restockSelectedId === i.rawproductid, alert: getStatus(i) !== 'good' }"
+                @click="restockSelectedId = i.rawproductid"
+              >
+                <div class="ipc-top">
+                  <span class="ipc-sku">SKU-{{ String(i.rawproductid).padStart(4, '0') }}</span>
+                  <span :class="['ipc-status', getStatus(i)]">{{ getStatusText(i) }}</span>
+                </div>
+                <span class="ipc-name">{{ i.name }}</span>
+                <span class="ipc-stock">{{ i.stockquantity }} {{ i.unit }} in stock</span>
+              </button>
             </div>
+            <span v-if="restockErrors.item" class="field-error">{{ restockErrors.item }}</span>
           </div>
 
-          <!-- If item pre-selected, show info card -->
-          <div v-else class="restock-target-card">
-            <div class="rtc-name">
-              <Package :size="14" />
-              <strong>{{ restockTarget.name }}</strong>
+          <!-- STEP 2: Batch details -->
+          <div v-else>
+            <!-- Selected item card -->
+            <div class="restock-target-card" v-if="restockPreviewItem">
+              <div class="rtc-top">
+                <div class="rtc-name"><Package :size="13" /><strong>{{ restockPreviewItem.name }}</strong></div>
+                <span class="rtc-sku">SKU-{{ String(restockPreviewItem.rawproductid).padStart(4,'0') }}</span>
+              </div>
+              <div class="rtc-stat-grid">
+                <div class="rtc-stat">
+                  <span class="rtcs-label">Current Total Stock</span>
+                  <span :class="['rtcs-val', getStatus(restockPreviewItem)]">
+                    {{ restockPreviewItem.stockquantity }} {{ restockPreviewItem.unit }}
+                  </span>
+                </div>
+                <div class="rtc-stat" v-if="restockPreviewItem.reorderlevel">
+                  <span class="rtcs-label">Reorder Point</span>
+                  <span class="rtcs-val neutral">{{ restockPreviewItem.reorderlevel }} {{ restockPreviewItem.unit }}</span>
+                </div>
+                <div class="rtc-stat" v-if="restockPreviewItem.reorderlevel">
+                  <span class="rtcs-label">EOQ Suggestion</span>
+                  <span class="rtcs-val blue">{{ calculateEOQ(restockPreviewItem) }} {{ restockPreviewItem.unit }}</span>
+                </div>
+              </div>
+              <button class="change-item-btn" @click="restockTarget = null; restockSelectedId = null">← Change item</button>
             </div>
-            <div class="rtc-stats">
-              <span>Current stock: <strong>{{ restockTarget.stockquantity }} {{ restockTarget.unit }}</strong></span>
-              <span v-if="restockTarget.reorderlevel">Reorder at: {{ restockTarget.reorderlevel }}</span>
-            </div>
-            <button class="change-item-btn" @click="restockTarget = null; restockSelectedId = null">
-              Change item
-            </button>
-          </div>
 
-          <div class="form-row" style="margin-top: 16px;">
-            <div class="form-group">
-              <label>Quantity to Add *</label>
-              <input type="number" v-model.number="restockForm.quantity" min="1"
-                placeholder="e.g. 500" />
-              <span v-if="restockErrors.quantity" class="field-error">{{ restockErrors.quantity }}</span>
+            <!-- Branch selector — shown ONLY in All Branches mode -->
+            <div v-if="!selectedBranchId" class="branch-required-block">
+              <label class="bfg-label">
+                Destination Branch *
+                <span class="label-hint">— you are in All Branches mode</span>
+              </label>
+              <div class="select-wrap" style="max-width:100%;margin-top:6px">
+                <select v-model="restockForm.branchId" class="filter-select">
+                  <option :value="null">Select a branch...</option>
+                  <option v-for="b in branches" :key="b.BranchId" :value="b.BranchId">{{ b.BranchName }}</option>
+                </select>
+                <ChevronDown :size="13" class="sel-icon" />
+              </div>
+              <span v-if="restockErrors.branch" class="field-error">{{ restockErrors.branch }}</span>
             </div>
-            <div class="form-group">
-              <label>New Expiry Date <span class="optional">(optional)</span></label>
-              <input type="date" v-model="restockForm.expirationdate" />
+            <div v-else class="branch-assigned-note">
+              <span>📍 Stock will be added to <strong>{{ selectedBranchName }}</strong></span>
             </div>
-          </div>
 
-          <!-- Preview new total -->
-          <div class="restock-preview" v-if="restockPreviewItem && restockForm.quantity > 0">
-            <div class="rp-row">
-              <span>Current stock</span>
-              <span>{{ restockPreviewItem.stockquantity }} {{ restockPreviewItem.unit }}</span>
+            <div class="divider-label">New Batch Details</div>
+
+            <!-- 2-column batch form -->
+            <div class="batch-form-grid">
+              <div class="bfg-card">
+                <label class="bfg-label">Quantity to Add *</label>
+                <div class="bfg-qty-row">
+                  <input
+                    type="number"
+                    v-model.number="restockForm.quantity"
+                    min="1"
+                    placeholder="0"
+                    class="bfg-qty-input"
+                  />
+                  <span class="bfg-unit-badge">{{ restockPreviewItem?.unit }}</span>
+                </div>
+                <button
+                  v-if="restockPreviewItem?.reorderlevel"
+                  class="eoq-fill-btn"
+                  @click="restockForm.quantity = calculateEOQ(restockPreviewItem)"
+                >
+                  <TrendingUp :size="12" /> Fill EOQ ({{ calculateEOQ(restockPreviewItem) }})
+                </button>
+                <span v-if="restockErrors.quantity" class="field-error">{{ restockErrors.quantity }}</span>
+              </div>
+
+              <div class="bfg-card">
+                <label class="bfg-label">Expiry Date <span class="label-hint">— for FEFO tracking</span></label>
+                <input type="date" v-model="restockForm.expirationdate" class="bfg-date-input" />
+                <p class="bfg-note">Leave blank for non-perishables (e.g. cups, straws)</p>
+              </div>
             </div>
-            <div class="rp-row add">
-              <span>Adding</span>
-              <span>+ {{ restockForm.quantity }} {{ restockPreviewItem.unit }}</span>
+
+            <!-- Live stock preview -->
+            <div class="restock-preview" v-if="restockPreviewItem && restockForm.quantity > 0">
+              <div class="rp-row"><span>Current total stock</span><span>{{ restockPreviewItem.stockquantity }} {{ restockPreviewItem.unit }}</span></div>
+              <div class="rp-row add"><span>+ This batch</span><span>+{{ restockForm.quantity }} {{ restockPreviewItem.unit }}</span></div>
+              <div class="rp-row total">
+                <span>New total</span>
+                <span>{{ restockPreviewItem.stockquantity + restockForm.quantity }} {{ restockPreviewItem.unit }}</span>
+              </div>
+              <div class="rp-row">
+                <span>Status after</span>
+                <span :class="['status-badge', getStatusAfterRestock(restockPreviewItem, restockForm.quantity)]">
+                  {{ getStatusTextAfterRestock(restockPreviewItem, restockForm.quantity) }}
+                </span>
+              </div>
             </div>
-            <div class="rp-row total">
-              <span>New total</span>
-              <span>{{ restockPreviewItem.stockquantity + restockForm.quantity }} {{ restockPreviewItem.unit }}</span>
+
+            <div class="fefo-note">
+              <Layers :size="12" />
+              <span>A new sub-batch will be logged under <strong>{{ restockPreviewItem?.name }}</strong>. Staff will be reminded to use earliest-expiring batches first (FEFO).</span>
             </div>
           </div>
 
           <div class="modal-actions">
             <button class="btn-secondary" @click="closeRestockModal">Cancel</button>
-            <button class="btn-primary" :disabled="savingRestock" @click="saveRestock">
+            <button class="btn-primary"
+              :disabled="savingRestock || (!restockTarget && !restockSelectedId)"
+              @click="saveRestock">
               {{ savingRestock ? 'Saving...' : 'Confirm Add Stock' }}
             </button>
           </div>
@@ -367,17 +554,86 @@
       </div>
     </div>
 
-    <!-- DELETE CONFIRM -->
+    <!-- ══ BATCH DETAIL MODAL ══ -->
+    <div v-if="showBatchDetail" class="modal" @click.self="showBatchDetail = false">
+      <div class="modal-content" style="max-width:640px">
+        <div class="modal-header">
+          <div>
+            <h2>{{ batchDetailItem?.name }} — All Batches</h2>
+            <p class="modal-sub">SKU-{{ String(batchDetailItem?.rawproductid).padStart(4,'0') }} · each row = one delivery/restock · FEFO order</p>
+          </div>
+          <button class="close-btn" @click="showBatchDetail = false">×</button>
+        </div>
+        <div class="modal-body" style="padding:0">
+          <div v-if="loadingItemBatches" class="loading-state" style="padding:30px"><div class="spinner"></div> Loading batches...</div>
+          <table v-else class="inventory-table">
+            <thead>
+              <tr>
+                <th>Sub-Batch</th>
+                <th>Qty (this batch)</th>
+                <th>Received On</th>
+                <th>Expiry Date</th>
+                <th>Days Left</th>
+                <th>FEFO Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="batch in itemBatches" :key="batch.rawtransactionid"
+                :class="['batch-row', getBatchExpiryClass(batch.expirationdate)]">
+                <td><span class="batch-id-tag">{{ batch.batchLabel }}</span></td>
+                <td>
+                  <strong class="qty-val" :class="getBatchExpiryClass(batch.expirationdate)">{{ batch.quantity }}</strong>
+                  <span class="td-text"> {{ batchDetailItem?.unit }}</span>
+                </td>
+                <td class="td-text">{{ formatDate(batch.createdat) }}</td>
+                <td>
+                  <span :class="['expiry-val', getBatchExpiryClass(batch.expirationdate)]">
+                    {{ batch.expirationdate ? formatDate(batch.expirationdate) : 'No expiry' }}
+                  </span>
+                </td>
+                <td>
+                  <span :class="['days-chip', getBatchExpiryClass(batch.expirationdate)]">{{ getDaysLabel(batch.expirationdate) }}</span>
+                </td>
+                <td>
+                  <span :class="['fefo-status-badge', getBatchExpiryClass(batch.expirationdate)]">{{ getFEFOLabel(batch.expirationdate) }}</span>
+                </td>
+                <td>
+                  <button class="icon-btn delete" @click="confirmDeleteBatch(batch)"><Trash2 :size="13" /></button>
+                </td>
+              </tr>
+              <tr v-if="itemBatches.length === 0">
+                <td colspan="7" class="empty-row">No batches for this item yet.</td>
+              </tr>
+            </tbody>
+          </table>
+          <!-- Total summary row -->
+          <div v-if="itemBatches.length > 0" class="batch-total-row">
+            <span>Total across {{ itemBatches.length }} batch{{ itemBatches.length !== 1 ? 'es' : '' }}:</span>
+            <strong>{{ itemBatches.reduce((s, b) => s + (b.quantity || 0), 0) }} {{ batchDetailItem?.unit }}</strong>
+            <span class="td-text">(matches rawproduct.stockquantity)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ DELETE CONFIRM ══ -->
     <Teleport to="body">
       <div v-if="showDeleteConfirm" class="modal" @click.self="showDeleteConfirm = false">
         <div class="modal-content" style="max-width:420px">
           <div class="modal-header">
-            <h2>Remove Item</h2>
+            <h2>{{ deleteType === 'batch' ? 'Remove Batch' : 'Remove Item' }}</h2>
             <button class="close-btn" @click="showDeleteConfirm = false">×</button>
           </div>
           <div class="modal-body">
             <p style="font-size:14px;margin-bottom:16px">
-              Remove <strong>{{ deleteTarget?.name }}</strong> from inventory? This cannot be undone.
+              <span v-if="deleteType === 'batch'">
+                Remove batch <strong>{{ deleteTarget?.batchLabel }}</strong>
+                ({{ deleteTarget?.quantity }} {{ deleteTarget?.rawproduct?.unit ?? batchDetailItem?.unit }})? The stock total will decrease by this amount.
+              </span>
+              <span v-else>
+                Remove <strong>{{ deleteTarget?.name }}</strong> and ALL its batches? This cannot be undone.
+              </span>
             </p>
             <div class="modal-actions">
               <button class="btn-secondary" @click="showDeleteConfirm = false">Cancel</button>
@@ -390,110 +646,166 @@
       </div>
     </Teleport>
 
-    <!-- TOAST -->
     <Teleport to="body">
       <div v-if="toast.show" :class="['toast-wrap', toast.type]">{{ toast.message }}</div>
     </Teleport>
-
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import {
-  Plus, Package, AlertCircle, Search, Trash2,
-  AlertTriangle, ChevronDown, CalendarX, XCircle, RefreshCw, Info
+  Plus, Package, AlertCircle, Search, Trash2, TrendingUp, Layers,
+  ChevronDown, CalendarX, XCircle, RefreshCw, Info
 } from 'lucide-vue-next'
 import { supabase } from '@/supabase.js'
 
-// State
-const isLoading  = ref(false)
-const savingNewItem = ref(false)
-const savingRestock = ref(false)
-const deleting   = ref(false)
+// STATE
+const isLoading        = ref(false)
+const loadingBatches   = ref(false)
+const loadingItemBatches = ref(false)
+const savingNewItem    = ref(false)
+const savingRestock    = ref(false)
+const deleting         = ref(false)
+const fetchBatchError  = ref('')
 
 const branches         = ref([])
 const selectedBranchId = ref(null)
 const allRawItems      = ref([])
+const allBatches       = ref([])   // all rawproducttransaction rows (transactiontype=restock)
 
-const searchQuery    = ref('')
-const filterCategory = ref('')
-const filterStatus   = ref('')
+const activeTab         = ref('items')
+const searchQuery       = ref('')
+const filterCategory    = ref('')
+const filterStatus      = ref('')
+const batchSearch       = ref('')
+const batchFilterExpiry = ref('')
 
-// New Item Modal
 const showNewItemModal = ref(false)
 const newItemErrors    = ref({})
-const newItemForm      = ref({
-  name: '', category: '', unit: 'g',
-  stockquantity: 0, reorderlevel: 0, expirationdate: ''
-})
+const newItemForm      = ref({ name: '', category: '', unit: 'g', stockquantity: 0, reorderlevel: 0, expirationdate: '', leadTimeDays: 2 })
 
-// Restock Modal
 const showRestockModal  = ref(false)
-const restockTarget     = ref(null)   // pre-selected item (from alert quick button or table button)
-const restockSelectedId = ref(null)   // dropdown selection when no pre-selected
+const restockTarget     = ref(null)
+const restockSelectedId = ref(null)
 const restockErrors     = ref({})
-const restockForm       = ref({ quantity: 0, expirationdate: '' })
+const restockForm       = ref({ quantity: 0, expirationdate: '', branchId: null })
 
-// Delete
 const showDeleteConfirm = ref(false)
 const deleteTarget      = ref(null)
+const deleteType        = ref('item')
+
+const showBatchDetail = ref(false)
+const batchDetailItem = ref(null)
+const itemBatches     = ref([])
 
 const toast = ref({ show: false, message: '', type: 'success' })
 
-// Computed 
+// BATCH LABELLING
+// B{rawproductid} for first batch, B{rawproductid}-2, B{rawproductid}-3 etc.
+// Uses rawtransactionid order (ascending = insertion order)
+const buildBatchLabels = (batches) => {
+  // Group by rawproductid, sorted by rawtransactionid asc
+  const groups = {}
+  const sorted = [...batches].sort((a, b) => a.rawtransactionid - b.rawtransactionid)
+  for (const b of sorted) {
+    if (!groups[b.rawproductid]) groups[b.rawproductid] = []
+    groups[b.rawproductid].push(b)
+  }
+  const labelMap = {}
+  for (const [rid, rows] of Object.entries(groups)) {
+    rows.forEach((b, i) => {
+      labelMap[b.rawtransactionid] = i === 0 ? `B${rid}` : `B${rid}-${i + 1}`
+    })
+  }
+  return labelMap
+}
+
+const batchLabelMap = computed(() => buildBatchLabels(allBatches.value))
+
+const attachLabels = (batches, labelMap) =>
+  batches.map(b => ({ ...b, batchLabel: labelMap[b.rawtransactionid] ?? `#${b.rawtransactionid}` }))
+
+// EOQ
+const calculateEOQ = (item) => {
+  if (!item.reorderlevel) return 0
+  const dailyUsage = item.dailyusage ?? (item.reorderlevel / 3)
+  const leadTime   = item.leadtimedays ?? 2
+  return Math.ceil(dailyUsage * leadTime * 1.15)
+}
+
+// COMPUTED
 const selectedBranchName = computed(() =>
   branches.value.find(b => b.BranchId === selectedBranchId.value)?.BranchName ?? ''
 )
 
 const filteredItems = computed(() => {
   let list = allRawItems.value
-  if (searchQuery.value)
-    list = list.filter(i => i.name?.toLowerCase().includes(searchQuery.value.toLowerCase()))
-  if (filterCategory.value)
-    list = list.filter(i => i.category === filterCategory.value)
-  if (filterStatus.value === 'expiring')
-    list = list.filter(i => getExpiryStatus(i.expirationdate) === 'expiring')
-  else if (filterStatus.value)
-    list = list.filter(i => getStatus(i) === filterStatus.value)
+  if (searchQuery.value) list = list.filter(i => i.name?.toLowerCase().includes(searchQuery.value.toLowerCase()))
+  if (filterCategory.value) list = list.filter(i => i.category === filterCategory.value)
+  if (filterStatus.value) list = list.filter(i => getStatus(i) === filterStatus.value)
   return list
 })
+
+// FEFO sort: earliest expiry first, no-expiry batches at end
+const sortedBatches = computed(() => {
+  const labelled = attachLabels(allBatches.value, batchLabelMap.value)
+  return [...labelled].sort((a, b) => {
+    if (!a.expirationdate && !b.expirationdate) return 0
+    if (!a.expirationdate) return 1
+    if (!b.expirationdate) return -1
+    return new Date(a.expirationdate) - new Date(b.expirationdate)
+  })
+})
+
+const filteredBatches = computed(() => {
+  let list = sortedBatches.value
+  if (batchSearch.value) {
+    const q = batchSearch.value.toLowerCase()
+    list = list.filter(b =>
+      b.rawproduct?.name?.toLowerCase().includes(q) ||
+      b.batchLabel?.toLowerCase().includes(q) ||
+      String(b.rawtransactionid).includes(q)
+    )
+  }
+  if (batchFilterExpiry.value) {
+    list = list.filter(b => getBatchExpiryClass(b.expirationdate) === batchFilterExpiry.value)
+  }
+  return list
+})
+
+const expiringBatches = computed(() =>
+  sortedBatches.value.filter(b => b.expirationdate && getDaysUntilExpiry(b.expirationdate) <= 7)
+)
 
 const categories = computed(() =>
   [...new Set(allRawItems.value.map(i => i.category).filter(Boolean))].sort()
 )
 
-const lowStockItems = computed(() =>
-  allRawItems.value.filter(i =>
-    (i.stockquantity ?? 0) <= 0 || (i.reorderlevel && i.stockquantity <= i.reorderlevel)
-  )
+const eoqItems = computed(() =>
+  allRawItems.value.filter(i => i.reorderlevel && (i.stockquantity ?? 0) <= i.reorderlevel)
 )
 
 const allBranchStats = computed(() => ({
   total:    allRawItems.value.length,
   low:      allRawItems.value.filter(i => i.reorderlevel && i.stockquantity > 0 && i.stockquantity <= i.reorderlevel).length,
   out:      allRawItems.value.filter(i => (i.stockquantity ?? 0) <= 0).length,
-  expiring: allRawItems.value.filter(i => getExpiryStatus(i.expirationdate) === 'expiring').length,
+  expiring: expiringBatches.value.length,
 }))
 
-const branchSummaries = computed(() =>
-  branches.value.map(b => ({
-    BranchId: b.BranchId, BranchName: b.BranchName,
-    total: allRawItems.value.length,
-    low:   allRawItems.value.filter(i => i.reorderlevel && i.stockquantity > 0 && i.stockquantity <= i.reorderlevel).length,
-    out:   allRawItems.value.filter(i => (i.stockquantity ?? 0) <= 0).length,
-  }))
-)
-
-// The actual item being restocked — either pre-selected or picked from dropdown
 const restockPreviewItem = computed(() => {
   if (restockTarget.value) return restockTarget.value
-  if (restockSelectedId.value)
-    return allRawItems.value.find(i => i.rawproductid === restockSelectedId.value) ?? null
+  if (restockSelectedId.value) return allRawItems.value.find(i => i.rawproductid === restockSelectedId.value) ?? null
   return null
 })
 
-// Fetch
+// BATCH COUNT HELPERS (uses allBatches which is always loaded on mount)
+const getBatchCountForItem  = (id) => allBatches.value.filter(b => b.rawproductid === id).length
+const getExpiringBatchCount = (id) =>
+  allBatches.value.filter(b => b.rawproductid === id && b.expirationdate && getDaysUntilExpiry(b.expirationdate) <= 7).length
+
+// FETCH — only reads columns that actually exist in DB schema
+// rawproducttransaction columns: rawtransactionid, rawproductid, transactiontype, quantity, expirationdate, createdat
 const fetchBranches = async () => {
   const { data } = await supabase.from('branch').select('BranchId, BranchName').order('BranchName')
   if (data) branches.value = data
@@ -510,116 +822,307 @@ const fetchRawMaterials = async () => {
     .from('rawproduct')
     .select('rawproductid, name, category, unit, stockquantity, reorderlevel, expirationdate, createdat, updatedat')
     .order('name')
-  if (error) { showToast('Failed to load inventory.', 'error'); isLoading.value = false; return }
+  if (error) { showToast('Failed to load inventory: ' + error.message, 'error'); isLoading.value = false; return }
   allRawItems.value = data ?? []
   isLoading.value = false
 }
 
-// Add New Item 
+// Key fix: only select columns that EXIST in rawproducttransaction per DB schema
+// No branchid — that column doesn't exist yet
+const fetchBatches = async () => {
+  loadingBatches.value = true
+  fetchBatchError.value = ''
+  const { data, error } = await supabase
+    .from('rawproducttransaction')
+    .select(`
+      rawtransactionid,
+      rawproductid,
+      transactiontype,
+      quantity,
+      expirationdate,
+      createdat,
+      rawproduct ( name, unit, category )
+    `)
+    .eq('transactiontype', 'restock')
+    .order('rawtransactionid', { ascending: true })
+
+  if (error) {
+    console.error('fetchBatches error:', error)
+    fetchBatchError.value = 'Failed to load batches: ' + error.message
+    loadingBatches.value = false
+    return
+  }
+
+  // Filter out zero-qty rows on the client side to avoid DB-side issues
+  allBatches.value = (data ?? []).filter(b => (b.quantity ?? 0) > 0)
+  loadingBatches.value = false
+}
+
+const handleBatchTab = async () => {
+  activeTab.value = 'batches'
+  // Always refresh when switching to batch tab to show latest data
+  await fetchBatches()
+}
+
+// NEW ITEM
 const openNewItemModal = () => {
   newItemErrors.value = {}
-  newItemForm.value = { name: '', category: '', unit: 'g', stockquantity: 0, reorderlevel: 0, expirationdate: '' }
+  newItemForm.value = { name: '', category: '', unit: 'g', stockquantity: 0, reorderlevel: 0, expirationdate: '', leadTimeDays: 2 }
   showNewItemModal.value = true
 }
-
 const closeNewItemModal = () => { showNewItemModal.value = false; newItemErrors.value = {} }
 
-const validateNewItem = () => {
+const saveNewItem = async () => {
   const e = {}
   if (!newItemForm.value.name.trim()) e.name = 'Name is required.'
-  if (!newItemForm.value.unit) e.unit = 'Unit is required.'
+  if (!newItemForm.value.unit)        e.unit = 'Unit is required.'
   newItemErrors.value = e
-  return Object.keys(e).length === 0
-}
+  if (Object.keys(e).length > 0) return
 
-const saveNewItem = async () => {
-  if (!validateNewItem()) return
   savingNewItem.value = true
-  const { error } = await supabase.from('rawproduct').insert([{
-    name: newItemForm.value.name,
-    category: newItemForm.value.category || null,
-    unit: newItemForm.value.unit,
-    stockquantity: newItemForm.value.stockquantity || 0,
-    reorderlevel: newItemForm.value.reorderlevel || null,
-    expirationdate: newItemForm.value.expirationdate || null,
-  }])
-  if (error) showToast('Failed: ' + error.message, 'error')
-  else {
-    showToast(`"${newItemForm.value.name}" added to inventory.`, 'success')
-    await fetchRawMaterials()
-    closeNewItemModal()
+
+  // 1. Insert rawproduct row
+  const { data: newItem, error: itemErr } = await supabase
+    .from('rawproduct')
+    .insert([{
+      name:           newItemForm.value.name.trim(),
+      category:       newItemForm.value.category || null,
+      unit:           newItemForm.value.unit,
+      stockquantity:  newItemForm.value.stockquantity || 0,
+      reorderlevel:   newItemForm.value.reorderlevel || null,
+      expirationdate: newItemForm.value.expirationdate || null,
+    }])
+    .select()
+    .single()
+
+  if (itemErr) { showToast('Failed to add item: ' + itemErr.message, 'error'); savingNewItem.value = false; return }
+
+  // 2. If initial qty > 0, log it as the first batch in rawproducttransaction
+  if (newItemForm.value.stockquantity > 0 && newItem) {
+    const { error: txErr } = await supabase
+      .from('rawproducttransaction')
+      .insert([{
+        rawproductid:    newItem.rawproductid,
+        transactiontype: 'restock',
+        quantity:        newItemForm.value.stockquantity,
+        expirationdate:  newItemForm.value.expirationdate || null,
+      }])
+    if (txErr) console.error('Initial batch insert error:', txErr)
   }
+
+  showToast(`"${newItem.name}" added — SKU-${String(newItem.rawproductid).padStart(4,'0')}`, 'success')
+  await Promise.all([fetchRawMaterials(), fetchBatches()])
+  closeNewItemModal()
   savingNewItem.value = false
 }
 
-// Add Stock (Restock)
+// RESTOCK (ADD STOCK)
+// Logic:
+//   rawproduct.stockquantity = running SUM of all batch quantities (the grand total)
+//   Each restock: stockquantity += batchQty  (additive, never overwrites)
+//   Each batch delete: stockquantity -= batchQty
+//   rawproduct.expirationdate = updated to soonest expiry (for FEFO reference on rawproduct row)
 const openRestockModal = (item) => {
   restockErrors.value = {}
-  restockForm.value = { quantity: 0, expirationdate: '' }
-  restockTarget.value = item  // null = user will pick from dropdown
+  restockForm.value = {
+    quantity: 0,
+    expirationdate: '',
+    branchId: selectedBranchId.value ?? null
+  }
+  restockTarget.value     = item
   restockSelectedId.value = item?.rawproductid ?? null
-  showRestockModal.value = true
+  showRestockModal.value  = true
 }
-
+const openRestockWithEOQ = (item) => {
+  openRestockModal(item)
+  restockForm.value.quantity = calculateEOQ(item)
+}
 const closeRestockModal = () => {
-  showRestockModal.value = false
-  restockTarget.value = null
+  showRestockModal.value  = false
+  restockTarget.value     = null
   restockSelectedId.value = null
-  restockErrors.value = {}
-}
-
-const validateRestock = () => {
-  const e = {}
-  if (!restockPreviewItem.value) e.quantity = 'Please select an item.'
-  else if (!restockForm.value.quantity || restockForm.value.quantity <= 0) e.quantity = 'Enter a valid quantity.'
-  restockErrors.value = e
-  return Object.keys(e).length === 0
+  restockErrors.value     = {}
 }
 
 const saveRestock = async () => {
-  if (!validateRestock()) return
+  const e = {}
+  if (!restockPreviewItem.value) {
+    e.item = 'Please select an item.'
+  } else {
+    if (!restockForm.value.quantity || restockForm.value.quantity <= 0)
+      e.quantity = 'Enter a valid quantity.'
+    // Branch is required when admin is in All Branches view
+    if (!selectedBranchId.value && !restockForm.value.branchId)
+      e.branch = 'Please select a destination branch.'
+  }
+  restockErrors.value = e
+  if (Object.keys(e).length > 0) return
+
   savingRestock.value = true
-
   const item = restockPreviewItem.value
-  const newQty = (item.stockquantity ?? 0) + restockForm.value.quantity
 
-  // Update stock quantity 
-  // needs improvement- should be sub expiriry i think 
-  const updatePayload = { stockquantity: newQty }
-  if (restockForm.value.expirationdate) updatePayload.expirationdate = restockForm.value.expirationdate
+  // STEP 1 — Increment rawproduct.stockquantity (additive, not a replace)
+  const newTotal = (item.stockquantity ?? 0) + restockForm.value.quantity
+  const productUpdate = { stockquantity: newTotal }
+  // Also update the product-level expirationdate if this batch has an expiry
+  // (keeps rawproduct.expirationdate as the "most recent" for quick reference)
+  if (restockForm.value.expirationdate) {
+    productUpdate.expirationdate = restockForm.value.expirationdate
+  }
 
   const { error: upErr } = await supabase
-    .from('rawproduct').update(updatePayload).eq('rawproductid', item.rawproductid)
+    .from('rawproduct')
+    .update(productUpdate)
+    .eq('rawproductid', item.rawproductid)
 
-  if (upErr) { showToast('Failed: ' + upErr.message, 'error'); savingRestock.value = false; return }
+  if (upErr) {
+    showToast('Failed to update stock: ' + upErr.message, 'error')
+    savingRestock.value = false
+    return
+  }
 
-  // Also log to rawproducttransaction 
-  await supabase.from('rawproducttransaction').insert([{
-    rawproductid: item.rawproductid,
+  // STEP 2 — Insert a new batch row in rawproducttransaction
+  // Only include columns that exist in schema (no branchid yet)
+  const batchRow = {
+    rawproductid:    item.rawproductid,
     transactiontype: 'restock',
-    quantity: restockForm.value.quantity,
-    expirationdate: restockForm.value.expirationdate || null,
-  }])
+    quantity:        restockForm.value.quantity,
+    expirationdate:  restockForm.value.expirationdate || null,
+  }
 
-  showToast(`Added ${restockForm.value.quantity} ${item.unit} of ${item.name}.`, 'success')
-  await fetchRawMaterials()
+  const { error: txErr } = await supabase
+    .from('rawproducttransaction')
+    .insert([batchRow])
+
+  if (txErr) {
+    // Stock total was already updated — show warning but don't block
+    console.error('Batch transaction insert error:', txErr)
+    showToast(`Stock updated but batch log failed: ${txErr.message}`, 'error')
+    savingRestock.value = false
+    await Promise.all([fetchRawMaterials(), fetchBatches()])
+    closeRestockModal()
+    return
+  }
+
+  showToast(
+    `✓ Added ${restockForm.value.quantity} ${item.unit} to ${item.name}. New total: ${newTotal} ${item.unit}`,
+    'success'
+  )
+
+  await Promise.all([fetchRawMaterials(), fetchBatches()])
+
+  // Refresh batch detail if it's open for this item
+  if (showBatchDetail.value && batchDetailItem.value?.rawproductid === item.rawproductid) {
+    await openBatchDetail(batchDetailItem.value)
+  }
+
   closeRestockModal()
   savingRestock.value = false
 }
 
-// Delete
-const confirmDelete = (item) => { deleteTarget.value = item; showDeleteConfirm.value = true }
+// BATCH DETAIL MODAL
+const openBatchDetail = async (item) => {
+  batchDetailItem.value   = item
+  showBatchDetail.value   = true
+  loadingItemBatches.value = true
+  itemBatches.value       = []
+
+  const { data, error } = await supabase
+    .from('rawproducttransaction')
+    .select('rawtransactionid, rawproductid, quantity, expirationdate, createdat')
+    .eq('rawproductid', item.rawproductid)
+    .eq('transactiontype', 'restock')
+    .gt('quantity', 0)
+    .order('rawtransactionid', { ascending: true })
+
+  if (error) {
+    console.error('openBatchDetail error:', error)
+    showToast('Could not load batches: ' + error.message, 'error')
+    loadingItemBatches.value = false
+    return
+  }
+
+  const rows = data ?? []
+  // Label: B{rawproductid} for first, B{rawproductid}-2 for second, etc.
+  const labelled = rows.map((b, i) => ({
+    ...b,
+    rawproduct: { name: item.name, unit: item.unit },
+    batchLabel: i === 0 ? `B${item.rawproductid}` : `B${item.rawproductid}-${i + 1}`
+  }))
+
+  // Sort FEFO for display (earliest expiry first)
+  itemBatches.value = labelled.sort((a, b) => {
+    if (!a.expirationdate && !b.expirationdate) return 0
+    if (!a.expirationdate) return 1
+    if (!b.expirationdate) return -1
+    return new Date(a.expirationdate) - new Date(b.expirationdate)
+  })
+
+  loadingItemBatches.value = false
+}
+
+const markBatchExpired = (batch) => confirmDeleteBatch(batch)
+
+// DELETE
+const confirmDelete      = (item)  => { deleteTarget.value = item;  deleteType.value = 'item';  showDeleteConfirm.value = true }
+const confirmDeleteBatch = (batch) => { deleteTarget.value = batch; deleteType.value = 'batch'; showDeleteConfirm.value = true }
 
 const doDelete = async () => {
   deleting.value = true
-  const { error } = await supabase.from('rawproduct').delete().eq('rawproductid', deleteTarget.value.rawproductid)
-  if (error) showToast('Failed to delete.', 'error')
-  else { showToast('Item removed.', 'success'); await fetchRawMaterials() }
+
+  if (deleteType.value === 'batch') {
+    const batch = deleteTarget.value
+    // Find current item in local state
+    const item = allRawItems.value.find(i => i.rawproductid === batch.rawproductid)
+
+    // 1. Subtract this batch quantity from rawproduct.stockquantity
+    if (item) {
+      const newQty = Math.max(0, (item.stockquantity ?? 0) - (batch.quantity ?? 0))
+      await supabase.from('rawproduct')
+        .update({ stockquantity: newQty })
+        .eq('rawproductid', item.rawproductid)
+    }
+
+    // 2. Delete the batch transaction row
+    const { error } = await supabase
+      .from('rawproducttransaction')
+      .delete()
+      .eq('rawtransactionid', batch.rawtransactionid)
+
+    if (error) {
+      showToast('Failed to remove batch: ' + error.message, 'error')
+    } else {
+      showToast('Batch removed — stock total adjusted.', 'success')
+      await Promise.all([fetchRawMaterials(), fetchBatches()])
+      // Refresh batch detail if open for this item
+      if (showBatchDetail.value && batchDetailItem.value) {
+        await openBatchDetail(batchDetailItem.value)
+      }
+    }
+
+  } else {
+    // Delete item: first remove all its transactions, then the product row
+    await supabase.from('rawproducttransaction')
+      .delete()
+      .eq('rawproductid', deleteTarget.value.rawproductid)
+
+    const { error } = await supabase.from('rawproduct')
+      .delete()
+      .eq('rawproductid', deleteTarget.value.rawproductid)
+
+    if (error) showToast('Failed to remove item: ' + error.message, 'error')
+    else {
+      showToast('Item and all batches removed.', 'success')
+      if (showBatchDetail.value) showBatchDetail.value = false
+      await Promise.all([fetchRawMaterials(), fetchBatches()])
+    }
+  }
+
   deleting.value = false
   showDeleteConfirm.value = false
 }
 
-// Helpers
+// STATUS HELPERS
 const getStatus = (item) => {
   if ((item.stockquantity ?? 0) <= 0) return 'out'
   if (item.reorderlevel && item.stockquantity <= item.reorderlevel) return 'low'
@@ -630,175 +1133,332 @@ const getStatusText = (item) => {
   if (item.reorderlevel && item.stockquantity <= item.reorderlevel) return 'Low Stock'
   return 'In Stock'
 }
-const getExpiryStatus = (date) => {
-  if (!date) return null
-  const diff = (new Date(date) - new Date()) / (1000 * 60 * 60 * 24)
-  if (diff < 0) return 'expired'
-  if (diff <= 7) return 'expiring'
+const getStatusAfterRestock = (item, qty) => {
+  const n = (item.stockquantity ?? 0) + qty
+  if (n <= 0) return 'out'
+  if (item.reorderlevel && n <= item.reorderlevel) return 'low'
+  return 'good'
+}
+const getStatusTextAfterRestock = (item, qty) => {
+  const s = getStatusAfterRestock(item, qty)
+  return s === 'good' ? 'In Stock' : s === 'low' ? 'Low Stock' : 'Out of Stock'
+}
+
+// EXPIRY HELPERS
+const getDaysUntilExpiry = (date) => {
+  if (!date) return 9999
+  return Math.floor((new Date(date) - new Date()) / (1000 * 60 * 60 * 24))
+}
+const getBatchExpiryClass = (date) => {
+  if (!date) return 'ok'
+  const d = getDaysUntilExpiry(date)
+  if (d < 0) return 'expired'
+  if (d <= 3) return 'critical'
+  if (d <= 7) return 'warning'
   return 'ok'
+}
+const getDaysLabel = (date) => {
+  if (!date) return '—'
+  const d = getDaysUntilExpiry(date)
+  if (d < 0) return 'Expired'
+  if (d === 0) return 'Today'
+  return `${d}d left`
+}
+const getFEFOLabel = (date) => {
+  if (!date) return 'No Expiry'
+  const d = getDaysUntilExpiry(date)
+  if (d < 0) return 'Discard'
+  if (d <= 3) return 'Use Now'
+  if (d <= 7) return 'Use Soon'
+  return 'OK'
 }
 const formatDate = (d) => {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
-const showToast = (message, type = 'success') => {
-  toast.value = { show: true, message, type }
-  setTimeout(() => { toast.value.show = false }, 3500)
+
+const showToast = (msg, type = 'success') => {
+  toast.value = { show: true, message: msg, type }
+  setTimeout(() => { toast.value.show = false }, 4000)
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT — fetch everything on mount
+// ─────────────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   await fetchBranches()
-  await fetchRawMaterials()
+  await Promise.all([fetchRawMaterials(), fetchBatches()])
 })
 </script>
 
 <style scoped>
 .inventory-content { padding: 24px 32px; font-family: 'Inter', sans-serif; background: #fafafa; min-height: 100vh; }
 
-.page-header { margin-bottom: 20px; }
-.page-header h1 { font-size: 26px; font-weight: 800; color: #31201D; margin: 0 0 4px; }
-.page-header p { font-size: 14px; color: #888; margin: 0; }
-.page-header strong { color: #31201D; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.ph-left h1 { font-size: 26px; font-weight: 800; color: #31201D; margin: 0 0 4px; }
+.ph-left p  { font-size: 14px; color: #888; margin: 0; }
+.ph-left strong { color: #31201D; }
+.system-badge { background: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; border: 1px solid #bae6fd; }
 
 .branch-selector { background: white; padding: 14px 20px; border-radius: 12px; border: 1px solid #E9ECEF; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
 .branch-selector label { font-size: 14px; font-weight: 600; color: #495057; white-space: nowrap; }
 .select-wrap { position: relative; flex: 1; max-width: 360px; }
 .select-wrap.sm { max-width: 170px; flex: unset; }
-.select-wrap.full { max-width: 100%; }
 .branch-dropdown, .filter-select { width: 100%; appearance: none; padding: 9px 32px 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: white; outline: none; cursor: pointer; box-sizing: border-box; transition: border-color 0.2s; }
 .branch-dropdown:focus, .filter-select:focus { border-color: #8B4513; }
 .sel-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #999; pointer-events: none; }
 
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
-.stat-card { background: white; border-radius: 12px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; border: 1px solid #E9ECEF; transition: box-shadow 0.2s; }
-.stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-.stat-card.warning { border-left: 3px solid #f59e0b; }
-.stat-card.danger  { border-left: 3px solid #ef4444; }
-.stat-icon { color: #8B4513; }
-.stat-icon.warn        { color: #f59e0b; }
-.stat-icon.danger-icon { color: #ef4444; }
-.stat-icon.expiry-icon { color: #8b5cf6; }
-.stat-info h3 { font-size: 12px; color: #6C757D; font-weight: 600; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-.stat-value { font-size: 26px; font-weight: 800; color: #212529; margin: 0 0 2px; }
-.stat-label { font-size: 11px; color: #ADB5BD; }
+.stat-card { background: white; border-radius: 12px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; border: 1px solid #E9ECEF; }
+.stat-card.warning      { border-left: 3px solid #f59e0b; }
+.stat-card.danger       { border-left: 3px solid #ef4444; }
+.stat-card.expiring-card{ border-left: 3px solid #8b5cf6; }
+.stat-icon              { color: #8B4513; }
+.stat-icon.warn         { color: #f59e0b; }
+.stat-icon.danger-icon  { color: #ef4444; }
+.stat-icon.expiry-icon  { color: #8b5cf6; }
+.stat-info h3  { font-size: 12px; color: #6C757D; font-weight: 600; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.stat-value    { font-size: 26px; font-weight: 800; color: #212529; margin: 0 0 2px; }
+.stat-label    { font-size: 11px; color: #ADB5BD; }
 
-.branch-overview { margin-bottom: 20px; }
-.overview-title { font-size: 13px; font-weight: 700; color: #495057; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-.branch-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-.branch-card { background: white; border: 1px solid #E9ECEF; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: 0.2s; }
-.branch-card:hover { border-color: #8B4513; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.branch-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.branch-name { font-size: 14px; font-weight: 700; color: #212529; }
-.branch-total { font-size: 12px; color: #888; }
-.branch-card-stats { display: flex; gap: 8px; flex-wrap: wrap; }
-.bs-out  { font-size: 12px; font-weight: 600; color: #C62828; }
-.bs-low  { font-size: 12px; font-weight: 600; color: #F57C00; }
-.bs-good { font-size: 12px; font-weight: 600; color: #2E7D32; }
+.fefo-alert { background: #fdf4ff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; }
+.fefo-header { margin-bottom: 14px; }
+.fefo-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.fefo-title-row h3 { font-size: 15px; font-weight: 700; color: #581c87; margin: 0; }
+.fefo-badge { background: #7c3aed; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.fefo-sub   { font-size: 13px; color: #6b21a8; margin: 0; opacity: 0.8; }
+.fefo-list  { display: flex; flex-direction: column; gap: 8px; }
+.fefo-row   { display: flex; align-items: center; gap: 16px; background: white; border-radius: 8px; padding: 10px 14px; border: 1px solid #e9d5ff; flex-wrap: wrap; }
+.fefo-item-info { flex: 1; min-width: 140px; }
+.fefo-name  { display: block; font-weight: 700; font-size: 14px; color: #212529; }
+.fefo-batch { display: block; font-size: 12px; color: #888; }
+.fefo-expiry-info { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+.fefo-days.expired  { color: #dc2626; font-size: 13px; font-weight: 800; }
+.fefo-days.critical { color: #dc2626; font-size: 13px; font-weight: 800; }
+.fefo-days.warning  { color: #d97706; font-size: 13px; font-weight: 800; }
+.fefo-date  { font-size: 11px; color: #888; }
+.expire-btn { background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.more-alerts{ font-size: 12px; color: #92400e; margin: 5px 0 0; }
 
-.alert-section { background: #FFF8E7; border: 1px solid #FFE4B5; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; }
-.alert-header { display: flex; align-items: center; gap: 8px; color: #F57C00; margin-bottom: 4px; }
-.alert-header h3 { font-size: 15px; font-weight: 700; color: #F57C00; margin: 0; }
-.alert-subtitle { font-size: 13px; color: #856404; margin: 0 0 12px; }
-.low-stock-list { display: flex; flex-direction: column; gap: 8px; }
-.low-stock-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: white; border-radius: 8px; border-left: 3px solid #FFC107; }
-.item-details { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.item-name { font-weight: 600; color: #212529; font-size: 14px; }
-.item-stock { font-size: 13px; color: #6C757D; }
-.item-alert-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.low-stock-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
-.low-stock-badge.low { background: #FFF3E0; color: #F57C00; }
-.low-stock-badge.out { background: #FFEBEE; color: #C62828; }
-.restock-quick-btn { display: flex; align-items: center; gap: 4px; background: #8B4513; color: white; border: none; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; white-space: nowrap; }
-.restock-quick-btn:hover { background: #A0522D; }
-.more-alerts { font-size: 12px; color: #92400e; margin: 6px 0 0; }
+.eoq-panel { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; }
+.eoq-header { margin-bottom: 12px; }
+.eoq-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.eoq-title-row h3 { font-size: 14px; font-weight: 700; color: #0c4a6e; margin: 0; }
+.eoq-badge { background: #0369a1; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.eoq-sub   { font-size: 12px; color: #0369a1; margin: 0; opacity: 0.8; }
+.eoq-list  { display: flex; flex-direction: column; gap: 7px; }
+.eoq-row   { display: flex; align-items: center; gap: 14px; background: white; border-radius: 8px; padding: 9px 14px; border: 1px solid #e0f2fe; flex-wrap: wrap; }
+.eoq-item-info { flex: 1; min-width: 120px; }
+.eoq-name  { display: block; font-weight: 700; font-size: 13px; color: #212529; }
+.eoq-stock { display: block; font-size: 11px; color: #888; }
+.eoq-suggestion { display: flex; align-items: center; gap: 5px; }
+.eoq-label { color: #888; font-size: 12px; }
+.eoq-qty   { font-weight: 800; color: #0369a1; font-size: 14px; }
+.eoq-restock-btn { background: #0369a1; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+.tabs-row { display: flex; gap: 4px; margin-bottom: 16px; background: white; border: 1px solid #eee; border-radius: 10px; padding: 4px; width: fit-content; }
+.tab-btn  { display: flex; align-items: center; gap: 7px; padding: 8px 18px; border: none; border-radius: 7px; background: none; font-size: 14px; font-weight: 600; color: #888; cursor: pointer; transition: 0.2s; }
+.tab-btn.active             { background: #8B4513; color: white; }
+.tab-btn:not(.active):hover { background: #f5f5f5; color: #8B4513; }
+.tab-alert-dot { background: #ef4444; color: white; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px; margin-left: 2px; }
 
 .inventory-section { background: white; border-radius: 12px; border: 1px solid #E9ECEF; overflow: hidden; }
 .section-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 1px solid #E9ECEF; }
-.section-header h2 { font-size: 17px; font-weight: 700; color: #212529; margin: 0 0 3px; }
-.section-subtitle { font-size: 13px; color: #6C757D; margin: 0; }
-.header-actions { display: flex; gap: 10px; }
+.section-header h2  { font-size: 17px; font-weight: 700; color: #212529; margin: 0 0 3px; }
+.section-subtitle   { font-size: 13px; color: #6C757D; margin: 0; }
+.header-actions     { display: flex; gap: 10px; }
 .btn-primary { display: flex; align-items: center; gap: 7px; background: #8B4513; color: white; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; white-space: nowrap; }
-.btn-primary:hover { background: #A0522D; }
+.btn-primary:hover    { background: #A0522D; }
 .btn-primary:disabled { opacity: .65; cursor: not-allowed; }
 .btn-secondary-outline { display: flex; align-items: center; gap: 7px; background: white; color: #8B4513; border: 1px solid #8B4513; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; white-space: nowrap; }
 .btn-secondary-outline:hover { background: #FFF4E6; }
 
+.fefo-legend { display: flex; gap: 14px; align-items: center; }
+.fl-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #555; }
+.fl-dot  { width: 10px; height: 10px; border-radius: 50%; }
+.fl-dot.expired  { background: #dc2626; }
+.fl-dot.critical { background: #f97316; }
+.fl-dot.warning  { background: #d97706; }
+.fl-dot.ok       { background: #16a34a; }
+
 .filters-bar { display: flex; gap: 12px; padding: 14px 24px; border-bottom: 1px solid #F1F3F5; flex-wrap: wrap; align-items: center; }
-.search-box { flex: 1; min-width: 180px; display: flex; align-items: center; gap: 8px; border: 1px solid #E9ECEF; border-radius: 8px; padding: 8px 12px; }
+.search-box  { flex: 1; min-width: 180px; display: flex; align-items: center; gap: 8px; border: 1px solid #E9ECEF; border-radius: 8px; padding: 8px 12px; }
 .search-box input { flex: 1; border: none; outline: none; font-size: 14px; }
 
 .loading-state { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 50px; color: #999; font-size: 14px; }
+.error-state   { display: flex; align-items: center; gap: 10px; justify-content: center; padding: 40px; color: #dc2626; font-size: 14px; }
+.retry-btn     { background: #dc2626; color: white; border: none; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; margin-left: 8px; }
 .spinner { width: 18px; height: 18px; border: 2px solid #eee; border-top-color: #8B4513; border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .table-container { overflow-x: auto; }
 .inventory-table { width: 100%; border-collapse: collapse; }
-.inventory-table th { text-align: left; padding: 11px 16px; background: #F8F9FA; color: #495057; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #E9ECEF; white-space: nowrap; }
-.inventory-table td { padding: 13px 16px; border-bottom: 1px solid #F1F3F5; font-size: 14px; vertical-align: middle; }
+.inventory-table th { text-align: left; padding: 10px 16px; background: #F8F9FA; color: #495057; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #E9ECEF; white-space: nowrap; }
+.inventory-table td { padding: 14px 16px; border-bottom: 1px solid #F1F3F5; font-size: 15px; vertical-align: middle; }
 .inventory-table tr:hover td { background: #fafafa; }
-.product-info { display: flex; align-items: center; gap: 8px; }
-.product-icon { color: #8B4513; flex-shrink: 0; }
-.muted { color: #999; font-size: 13px; }
-.empty-row { text-align: center; color: #bbb; padding: 40px !important; font-size: 13px; }
-.qty-val { font-weight: 700; font-size: 15px; }
-.qty-val.good { color: #2E7D32; }
-.qty-val.low  { color: #F57C00; }
-.qty-val.out  { color: #C62828; }
-.expiry-val { font-size: 13px; font-weight: 600; }
-.expiry-val.ok       { color: #555; }
-.expiry-val.expiring { color: #F57C00; }
-.expiry-val.expired  { color: #C62828; }
-.status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+.inventory-table tr.row-alert td { background: #fffbf0; }
+.inventory-table tr.batch-row.expired td  { background: #fff5f5; }
+.inventory-table tr.batch-row.critical td { background: #fff7ed; }
+.inventory-table tr.batch-row.warning td  { background: #fffbeb; }
+
+.product-info  { display: flex; align-items: center; gap: 8px; }
+.product-icon  { color: #8B4513; flex-shrink: 0; }
+.item-name-text{ font-size: 15px; font-weight: 700; color: #212529; }
+.td-text   { color: #555; font-size: 14px; }
+.sku-label { display: block; font-size: 11px; color: #bbb; font-family: monospace; margin-top: 3px; }
+.empty-row { text-align: center; color: #bbb; padding: 40px !important; font-size: 14px; }
+
+.stock-cell { display: flex; flex-direction: column; gap: 4px; }
+.qty-val { font-weight: 800; font-size: 16px; }
+.qty-val.good     { color: #2E7D32; }
+.qty-val.low      { color: #F57C00; }
+.qty-val.out      { color: #C62828; }
+.qty-val.expired  { color: #dc2626; }
+.qty-val.warning  { color: #d97706; }
+.qty-val.critical { color: #dc2626; }
+.qty-val.ok       { color: #2E7D32; }
+.stock-bar-wrap { width: 64px; height: 5px; background: #eee; border-radius: 3px; overflow: hidden; }
+.stock-bar { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.stock-bar.good { background: #4ade80; }
+.stock-bar.low  { background: #fb923c; }
+.stock-bar.out  { background: #f87171; }
+
+.eoq-chip { background: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+
+.batch-summary { cursor: pointer; }
+.batch-summary:hover .batch-count { text-decoration: underline; }
+.batch-count        { font-size: 14px; font-weight: 600; color: #555; display: block; }
+.batch-expiring-warn{ font-size: 12px; color: #d97706; font-weight: 700; display: block; }
+
+.status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
 .status-badge.good { background: #E8F5E9; color: #2E7D32; }
 .status-badge.low  { background: #FFF3E0; color: #F57C00; }
 .status-badge.out  { background: #FFEBEE; color: #C62828; }
-.actions-cell { display: flex; gap: 8px; }
-.icon-btn { background: none; border: none; cursor: pointer; padding: 5px; border-radius: 4px; transition: 0.2s; display: flex; }
-.icon-btn.restock { color: #2E7D32; }
-.icon-btn.restock:hover { background: #E8F5E9; }
-.icon-btn.delete { color: #DC3545; }
-.icon-btn.delete:hover { background: #FFEBEE; }
 
+.batch-id-tag { background: #f0ebe4; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-weight: 700; font-size: 13px; color: #5c3317; }
+
+.expiry-val { font-size: 14px; font-weight: 700; }
+.expiry-val.ok       { color: #2E7D32; }
+.expiry-val.warning  { color: #d97706; }
+.expiry-val.critical { color: #dc2626; }
+.expiry-val.expired  { color: #dc2626; }
+
+.days-chip { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 6px; }
+.days-chip.ok       { background: #E8F5E9; color: #2E7D32; }
+.days-chip.warning  { background: #FFF3E0; color: #d97706; }
+.days-chip.critical { background: #FEF0E8; color: #dc2626; }
+.days-chip.expired  { background: #FFEBEE; color: #dc2626; }
+
+.fefo-status-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+.fefo-status-badge.ok       { background: #E8F5E9; color: #2E7D32; }
+.fefo-status-badge.warning  { background: #FFF3E0; color: #d97706; }
+.fefo-status-badge.critical { background: #FEF0E8; color: #dc2626; }
+.fefo-status-badge.expired  { background: #FFEBEE; color: #dc2626; }
+
+.actions-cell { display: flex; gap: 6px; }
+.icon-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 6px; transition: 0.2s; display: flex; }
+.icon-btn.restock       { color: #2E7D32; }
+.icon-btn.restock:hover { background: #E8F5E9; }
+.icon-btn.batches       { color: #7c3aed; }
+.icon-btn.batches:hover { background: #f3e8ff; }
+.icon-btn.delete        { color: #DC3545; }
+.icon-btn.delete:hover  { background: #FFEBEE; }
+
+/* MODAL */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
-.modal-content { background: white; border-radius: 12px; width: 90%; max-width: 540px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
-.modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 20px; border-bottom: 1px solid #E9ECEF; }
+.modal-content { background: white; border-radius: 14px; width: 90%; max-width: 580px; max-height: 92vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
+.modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 22px; border-bottom: 1px solid #E9ECEF; }
 .modal-header h2 { font-size: 17px; font-weight: 700; color: #212529; margin: 0 0 2px; }
 .modal-sub { font-size: 13px; color: #888; margin: 0; }
 .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #6C757D; line-height: 1; flex-shrink: 0; }
 .close-btn:hover { color: #212529; }
-.modal-body { padding: 20px; }
+.modal-body { padding: 22px; }
 
 .form-group { margin-bottom: 16px; }
-.form-group label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: #495057; }
-.optional { font-size: 11px; color: #bbb; font-weight: 400; }
-.form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #E9ECEF; border-radius: 6px; font-size: 14px; outline: none; box-sizing: border-box; transition: 0.2s; }
-.form-group input:focus, .form-group select:focus { border-color: #8B4513; box-shadow: 0 0 0 3px rgba(139,69,19,.1); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.field-error { font-size: 12px; color: #dc3545; margin-top: 4px; display: block; }
+.form-group label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #495057; }
+.label-hint { font-size: 11px; color: #0369a1; font-weight: 400; }
+.optional   { font-size: 11px; color: #bbb; font-weight: 400; }
+.form-group input,
+.form-group select { width: 100%; padding: 10px 12px; border: 1px solid #E9ECEF; border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box; transition: 0.2s; }
+.form-group input:focus, .form-group select:focus { border-color: #8B4513; box-shadow: 0 0 0 3px rgba(139,69,19,.08); }
+.form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.field-error{ font-size: 12px; color: #dc3545; margin-top: 4px; display: block; }
+.divider-label { font-size: 12px; font-weight: 700; color: #8B4513; text-transform: uppercase; letter-spacing: 0.06em; margin: 20px 0 14px; padding-bottom: 6px; border-bottom: 1px solid #f0ebe4; }
+
+.step-block { margin-bottom: 4px; }
+.step-label { font-size: 13px; font-weight: 700; color: #495057; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+.step-num   { background: #8B4513; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; }
+
+.item-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 10px; max-height: 300px; overflow-y: auto; padding: 2px; margin-bottom: 12px; }
+.item-picker-card { background: white; border: 2px solid #E9ECEF; border-radius: 10px; padding: 12px; cursor: pointer; transition: 0.2s; text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.item-picker-card:hover    { border-color: #8B4513; background: #FFF4E6; }
+.item-picker-card.selected { border-color: #8B4513; background: #FFF4E6; box-shadow: 0 0 0 3px rgba(139,69,19,.1); }
+.item-picker-card.alert    { border-color: #fbbf24; background: #fffbeb; }
+.ipc-top    { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.ipc-sku    { font-size: 10px; color: #bbb; font-family: monospace; }
+.ipc-status { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; }
+.ipc-status.good { background: #E8F5E9; color: #2E7D32; }
+.ipc-status.low  { background: #FFF3E0; color: #F57C00; }
+.ipc-status.out  { background: #FFEBEE; color: #C62828; }
+.ipc-name  { font-size: 13px; font-weight: 700; color: #212529; line-height: 1.3; }
+.ipc-stock { font-size: 11px; color: #888; }
+
+.restock-target-card { background: #f9f4ef; border: 1px solid #e8d5c4; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+.rtc-top  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.rtc-name { display: flex; align-items: center; gap: 8px; font-size: 15px; color: #31201D; }
+.rtc-sku  { font-size: 11px; color: #bbb; font-family: monospace; }
+.rtc-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+.rtc-stat  { background: white; border-radius: 8px; padding: 8px 10px; border: 1px solid #e8d5c4; }
+.rtcs-label{ display: block; font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
+.rtcs-val  { font-size: 14px; font-weight: 800; }
+.rtcs-val.good    { color: #2E7D32; }
+.rtcs-val.low     { color: #F57C00; }
+.rtcs-val.out     { color: #C62828; }
+.rtcs-val.neutral { color: #495057; }
+.rtcs-val.blue    { color: #0369a1; }
+.change-item-btn { background: none; border: none; color: #8B4513; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; }
+
+/* Branch required block */
+.branch-required-block { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+.branch-assigned-note  { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: #0369a1; }
+.branch-assigned-note strong { color: #0c4a6e; }
+
+/* Batch form — strict 2-column grid */
+.batch-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.bfg-card  { background: #f8f9fa; border: 1px solid #E9ECEF; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.bfg-label { font-size: 13px; font-weight: 600; color: #495057; margin: 0; }
+.bfg-qty-row { display: flex; align-items: stretch; gap: 8px; }
+.bfg-qty-input { flex: 1; min-width: 0; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 22px; font-weight: 800; color: #212529; outline: none; transition: border-color 0.2s; width: 0; }
+.bfg-qty-input:focus { border-color: #8B4513; box-shadow: 0 0 0 3px rgba(139,69,19,.08); }
+.bfg-unit-badge { background: #e9ecef; color: #495057; font-size: 13px; font-weight: 700; padding: 0 12px; border-radius: 8px; display: flex; align-items: center; white-space: nowrap; flex-shrink: 0; }
+.bfg-date-input { width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 15px; font-weight: 600; color: #212529; outline: none; box-sizing: border-box; transition: border-color 0.2s; }
+.bfg-date-input:focus { border-color: #8B4513; box-shadow: 0 0 0 3px rgba(139,69,19,.08); }
+.bfg-note  { font-size: 11px; color: #999; margin: 0; line-height: 1.4; }
+.eoq-fill-btn { display: flex; align-items: center; gap: 5px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; width: fit-content; }
+.eoq-fill-btn:hover { background: #bae6fd; }
+
+.restock-preview { background: #f9f9f9; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
+.rp-row { display: flex; justify-content: space-between; font-size: 14px; color: #555; }
+.rp-row.add   { color: #2E7D32; font-weight: 600; }
+.rp-row.total { font-size: 16px; font-weight: 800; color: #212529; padding-top: 8px; border-top: 1px solid #eee; margin-top: 3px; }
+
+.fefo-note { display: flex; align-items: flex-start; gap: 8px; background: #fdf4ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 10px 13px; font-size: 12px; color: #6b21a8; }
+.fefo-note strong { color: #581c87; }
 
 .info-box { display: flex; align-items: flex-start; gap: 10px; background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 14px; margin: 16px 0; font-size: 13px; color: #1e40af; }
 .info-box strong { color: #1d4ed8; }
 
-/* RESTOCK MODAL SPECIFIC */
-.restock-target-card { background: #f9f4ef; border: 1px solid #e8d5c4; border-radius: 10px; padding: 14px 16px; }
-.rtc-name { display: flex; align-items: center; gap: 8px; font-size: 15px; color: #31201D; margin-bottom: 6px; }
-.rtc-stats { display: flex; gap: 16px; font-size: 13px; color: #888; margin-bottom: 8px; }
-.rtc-stats strong { color: #31201D; }
-.change-item-btn { background: none; border: none; color: #8B4513; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; }
+.batch-total-row { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #f8f9fa; border-top: 2px solid #E9ECEF; font-size: 14px; color: #555; }
+.batch-total-row strong { color: #212529; font-size: 16px; }
 
-.restock-preview { background: #f9f9f9; border-radius: 10px; padding: 14px 16px; margin: 16px 0 0; display: flex; flex-direction: column; gap: 8px; }
-.rp-row { display: flex; justify-content: space-between; font-size: 14px; color: #555; }
-.rp-row.add { color: #2E7D32; font-weight: 600; }
-.rp-row.total { font-size: 16px; font-weight: 800; color: #212529; padding-top: 10px; border-top: 1px solid #eee; margin-top: 4px; }
-
-.modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E9ECEF; }
-.btn-secondary { background: #F8F9FA; border: 1px solid #E9ECEF; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; padding-top: 16px; border-top: 1px solid #E9ECEF; }
+.btn-secondary { background: #F8F9FA; border: 1px solid #E9ECEF; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: 0.2s; }
 .btn-secondary:hover { background: #E9ECEF; }
-.btn-danger { background: #dc3545; color: white; border: none; padding: 9px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: 0.2s; }
+.btn-danger { background: #dc3545; color: white; border: none; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; }
 .btn-danger:hover:not(:disabled) { background: #b02a37; }
 .btn-danger:disabled { opacity: .65; cursor: not-allowed; }
 
-.toast-wrap { position: fixed; bottom: 24px; right: 24px; padding: 11px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 9999; animation: slideUp .2s ease; max-width: 360px; }
+.toast-wrap { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 9999; animation: slideUp .2s ease; max-width: 420px; }
 .toast-wrap.success { background: #d1e7dd; color: #0a3622; }
 .toast-wrap.error   { background: #f8d7da; color: #58151c; }
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -806,10 +1466,12 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .inventory-content { padding: 16px; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
-  .form-row { grid-template-columns: 1fr; }
+  .form-row, .batch-form-grid { grid-template-columns: 1fr; }
+  .rtc-stat-grid { grid-template-columns: 1fr 1fr; }
   .branch-selector { flex-direction: column; align-items: flex-start; }
   .select-wrap { max-width: 100%; width: 100%; }
-  .filters-bar { flex-direction: column; }
-  .header-actions { flex-direction: column; }
+  .filters-bar, .header-actions { flex-direction: column; }
+  .fefo-row, .eoq-row { flex-direction: column; align-items: flex-start; }
+  .fefo-legend { flex-wrap: wrap; gap: 8px; }
 }
 </style>
