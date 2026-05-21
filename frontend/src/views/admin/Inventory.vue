@@ -16,7 +16,7 @@
     <div class="branch-selector">
       <label>Select Branch:</label>
       <div class="select-wrap">
-        <select v-model="selectedBranchId" class="branch-dropdown">
+        <select v-model="selectedBranchId" class="branch-dropdown" @change="onBranchChange">
           <option :value="null">All Branches</option>
           <option v-for="b in branches" :key="b.BranchId" :value="b.BranchId">{{ b.BranchName }}</option>
         </select>
@@ -98,15 +98,18 @@
         <div class="eoq-title-row">
           <TrendingUp :size="16" />
           <h3>Smart Reorder Suggestions</h3>
-          <span class="eoq-badge">EOQ Model</span>
+          <span class="eoq-badge">EOQ — Based on Sales</span>
         </div>
-        <p class="eoq-sub">Items at or below reorder point. Order suggested quantity to optimize cost.</p>
+        <p class="eoq-sub">Items at or below reorder point. Order quantity calculated from actual menu sales × recipe usage.</p>
       </div>
       <div class="eoq-list">
         <div v-for="item in eoqItems.slice(0, 4)" :key="item.rawproductid" class="eoq-row">
           <div class="eoq-item-info">
             <span class="eoq-name">{{ item.name }}</span>
-            <span class="eoq-stock">{{ item.stockquantity }} {{ item.unit }} remaining</span>
+            <span class="eoq-stock">
+              {{ item.stockquantity }} {{ item.unit }} remaining
+              <span v-if="item._dailyUsage > 0" class="usage-hint">· ~{{ item._dailyUsage.toFixed(1) }} {{ item.unit }}/day from sales</span>
+            </span>
           </div>
           <div class="eoq-suggestion">
             <span class="eoq-label">Order:</span>
@@ -175,7 +178,7 @@
             <tr>
               <th>Item</th>
               <th>Category</th>
-              <th>Total Stock</th>
+              <th>Stock (this branch)</th>
               <th>Unit</th>
               <th>Reorder Point</th>
               <th>EOQ Suggest</th>
@@ -280,7 +283,7 @@
             <tr>
               <th>Batch ID</th>
               <th>Item</th>
-              <th>SKU</th>
+              <th>Branch</th>
               <th>Batch Qty</th>
               <th>Received</th>
               <th>Expiry Date</th>
@@ -296,7 +299,9 @@
               <td>
                 <strong class="item-name-text">{{ batch.rawproduct?.name ?? '—' }}</strong>
               </td>
-              <td><span class="sku-label" style="margin:0">SKU-{{ String(batch.rawproductid).padStart(4, '0') }}</span></td>
+              <td>
+                <span class="td-text">{{ getBranchName(batch.branchid) }}</span>
+              </td>
               <td>
                 <span class="qty-val" :class="getBatchExpiryClass(batch.expirationdate)">{{ batch.quantity }}</span>
                 <span class="td-text"> {{ batch.rawproduct?.unit }}</span>
@@ -375,8 +380,8 @@
               <input type="number" v-model.number="newItemForm.reorderlevel" min="0" placeholder="e.g. 500" />
             </div>
             <div class="form-group">
-              <label>Lead Time (days) <span class="label-hint">— for EOQ</span></label>
-              <input type="number" v-model.number="newItemForm.leadTimeDays" min="1" placeholder="2" />
+              <label>Lead Time (days) <span class="label-hint">— days from order to arrival</span></label>
+              <input type="number" v-model.number="newItemForm.leadtimedays" min="1" placeholder="2" />
             </div>
           </div>
 
@@ -395,7 +400,7 @@
 
           <div class="info-box">
             <Info :size="13" />
-            <span>A unique <strong>SKU</strong> will be auto-assigned. Each time you add stock, a new <strong>batch</strong> is created with its own expiry date — enabling FEFO tracking.</span>
+            <span>A unique <strong>SKU</strong> will be auto-assigned. Each time you add stock, a new <strong>batch</strong> is created with its own expiry date — enabling FEFO tracking. EOQ is calculated from your actual menu sales.</span>
           </div>
 
           <div class="modal-actions">
@@ -420,7 +425,7 @@
         </div>
         <div class="modal-body">
 
-          <!-- STEP 1: Item picker (no pre-selection) -->
+          <!-- STEP 1: Item picker -->
           <div v-if="!restockTarget && !restockSelectedId" class="step-block">
             <p class="step-label"><span class="step-num">1</span> Select an item to restock</p>
             <div class="item-picker-grid">
@@ -451,7 +456,7 @@
               </div>
               <div class="rtc-stat-grid">
                 <div class="rtc-stat">
-                  <span class="rtcs-label">Current Total Stock</span>
+                  <span class="rtcs-label">Current Stock</span>
                   <span :class="['rtcs-val', getStatus(restockPreviewItem)]">
                     {{ restockPreviewItem.stockquantity }} {{ restockPreviewItem.unit }}
                   </span>
@@ -463,6 +468,10 @@
                 <div class="rtc-stat" v-if="restockPreviewItem.reorderlevel">
                   <span class="rtcs-label">EOQ Suggestion</span>
                   <span class="rtcs-val blue">{{ calculateEOQ(restockPreviewItem) }} {{ restockPreviewItem.unit }}</span>
+                </div>
+                <div class="rtc-stat" v-if="restockPreviewItem._dailyUsage > 0">
+                  <span class="rtcs-label">Daily Usage</span>
+                  <span class="rtcs-val neutral">~{{ restockPreviewItem._dailyUsage.toFixed(1) }} {{ restockPreviewItem.unit }}/day</span>
                 </div>
               </div>
               <button class="change-item-btn" @click="restockTarget = null; restockSelectedId = null">← Change item</button>
@@ -484,7 +493,7 @@
               <span v-if="restockErrors.branch" class="field-error">{{ restockErrors.branch }}</span>
             </div>
             <div v-else class="branch-assigned-note">
-              <span>📍 Stock will be added to <strong>{{ selectedBranchName }}</strong></span>
+              <span>Stock will be added to <strong>{{ selectedBranchName }}</strong></span>
             </div>
 
             <div class="divider-label">New Batch Details</div>
@@ -538,7 +547,7 @@
 
             <div class="fefo-note">
               <Layers :size="12" />
-              <span>A new sub-batch will be logged under <strong>{{ restockPreviewItem?.name }}</strong>. Staff will be reminded to use earliest-expiring batches first (FEFO).</span>
+              <span>A new batch will be logged under <strong>{{ restockPreviewItem?.name }}</strong> with its own expiry date. Staff will be reminded to use earliest-expiring batches first (FEFO).</span>
             </div>
           </div>
 
@@ -556,7 +565,7 @@
 
     <!-- ══ BATCH DETAIL MODAL ══ -->
     <div v-if="showBatchDetail" class="modal" @click.self="showBatchDetail = false">
-      <div class="modal-content" style="max-width:640px">
+      <div class="modal-content" style="max-width:680px">
         <div class="modal-header">
           <div>
             <h2>{{ batchDetailItem?.name }} — All Batches</h2>
@@ -570,6 +579,7 @@
             <thead>
               <tr>
                 <th>Sub-Batch</th>
+                <th>Branch</th>
                 <th>Qty (this batch)</th>
                 <th>Received On</th>
                 <th>Expiry Date</th>
@@ -582,6 +592,7 @@
               <tr v-for="batch in itemBatches" :key="batch.rawtransactionid"
                 :class="['batch-row', getBatchExpiryClass(batch.expirationdate)]">
                 <td><span class="batch-id-tag">{{ batch.batchLabel }}</span></td>
+                <td><span class="td-text">{{ getBranchName(batch.branchid) }}</span></td>
                 <td>
                   <strong class="qty-val" :class="getBatchExpiryClass(batch.expirationdate)">{{ batch.quantity }}</strong>
                   <span class="td-text"> {{ batchDetailItem?.unit }}</span>
@@ -603,7 +614,7 @@
                 </td>
               </tr>
               <tr v-if="itemBatches.length === 0">
-                <td colspan="7" class="empty-row">No batches for this item yet.</td>
+                <td colspan="8" class="empty-row">No batches for this item yet.</td>
               </tr>
             </tbody>
           </table>
@@ -611,7 +622,6 @@
           <div v-if="itemBatches.length > 0" class="batch-total-row">
             <span>Total across {{ itemBatches.length }} batch{{ itemBatches.length !== 1 ? 'es' : '' }}:</span>
             <strong>{{ itemBatches.reduce((s, b) => s + (b.quantity || 0), 0) }} {{ batchDetailItem?.unit }}</strong>
-            <span class="td-text">(matches rawproduct.stockquantity)</span>
           </div>
         </div>
       </div>
@@ -660,19 +670,19 @@ import {
 } from 'lucide-vue-next'
 import { supabase } from '@/supabase.js'
 
-// STATE
-const isLoading        = ref(false)
-const loadingBatches   = ref(false)
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const isLoading          = ref(false)
+const loadingBatches     = ref(false)
 const loadingItemBatches = ref(false)
-const savingNewItem    = ref(false)
-const savingRestock    = ref(false)
-const deleting         = ref(false)
-const fetchBatchError  = ref('')
+const savingNewItem      = ref(false)
+const savingRestock      = ref(false)
+const deleting           = ref(false)
+const fetchBatchError    = ref('')
 
 const branches         = ref([])
 const selectedBranchId = ref(null)
-const allRawItems      = ref([])
-const allBatches       = ref([])   // all rawproducttransaction rows (transactiontype=restock)
+const allRawItems      = ref([])   // rawproduct rows, enriched with _dailyUsage
+const allBatches       = ref([])   // all rawproducttransaction restock rows
 
 const activeTab         = ref('items')
 const searchQuery       = ref('')
@@ -683,7 +693,11 @@ const batchFilterExpiry = ref('')
 
 const showNewItemModal = ref(false)
 const newItemErrors    = ref({})
-const newItemForm      = ref({ name: '', category: '', unit: 'g', stockquantity: 0, reorderlevel: 0, expirationdate: '', leadTimeDays: 2 })
+const newItemForm      = ref({
+  name: '', category: '', unit: 'g',
+  stockquantity: 0, reorderlevel: 0,
+  expirationdate: '', leadtimedays: 2
+})
 
 const showRestockModal  = ref(false)
 const restockTarget     = ref(null)
@@ -695,17 +709,15 @@ const showDeleteConfirm = ref(false)
 const deleteTarget      = ref(null)
 const deleteType        = ref('item')
 
-const showBatchDetail = ref(false)
-const batchDetailItem = ref(null)
-const itemBatches     = ref([])
+const showBatchDetail    = ref(false)
+const batchDetailItem    = ref(null)
+const itemBatches        = ref([])
 
 const toast = ref({ show: false, message: '', type: 'success' })
 
-// BATCH LABELLING
-// B{rawproductid} for first batch, B{rawproductid}-2, B{rawproductid}-3 etc.
-// Uses rawtransactionid order (ascending = insertion order)
+// ─── BATCH LABELLING ──────────────────────────────────────────────────────────
+// B{rawproductid} for first, B{rawproductid}-2 for second, etc. (insertion order)
 const buildBatchLabels = (batches) => {
-  // Group by rawproductid, sorted by rawtransactionid asc
   const groups = {}
   const sorted = [...batches].sort((a, b) => a.rawtransactionid - b.rawtransactionid)
   for (const b of sorted) {
@@ -726,31 +738,110 @@ const batchLabelMap = computed(() => buildBatchLabels(allBatches.value))
 const attachLabels = (batches, labelMap) =>
   batches.map(b => ({ ...b, batchLabel: labelMap[b.rawtransactionid] ?? `#${b.rawtransactionid}` }))
 
-// EOQ
+// ─── EOQ CALCULATION ─────────────────────────────────────────────────────────
+// EOQ = Economic Order Quantity
+// Formula: sqrt(2 * D * S / H) — but simplified for small food businesses:
+//   we use: order_qty = daily_usage * lead_time * safety_factor (1.5)
+//   daily_usage is computed from: recipe.quantityneeded × actual orders sold in last 30 days
+//
+// If no sales data: fall back to reorderlevel / 3 * lead_time * safety_factor
 const calculateEOQ = (item) => {
   if (!item.reorderlevel) return 0
-  const dailyUsage = item.dailyusage ?? (item.reorderlevel / 3)
-  const leadTime   = item.leadtimedays ?? 2
-  return Math.ceil(dailyUsage * leadTime * 1.15)
+  const dailyUsage = item._dailyUsage > 0
+    ? item._dailyUsage
+    : (item.reorderlevel / 14)                        // fallback: assume 14-day supply covers reorder
+  const leadTime = item.leadtimedays ?? 2
+  // Safety stock = 1.5 × lead_time demand; order enough to cover lead time + safety stock
+  return Math.ceil(dailyUsage * leadTime * 1.5 + dailyUsage * leadTime)
 }
 
-// COMPUTED
+// ─── FETCH: DAILY USAGE FROM SALES ───────────────────────────────────────────
+// Joins: recipe (rawproductid, finishedproductid, quantityneeded)
+//       + orderitem (ProductId, Quantity)
+//       + orders (OrderId, CreatedAt) — last 30 days
+// Returns: Map<rawproductid, dailyUsage>
+const fetchDailyUsageFromSales = async () => {
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  const since = thirtyDaysAgo.toISOString()
+
+  // 1. Pull recent order items (ProductId = finishedproductid)
+  const { data: orderItems, error: oi_err } = await supabase
+    .from('orderitem')
+    .select(`
+      ProductId,
+      Quantity,
+      orders!inner ( OrderId, CreatedAt, Status )
+    `)
+    .gte('orders.CreatedAt', since)
+    .neq('orders.Status', 'cancelled')
+
+  if (oi_err) {
+    console.error('fetchDailyUsageFromSales orderitem error:', oi_err)
+    return {}
+  }
+
+  // 2. Sum units sold per product
+  const unitsSold = {}
+  for (const row of (orderItems ?? [])) {
+    const pid = row.ProductId
+    unitsSold[pid] = (unitsSold[pid] ?? 0) + (row.Quantity ?? 0)
+  }
+
+  // 3. Pull all recipes
+  const { data: recipes, error: r_err } = await supabase
+    .from('recipe')
+    .select('rawproductid, finishedproductid, quantityneeded')
+
+  if (r_err) {
+    console.error('fetchDailyUsageFromSales recipe error:', r_err)
+    return {}
+  }
+
+  // 4. Compute raw material usage over 30 days, then per day
+  const usageMap = {}
+  for (const recipe of (recipes ?? [])) {
+    const sold = unitsSold[recipe.finishedproductid] ?? 0
+    const totalUsed = sold * (recipe.quantityneeded ?? 0)
+    usageMap[recipe.rawproductid] = (usageMap[recipe.rawproductid] ?? 0) + totalUsed
+  }
+
+  // Convert 30-day total → daily usage
+  const dailyMap = {}
+  for (const [rid, total] of Object.entries(usageMap)) {
+    dailyMap[rid] = total / 30
+  }
+
+  return dailyMap
+}
+
+// ─── COMPUTED ─────────────────────────────────────────────────────────────────
 const selectedBranchName = computed(() =>
   branches.value.find(b => b.BranchId === selectedBranchId.value)?.BranchName ?? ''
 )
 
+const getBranchName = (branchId) => {
+  if (!branchId) return '—'
+  return branches.value.find(b => b.BranchId === branchId)?.BranchName ?? `Branch ${branchId}`
+}
+
 const filteredItems = computed(() => {
   let list = allRawItems.value
-  if (searchQuery.value) list = list.filter(i => i.name?.toLowerCase().includes(searchQuery.value.toLowerCase()))
+  if (searchQuery.value)    list = list.filter(i => i.name?.toLowerCase().includes(searchQuery.value.toLowerCase()))
   if (filterCategory.value) list = list.filter(i => i.category === filterCategory.value)
-  if (filterStatus.value) list = list.filter(i => getStatus(i) === filterStatus.value)
+  if (filterStatus.value)   list = list.filter(i => getStatus(i) === filterStatus.value)
   return list
 })
 
 // FEFO sort: earliest expiry first, no-expiry batches at end
+// Also filter by selectedBranchId when one is chosen
 const sortedBatches = computed(() => {
   const labelled = attachLabels(allBatches.value, batchLabelMap.value)
-  return [...labelled].sort((a, b) => {
+  let list = labelled
+  if (selectedBranchId.value) {
+    list = list.filter(b => b.branchid === selectedBranchId.value)
+  }
+  return [...list].sort((a, b) => {
     if (!a.expirationdate && !b.expirationdate) return 0
     if (!a.expirationdate) return 1
     if (!b.expirationdate) return -1
@@ -799,13 +890,22 @@ const restockPreviewItem = computed(() => {
   return null
 })
 
-// BATCH COUNT HELPERS (uses allBatches which is always loaded on mount)
-const getBatchCountForItem  = (id) => allBatches.value.filter(b => b.rawproductid === id).length
-const getExpiringBatchCount = (id) =>
-  allBatches.value.filter(b => b.rawproductid === id && b.expirationdate && getDaysUntilExpiry(b.expirationdate) <= 7).length
+// ─── BATCH COUNT HELPERS ──────────────────────────────────────────────────────
+const getBatchCountForItem = (id) => {
+  let batches = allBatches.value.filter(b => b.rawproductid === id)
+  if (selectedBranchId.value) batches = batches.filter(b => b.branchid === selectedBranchId.value)
+  return batches.length
+}
 
-// FETCH — only reads columns that actually exist in DB schema
-// rawproducttransaction columns: rawtransactionid, rawproductid, transactiontype, quantity, expirationdate, createdat
+const getExpiringBatchCount = (id) => {
+  let batches = allBatches.value.filter(b =>
+    b.rawproductid === id && b.expirationdate && getDaysUntilExpiry(b.expirationdate) <= 7
+  )
+  if (selectedBranchId.value) batches = batches.filter(b => b.branchid === selectedBranchId.value)
+  return batches.length
+}
+
+// ─── FETCH FUNCTIONS ──────────────────────────────────────────────────────────
 const fetchBranches = async () => {
   const { data } = await supabase.from('branch').select('BranchId, BranchName').order('BranchName')
   if (data) branches.value = data
@@ -818,32 +918,57 @@ const fetchBranches = async () => {
 
 const fetchRawMaterials = async () => {
   isLoading.value = true
+  const dailyUsageMap = await fetchDailyUsageFromSales()
+
   const { data, error } = await supabase
     .from('rawproduct')
-    .select('rawproductid, name, category, unit, stockquantity, reorderlevel, expirationdate, createdat, updatedat')
+    .select('rawproductid, name, category, unit, reorderlevel, leadtimedays, expirationdate, createdat, updatedat')
     .order('name')
-  if (error) { showToast('Failed to load inventory: ' + error.message, 'error'); isLoading.value = false; return }
-  allRawItems.value = data ?? []
+
+  if (error) {
+    showToast('Failed to load inventory: ' + error.message, 'error')
+    isLoading.value = false
+    return
+  }
+
+  const items = data ?? []
+
+  // Always compute stock from batches — never trust rawproduct.stockquantity
+  items.forEach(item => {
+    let batches = allBatches.value.filter(b => b.rawproductid === item.rawproductid)
+    if (selectedBranchId.value) {
+      batches = batches.filter(b => b.branchid === selectedBranchId.value)
+    }
+    item.stockquantity = batches.reduce((sum, b) => sum + (b.quantity ?? 0), 0)
+  })
+
+  allRawItems.value = items.map(item => ({
+    ...item,
+    _dailyUsage: dailyUsageMap[item.rawproductid] ?? 0
+  }))
+
   isLoading.value = false
 }
 
-// Key fix: only select columns that EXIST in rawproducttransaction per DB schema
-// No branchid — that column doesn't exist yet
+// ⚠️  KEY FIX: rawproducttransaction DOES have branchid per the DB schema
 const fetchBatches = async () => {
   loadingBatches.value = true
   fetchBatchError.value = ''
+
   const { data, error } = await supabase
     .from('rawproducttransaction')
     .select(`
       rawtransactionid,
       rawproductid,
+      branchid,
       transactiontype,
       quantity,
       expirationdate,
       createdat,
       rawproduct ( name, unit, category )
     `)
-    .eq('transactiontype', 'restock')
+    .eq('transactiontype', 'in')
+    .gt('quantity', 0)
     .order('rawtransactionid', { ascending: true })
 
   if (error) {
@@ -853,21 +978,28 @@ const fetchBatches = async () => {
     return
   }
 
-  // Filter out zero-qty rows on the client side to avoid DB-side issues
-  allBatches.value = (data ?? []).filter(b => (b.quantity ?? 0) > 0)
+  allBatches.value = data ?? []
   loadingBatches.value = false
+}
+
+const onBranchChange = async () => {
+  // Re-compute per-branch stock when branch filter changes
+  await fetchRawMaterials()
 }
 
 const handleBatchTab = async () => {
   activeTab.value = 'batches'
-  // Always refresh when switching to batch tab to show latest data
   await fetchBatches()
 }
 
-// NEW ITEM
+// ─── NEW ITEM ─────────────────────────────────────────────────────────────────
 const openNewItemModal = () => {
   newItemErrors.value = {}
-  newItemForm.value = { name: '', category: '', unit: 'g', stockquantity: 0, reorderlevel: 0, expirationdate: '', leadTimeDays: 2 }
+  newItemForm.value = {
+    name: '', category: '', unit: 'g',
+    stockquantity: 0, reorderlevel: 0,
+    expirationdate: '', leadtimedays: 2
+  }
   showNewItemModal.value = true
 }
 const closeNewItemModal = () => { showNewItemModal.value = false; newItemErrors.value = {} }
@@ -885,25 +1017,32 @@ const saveNewItem = async () => {
   const { data: newItem, error: itemErr } = await supabase
     .from('rawproduct')
     .insert([{
-      name:           newItemForm.value.name.trim(),
-      category:       newItemForm.value.category || null,
-      unit:           newItemForm.value.unit,
-      stockquantity:  newItemForm.value.stockquantity || 0,
-      reorderlevel:   newItemForm.value.reorderlevel || null,
+      name:          newItemForm.value.name.trim(),
+      category:      newItemForm.value.category || null,
+      unit:          newItemForm.value.unit,
+      stockquantity: newItemForm.value.stockquantity || 0,
+      reorderlevel:  newItemForm.value.reorderlevel || null,
+      leadtimedays:  newItemForm.value.leadtimedays || 2,
       expirationdate: newItemForm.value.expirationdate || null,
     }])
     .select()
     .single()
 
-  if (itemErr) { showToast('Failed to add item: ' + itemErr.message, 'error'); savingNewItem.value = false; return }
+  if (itemErr) {
+    showToast('Failed to add item: ' + itemErr.message, 'error')
+    savingNewItem.value = false
+    return
+  }
 
-  // 2. If initial qty > 0, log it as the first batch in rawproducttransaction
+  // 2. If initial qty > 0, log it as the first batch
   if (newItemForm.value.stockquantity > 0 && newItem) {
+    const branchId = selectedBranchId.value  // can be null if All Branches — that's OK
     const { error: txErr } = await supabase
       .from('rawproducttransaction')
       .insert([{
         rawproductid:    newItem.rawproductid,
-        transactiontype: 'restock',
+        branchid:        branchId,
+        transactiontype: 'in',
         quantity:        newItemForm.value.stockquantity,
         expirationdate:  newItemForm.value.expirationdate || null,
       }])
@@ -911,17 +1050,17 @@ const saveNewItem = async () => {
   }
 
   showToast(`"${newItem.name}" added — SKU-${String(newItem.rawproductid).padStart(4,'0')}`, 'success')
-  await Promise.all([fetchRawMaterials(), fetchBatches()])
+  await Promise.all([fetchBatches(), fetchRawMaterials()])
   closeNewItemModal()
   savingNewItem.value = false
 }
 
-// RESTOCK (ADD STOCK)
-// Logic:
-//   rawproduct.stockquantity = running SUM of all batch quantities (the grand total)
-//   Each restock: stockquantity += batchQty  (additive, never overwrites)
-//   Each batch delete: stockquantity -= batchQty
-//   rawproduct.expirationdate = updated to soonest expiry (for FEFO reference on rawproduct row)
+// ─── RESTOCK (ADD STOCK) ─────────────────────────────────────────────────────
+// LOGIC:
+//   rawproduct.stockquantity = grand total across ALL branches (SUM of all batch quantities)
+//   Each restock: +batch_qty to rawproduct.stockquantity AND insert a batch row with branchid
+//   Each batch delete: -batch_qty from rawproduct.stockquantity AND delete the row
+//   Per-branch stock is computed on the client by filtering batches by branchid
 const openRestockModal = (item) => {
   restockErrors.value = {}
   restockForm.value = {
@@ -951,7 +1090,6 @@ const saveRestock = async () => {
   } else {
     if (!restockForm.value.quantity || restockForm.value.quantity <= 0)
       e.quantity = 'Enter a valid quantity.'
-    // Branch is required when admin is in All Branches view
     if (!selectedBranchId.value && !restockForm.value.branchId)
       e.branch = 'Please select a destination branch.'
   }
@@ -960,19 +1098,26 @@ const saveRestock = async () => {
 
   savingRestock.value = true
   const item = restockPreviewItem.value
+  const targetBranchId = selectedBranchId.value ?? restockForm.value.branchId
 
-  // STEP 1 — Increment rawproduct.stockquantity (additive, not a replace)
+  // STEP 1 — Increment rawproduct.stockquantity (grand total, all branches combined)
   const newTotal = (item.stockquantity ?? 0) + restockForm.value.quantity
-  const productUpdate = { stockquantity: newTotal }
-  // Also update the product-level expirationdate if this batch has an expiry
-  // (keeps rawproduct.expirationdate as the "most recent" for quick reference)
-  if (restockForm.value.expirationdate) {
-    productUpdate.expirationdate = restockForm.value.expirationdate
+
+  // If branch is selected, we need the TRUE grand total (not branch-filtered stock)
+  // So we fetch it fresh to avoid stale state
+  let actualTotal = newTotal
+  if (selectedBranchId.value) {
+    const { data: fresh } = await supabase
+      .from('rawproduct')
+      .select('stockquantity')
+      .eq('rawproductid', item.rawproductid)
+      .single()
+    actualTotal = (fresh?.stockquantity ?? 0) + restockForm.value.quantity
   }
 
   const { error: upErr } = await supabase
     .from('rawproduct')
-    .update(productUpdate)
+    .update({ stockquantity: actualTotal })
     .eq('rawproductid', item.rawproductid)
 
   if (upErr) {
@@ -981,11 +1126,11 @@ const saveRestock = async () => {
     return
   }
 
-  // STEP 2 — Insert a new batch row in rawproducttransaction
-  // Only include columns that exist in schema (no branchid yet)
+  // STEP 2 — Insert a new batch row WITH branchid
   const batchRow = {
     rawproductid:    item.rawproductid,
-    transactiontype: 'restock',
+    branchid:        targetBranchId,               // ← KEY FIX: include branchid
+    transactiontype: 'in',
     quantity:        restockForm.value.quantity,
     expirationdate:  restockForm.value.expirationdate || null,
   }
@@ -995,23 +1140,22 @@ const saveRestock = async () => {
     .insert([batchRow])
 
   if (txErr) {
-    // Stock total was already updated — show warning but don't block
     console.error('Batch transaction insert error:', txErr)
     showToast(`Stock updated but batch log failed: ${txErr.message}`, 'error')
     savingRestock.value = false
-    await Promise.all([fetchRawMaterials(), fetchBatches()])
+    await Promise.all([fetchBatches(), fetchRawMaterials()])
     closeRestockModal()
     return
   }
 
   showToast(
-    `✓ Added ${restockForm.value.quantity} ${item.unit} to ${item.name}. New total: ${newTotal} ${item.unit}`,
+    `✓ Added ${restockForm.value.quantity} ${item.unit} of ${item.name} to ${getBranchName(targetBranchId)}.`,
     'success'
   )
 
-  await Promise.all([fetchRawMaterials(), fetchBatches()])
+  await Promise.all([fetchBatches(), fetchRawMaterials()])
 
-  // Refresh batch detail if it's open for this item
+  // Refresh batch detail if open for this item
   if (showBatchDetail.value && batchDetailItem.value?.rawproductid === item.rawproductid) {
     await openBatchDetail(batchDetailItem.value)
   }
@@ -1020,20 +1164,27 @@ const saveRestock = async () => {
   savingRestock.value = false
 }
 
-// BATCH DETAIL MODAL
+// ─── BATCH DETAIL MODAL ───────────────────────────────────────────────────────
 const openBatchDetail = async (item) => {
-  batchDetailItem.value   = item
-  showBatchDetail.value   = true
+  batchDetailItem.value    = item
+  showBatchDetail.value    = true
   loadingItemBatches.value = true
-  itemBatches.value       = []
+  itemBatches.value        = []
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('rawproducttransaction')
-    .select('rawtransactionid, rawproductid, quantity, expirationdate, createdat')
+    .select('rawtransactionid, rawproductid, branchid, quantity, expirationdate, createdat')
     .eq('rawproductid', item.rawproductid)
-    .eq('transactiontype', 'restock')
+    .eq('transactiontype', 'in')
     .gt('quantity', 0)
     .order('rawtransactionid', { ascending: true })
+
+  // If a branch is selected, only show that branch's batches
+  if (selectedBranchId.value) {
+    query = query.eq('branchid', selectedBranchId.value)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('openBatchDetail error:', error)
@@ -1043,14 +1194,14 @@ const openBatchDetail = async (item) => {
   }
 
   const rows = data ?? []
-  // Label: B{rawproductid} for first, B{rawproductid}-2 for second, etc.
+  // Assign batch labels (within this item's scope)
   const labelled = rows.map((b, i) => ({
     ...b,
     rawproduct: { name: item.name, unit: item.unit },
     batchLabel: i === 0 ? `B${item.rawproductid}` : `B${item.rawproductid}-${i + 1}`
   }))
 
-  // Sort FEFO for display (earliest expiry first)
+  // Sort FEFO (earliest expiry first, no-expiry at end)
   itemBatches.value = labelled.sort((a, b) => {
     if (!a.expirationdate && !b.expirationdate) return 0
     if (!a.expirationdate) return 1
@@ -1063,7 +1214,7 @@ const openBatchDetail = async (item) => {
 
 const markBatchExpired = (batch) => confirmDeleteBatch(batch)
 
-// DELETE
+// ─── DELETE ───────────────────────────────────────────────────────────────────
 const confirmDelete      = (item)  => { deleteTarget.value = item;  deleteType.value = 'item';  showDeleteConfirm.value = true }
 const confirmDeleteBatch = (batch) => { deleteTarget.value = batch; deleteType.value = 'batch'; showDeleteConfirm.value = true }
 
@@ -1072,18 +1223,20 @@ const doDelete = async () => {
 
   if (deleteType.value === 'batch') {
     const batch = deleteTarget.value
-    // Find current item in local state
-    const item = allRawItems.value.find(i => i.rawproductid === batch.rawproductid)
 
-    // 1. Subtract this batch quantity from rawproduct.stockquantity
-    if (item) {
-      const newQty = Math.max(0, (item.stockquantity ?? 0) - (batch.quantity ?? 0))
-      await supabase.from('rawproduct')
-        .update({ stockquantity: newQty })
-        .eq('rawproductid', item.rawproductid)
-    }
+    // Fetch the TRUE grand total stockquantity (not branch-filtered)
+    const { data: fresh } = await supabase
+      .from('rawproduct')
+      .select('stockquantity')
+      .eq('rawproductid', batch.rawproductid)
+      .single()
 
-    // 2. Delete the batch transaction row
+    const newQty = Math.max(0, (fresh?.stockquantity ?? 0) - (batch.quantity ?? 0))
+
+    await supabase.from('rawproduct')
+      .update({ stockquantity: newQty })
+      .eq('rawproductid', batch.rawproductid)
+
     const { error } = await supabase
       .from('rawproducttransaction')
       .delete()
@@ -1093,15 +1246,14 @@ const doDelete = async () => {
       showToast('Failed to remove batch: ' + error.message, 'error')
     } else {
       showToast('Batch removed — stock total adjusted.', 'success')
-      await Promise.all([fetchRawMaterials(), fetchBatches()])
-      // Refresh batch detail if open for this item
+      await Promise.all([fetchBatches(), fetchRawMaterials()])
       if (showBatchDetail.value && batchDetailItem.value) {
         await openBatchDetail(batchDetailItem.value)
       }
     }
 
   } else {
-    // Delete item: first remove all its transactions, then the product row
+    // Delete all batches first, then the product
     await supabase.from('rawproducttransaction')
       .delete()
       .eq('rawproductid', deleteTarget.value.rawproductid)
@@ -1114,7 +1266,7 @@ const doDelete = async () => {
     else {
       showToast('Item and all batches removed.', 'success')
       if (showBatchDetail.value) showBatchDetail.value = false
-      await Promise.all([fetchRawMaterials(), fetchBatches()])
+      await Promise.all([fetchBatches(), fetchRawMaterials()])
     }
   }
 
@@ -1122,7 +1274,7 @@ const doDelete = async () => {
   showDeleteConfirm.value = false
 }
 
-// STATUS HELPERS
+// ─── STATUS HELPERS ───────────────────────────────────────────────────────────
 const getStatus = (item) => {
   if ((item.stockquantity ?? 0) <= 0) return 'out'
   if (item.reorderlevel && item.stockquantity <= item.reorderlevel) return 'low'
@@ -1144,7 +1296,7 @@ const getStatusTextAfterRestock = (item, qty) => {
   return s === 'good' ? 'In Stock' : s === 'low' ? 'Low Stock' : 'Out of Stock'
 }
 
-// EXPIRY HELPERS
+// ─── EXPIRY HELPERS ───────────────────────────────────────────────────────────
 const getDaysUntilExpiry = (date) => {
   if (!date) return 9999
   return Math.floor((new Date(date) - new Date()) / (1000 * 60 * 60 * 24))
@@ -1152,7 +1304,7 @@ const getDaysUntilExpiry = (date) => {
 const getBatchExpiryClass = (date) => {
   if (!date) return 'ok'
   const d = getDaysUntilExpiry(date)
-  if (d < 0) return 'expired'
+  if (d < 0)  return 'expired'
   if (d <= 3) return 'critical'
   if (d <= 7) return 'warning'
   return 'ok'
@@ -1160,14 +1312,14 @@ const getBatchExpiryClass = (date) => {
 const getDaysLabel = (date) => {
   if (!date) return '—'
   const d = getDaysUntilExpiry(date)
-  if (d < 0) return 'Expired'
+  if (d < 0)   return 'Expired'
   if (d === 0) return 'Today'
   return `${d}d left`
 }
 const getFEFOLabel = (date) => {
   if (!date) return 'No Expiry'
   const d = getDaysUntilExpiry(date)
-  if (d < 0) return 'Discard'
+  if (d < 0)  return 'Discard'
   if (d <= 3) return 'Use Now'
   if (d <= 7) return 'Use Soon'
   return 'OK'
@@ -1182,16 +1334,17 @@ const showToast = (msg, type = 'success') => {
   setTimeout(() => { toast.value.show = false }, 4000)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// INIT — fetch everything on mount
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── INIT ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   await fetchBranches()
-  await Promise.all([fetchRawMaterials(), fetchBatches()])
+  // Fetch batches first so branch-filtered stock calc has data
+  await fetchBatches()
+  await fetchRawMaterials()
 })
 </script>
 
 <style scoped>
+/* ─── BASE ─────────────────────────────────────────────── */
 .inventory-content { padding: 24px 32px; font-family: 'Inter', sans-serif; background: #fafafa; min-height: 100vh; }
 
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
@@ -1200,6 +1353,7 @@ onMounted(async () => {
 .ph-left strong { color: #31201D; }
 .system-badge { background: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; border: 1px solid #bae6fd; }
 
+/* ─── BRANCH SELECTOR ──────────────────────────────────── */
 .branch-selector { background: white; padding: 14px 20px; border-radius: 12px; border: 1px solid #E9ECEF; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
 .branch-selector label { font-size: 14px; font-weight: 600; color: #495057; white-space: nowrap; }
 .select-wrap { position: relative; flex: 1; max-width: 360px; }
@@ -1208,19 +1362,21 @@ onMounted(async () => {
 .branch-dropdown:focus, .filter-select:focus { border-color: #8B4513; }
 .sel-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #999; pointer-events: none; }
 
+/* ─── STATS ────────────────────────────────────────────── */
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
 .stat-card { background: white; border-radius: 12px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; border: 1px solid #E9ECEF; }
-.stat-card.warning      { border-left: 3px solid #f59e0b; }
-.stat-card.danger       { border-left: 3px solid #ef4444; }
-.stat-card.expiring-card{ border-left: 3px solid #8b5cf6; }
-.stat-icon              { color: #8B4513; }
-.stat-icon.warn         { color: #f59e0b; }
-.stat-icon.danger-icon  { color: #ef4444; }
-.stat-icon.expiry-icon  { color: #8b5cf6; }
+.stat-card.warning       { border-left: 3px solid #f59e0b; }
+.stat-card.danger        { border-left: 3px solid #ef4444; }
+.stat-card.expiring-card { border-left: 3px solid #8b5cf6; }
+.stat-icon               { color: #8B4513; }
+.stat-icon.warn          { color: #f59e0b; }
+.stat-icon.danger-icon   { color: #ef4444; }
+.stat-icon.expiry-icon   { color: #8b5cf6; }
 .stat-info h3  { font-size: 12px; color: #6C757D; font-weight: 600; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
 .stat-value    { font-size: 26px; font-weight: 800; color: #212529; margin: 0 0 2px; }
 .stat-label    { font-size: 11px; color: #ADB5BD; }
 
+/* ─── FEFO ALERT ───────────────────────────────────────── */
 .fefo-alert { background: #fdf4ff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; }
 .fefo-header { margin-bottom: 14px; }
 .fefo-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -1240,6 +1396,7 @@ onMounted(async () => {
 .expire-btn { background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .more-alerts{ font-size: 12px; color: #92400e; margin: 5px 0 0; }
 
+/* ─── EOQ PANEL ────────────────────────────────────────── */
 .eoq-panel { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; }
 .eoq-header { margin-bottom: 12px; }
 .eoq-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
@@ -1251,22 +1408,25 @@ onMounted(async () => {
 .eoq-item-info { flex: 1; min-width: 120px; }
 .eoq-name  { display: block; font-weight: 700; font-size: 13px; color: #212529; }
 .eoq-stock { display: block; font-size: 11px; color: #888; }
+.usage-hint { color: #0369a1; font-weight: 600; }
 .eoq-suggestion { display: flex; align-items: center; gap: 5px; }
 .eoq-label { color: #888; font-size: 12px; }
 .eoq-qty   { font-weight: 800; color: #0369a1; font-size: 14px; }
 .eoq-restock-btn { background: #0369a1; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; }
 
+/* ─── TABS ─────────────────────────────────────────────── */
 .tabs-row { display: flex; gap: 4px; margin-bottom: 16px; background: white; border: 1px solid #eee; border-radius: 10px; padding: 4px; width: fit-content; }
 .tab-btn  { display: flex; align-items: center; gap: 7px; padding: 8px 18px; border: none; border-radius: 7px; background: none; font-size: 14px; font-weight: 600; color: #888; cursor: pointer; transition: 0.2s; }
 .tab-btn.active             { background: #8B4513; color: white; }
 .tab-btn:not(.active):hover { background: #f5f5f5; color: #8B4513; }
 .tab-alert-dot { background: #ef4444; color: white; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px; margin-left: 2px; }
 
+/* ─── INVENTORY SECTION ────────────────────────────────── */
 .inventory-section { background: white; border-radius: 12px; border: 1px solid #E9ECEF; overflow: hidden; }
 .section-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 1px solid #E9ECEF; }
-.section-header h2  { font-size: 17px; font-weight: 700; color: #212529; margin: 0 0 3px; }
-.section-subtitle   { font-size: 13px; color: #6C757D; margin: 0; }
-.header-actions     { display: flex; gap: 10px; }
+.section-header h2 { font-size: 17px; font-weight: 700; color: #212529; margin: 0 0 3px; }
+.section-subtitle  { font-size: 13px; color: #6C757D; margin: 0; }
+.header-actions    { display: flex; gap: 10px; }
 .btn-primary { display: flex; align-items: center; gap: 7px; background: #8B4513; color: white; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; white-space: nowrap; }
 .btn-primary:hover    { background: #A0522D; }
 .btn-primary:disabled { opacity: .65; cursor: not-allowed; }
@@ -1291,6 +1451,7 @@ onMounted(async () => {
 .spinner { width: 18px; height: 18px; border: 2px solid #eee; border-top-color: #8B4513; border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ─── TABLE ────────────────────────────────────────────── */
 .table-container { overflow-x: auto; }
 .inventory-table { width: 100%; border-collapse: collapse; }
 .inventory-table th { text-align: left; padding: 10px 16px; background: #F8F9FA; color: #495057; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #E9ECEF; white-space: nowrap; }
@@ -1364,7 +1525,7 @@ onMounted(async () => {
 .icon-btn.delete        { color: #DC3545; }
 .icon-btn.delete:hover  { background: #FFEBEE; }
 
-/* MODAL */
+/* ─── MODAL ────────────────────────────────────────────── */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
 .modal-content { background: white; border-radius: 14px; width: 90%; max-width: 580px; max-height: 92vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
 .modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 22px; border-bottom: 1px solid #E9ECEF; }
@@ -1374,6 +1535,7 @@ onMounted(async () => {
 .close-btn:hover { color: #212529; }
 .modal-body { padding: 22px; }
 
+/* ─── FORMS ────────────────────────────────────────────── */
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #495057; }
 .label-hint { font-size: 11px; color: #0369a1; font-weight: 400; }
@@ -1385,6 +1547,7 @@ onMounted(async () => {
 .field-error{ font-size: 12px; color: #dc3545; margin-top: 4px; display: block; }
 .divider-label { font-size: 12px; font-weight: 700; color: #8B4513; text-transform: uppercase; letter-spacing: 0.06em; margin: 20px 0 14px; padding-bottom: 6px; border-bottom: 1px solid #f0ebe4; }
 
+/* ─── STEP PICKER ──────────────────────────────────────── */
 .step-block { margin-bottom: 4px; }
 .step-label { font-size: 13px; font-weight: 700; color: #495057; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
 .step-num   { background: #8B4513; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; }
@@ -1403,11 +1566,12 @@ onMounted(async () => {
 .ipc-name  { font-size: 13px; font-weight: 700; color: #212529; line-height: 1.3; }
 .ipc-stock { font-size: 11px; color: #888; }
 
+/* ─── RESTOCK CARD ─────────────────────────────────────── */
 .restock-target-card { background: #f9f4ef; border: 1px solid #e8d5c4; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
 .rtc-top  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .rtc-name { display: flex; align-items: center; gap: 8px; font-size: 15px; color: #31201D; }
 .rtc-sku  { font-size: 11px; color: #bbb; font-family: monospace; }
-.rtc-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+.rtc-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-bottom: 10px; }
 .rtc-stat  { background: white; border-radius: 8px; padding: 8px 10px; border: 1px solid #e8d5c4; }
 .rtcs-label{ display: block; font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
 .rtcs-val  { font-size: 14px; font-weight: 800; }
@@ -1418,12 +1582,12 @@ onMounted(async () => {
 .rtcs-val.blue    { color: #0369a1; }
 .change-item-btn { background: none; border: none; color: #8B4513; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; }
 
-/* Branch required block */
+/* ─── BRANCH BLOCKS ────────────────────────────────────── */
 .branch-required-block { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
 .branch-assigned-note  { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: #0369a1; }
 .branch-assigned-note strong { color: #0c4a6e; }
 
-/* Batch form — strict 2-column grid */
+/* ─── BATCH FORM ───────────────────────────────────────── */
 .batch-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 .bfg-card  { background: #f8f9fa; border: 1px solid #E9ECEF; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .bfg-label { font-size: 13px; font-weight: 600; color: #495057; margin: 0; }
@@ -1437,6 +1601,7 @@ onMounted(async () => {
 .eoq-fill-btn { display: flex; align-items: center; gap: 5px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; width: fit-content; }
 .eoq-fill-btn:hover { background: #bae6fd; }
 
+/* ─── RESTOCK PREVIEW ──────────────────────────────────── */
 .restock-preview { background: #f9f9f9; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
 .rp-row { display: flex; justify-content: space-between; font-size: 14px; color: #555; }
 .rp-row.add   { color: #2E7D32; font-weight: 600; }
@@ -1451,6 +1616,7 @@ onMounted(async () => {
 .batch-total-row { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #f8f9fa; border-top: 2px solid #E9ECEF; font-size: 14px; color: #555; }
 .batch-total-row strong { color: #212529; font-size: 16px; }
 
+/* ─── MODAL ACTIONS ────────────────────────────────────── */
 .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; padding-top: 16px; border-top: 1px solid #E9ECEF; }
 .btn-secondary { background: #F8F9FA; border: 1px solid #E9ECEF; padding: 9px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: 0.2s; }
 .btn-secondary:hover { background: #E9ECEF; }
@@ -1458,11 +1624,13 @@ onMounted(async () => {
 .btn-danger:hover:not(:disabled) { background: #b02a37; }
 .btn-danger:disabled { opacity: .65; cursor: not-allowed; }
 
+/* ─── TOAST ────────────────────────────────────────────── */
 .toast-wrap { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 9999; animation: slideUp .2s ease; max-width: 420px; }
 .toast-wrap.success { background: #d1e7dd; color: #0a3622; }
 .toast-wrap.error   { background: #f8d7da; color: #58151c; }
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+/* ─── RESPONSIVE ───────────────────────────────────────── */
 @media (max-width: 768px) {
   .inventory-content { padding: 16px; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
