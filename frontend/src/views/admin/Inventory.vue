@@ -8,7 +8,6 @@
         <p>Managing inventory for <strong>{{ selectedBranchName || 'All Branches' }}</strong></p>
       </div>
       <div class="ph-right">
-        <span class="system-badge">EOQ + FEFO Batch Tracking</span>
       </div>
     </div>
 
@@ -65,8 +64,8 @@
       <div class="fefo-header">
         <div class="fefo-title-row">
           <CalendarX :size="16" />
-          <h3>FEFO Alert — Use These First</h3>
-          <span class="fefo-badge">First Expired, First Out</span>
+          <h3>Use These First</h3>
+          <span class="fefo-badge"></span>
         </div>
         <p class="fefo-sub">These batches expire soonest. Use them before opening newer stock to minimize waste.</p>
       </div>
@@ -97,10 +96,10 @@
       <div class="eoq-header">
         <div class="eoq-title-row">
           <TrendingUp :size="16" />
-          <h3>Smart Reorder Suggestions</h3>
-          <span class="eoq-badge">EOQ — Based on Sales</span>
+          <h3>Reorder Suggestions</h3>
+          <span class="eoq-badge">Based on Sales</span>
         </div>
-        <p class="eoq-sub">Items at or below reorder point. Order quantity calculated from actual menu sales × recipe usage.</p>
+        <p class="eoq-sub">Items at or below reorder point.</p>
       </div>
       <div class="eoq-list">
         <div v-for="item in eoqItems.slice(0, 4)" :key="item.rawproductid" class="eoq-row">
@@ -547,7 +546,7 @@
 
             <div class="fefo-note">
               <Layers :size="12" />
-              <span>A new batch will be logged under <strong>{{ restockPreviewItem?.name }}</strong> with its own expiry date. Staff will be reminded to use earliest-expiring batches first (FEFO).</span>
+              <span>A new batch will be logged under <strong>{{ restockPreviewItem?.name }}</strong> with its own expiry date. Staff will be reminded to use earliest-expiring batches first.</span>
             </div>
           </div>
 
