@@ -4,8 +4,16 @@
     <header class="page-header">
       <div class="header-text">
         <h1>Sales Overview</h1>
-        <p>View sales transactions and performance</p>
+        <p>
+          View sales transactions and performance
+          <span v-if="isManager && lockedBranchId">
+            — {{ branches.find(b => b.BranchId === lockedBranchId)?.BranchName }}
+          </span>
+        </p>
       </div>
+      <button class="launch-pos-btn" @click="showPOS = true">
+        <CreditCard :size="15" /> Launch POS
+      </button>
     </header>
 
     <!-- Stats -->
@@ -34,7 +42,7 @@
 
     <!-- Filters -->
     <div class="filters-bar">
-      <div class="filter-group">
+      <div class="filter-group" v-if="!isManager">
         <label>Branch</label>
         <div class="select-wrap">
           <select v-model="filterBranch">
@@ -125,7 +133,7 @@
               <th @click="setSort('CreatedAt')" class="sortable">
                 Date <SortIcon field="CreatedAt" :current="sortBy" :dir="sortDir" />
               </th>
-              <th>Branch</th>
+              <th v-if="!isManager">Branch</th>
               <th>Items</th>
               <th>Discount</th>
               <th @click="setSort('TotalAmount')" class="sortable">
@@ -147,7 +155,7 @@
                   <span class="date-main">{{ formatDateShort(tr.CreatedAt) }}</span>
                   <span class="date-time">{{ formatTime(tr.CreatedAt) }}</span>
                 </td>
-                <td>
+                <td v-if="!isManager">
                   <span class="branch-pill">{{ getBranchName(tr.BranchId) }}</span>
                 </td>
                 <td class="items-preview">
@@ -180,7 +188,7 @@
 
               <!-- Expanded detail row -->
               <tr v-if="expandedId === tr.OrderId" class="detail-row">
-                <td colspan="10">
+                <td :colspan="isManager ? 9 : 10">
                   <div class="detail-panel">
                     <div class="detail-cols">
                       <div class="detail-col">
@@ -236,6 +244,15 @@
       </template>
     </div>
 
+    <!-- ══ POS MODAL ══ -->
+    <Teleport to="body">
+      <div v-if="showPOS" class="pos-overlay" @click.self="showPOS = false">
+        <div class="pos-modal-wrap">
+          <POSView :embedded="true" @transaction-complete="onTransactionComplete" />
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
@@ -243,11 +260,12 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import {
   DollarSign, TrendingUp, Tag, ShoppingBag, ChevronDown,
-  ChevronLeft, ChevronRight, Search, X
+  ChevronLeft, ChevronRight, Search, X, CreditCard
 } from 'lucide-vue-next';
 import { supabase } from '@/supabase';
+import POSView from '@/views/staff/POS.vue';
 
-// Sort icon inline component
+// ── Sort icon inline component ──────────────────────────────────────────────
 const SortIcon = {
   props: ['field', 'current', 'dir'],
   template: `<span class="sort-arrows">
@@ -256,31 +274,37 @@ const SortIcon = {
   </span>`
 };
 
-// State 
+// ── Role / branch lock ──────────────────────────────────────────────────────
+const userRole       = ref(localStorage.getItem('role') ?? 'staff');
+const isManager      = computed(() => userRole.value === 'manager');
+const lockedBranchId = ref(null);
+
+// ── State ───────────────────────────────────────────────────────────────────
 const allTransactions = ref([]);
-const branches = ref([]);
-const loading = ref(false);
+const branches        = ref([]);
+const loading         = ref(false);
+const showPOS         = ref(false);
 
-// Filters
-const filterBranch = ref('');
-const filterStatus = ref('');
-const filterPayment = ref('');
+// ── Filters ─────────────────────────────────────────────────────────────────
+const filterBranch   = ref('');
+const filterStatus   = ref('');
+const filterPayment  = ref('');
 const filterDateFrom = ref('');
-const filterDateTo = ref('');
-const filterSearch = ref('');
+const filterDateTo   = ref('');
+const filterSearch   = ref('');
 
-// Sort
-const sortBy = ref('CreatedAt');
+// ── Sort ─────────────────────────────────────────────────────────────────────
+const sortBy  = ref('CreatedAt');
 const sortDir = ref('desc');
 
-// Pagination
-const page = ref(1);
+// ── Pagination ───────────────────────────────────────────────────────────────
+const page    = ref(1);
 const perPage = ref(20);
 
-// Expand
+// ── Expand ───────────────────────────────────────────────────────────────────
 const expandedId = ref(null);
 
-// Computed
+// ── Computed ─────────────────────────────────────────────────────────────────
 const hasActiveFilters = computed(() =>
   filterBranch.value || filterStatus.value || filterPayment.value ||
   filterDateFrom.value || filterDateTo.value || filterSearch.value
@@ -289,8 +313,12 @@ const hasActiveFilters = computed(() =>
 const filteredTransactions = computed(() => {
   let list = [...allTransactions.value];
 
-  if (filterBranch.value)
+  // Managers: data is already scoped at query level, but apply local filter too
+  if (isManager.value && lockedBranchId.value) {
+    list = list.filter(t => t.BranchId === lockedBranchId.value);
+  } else if (filterBranch.value) {
     list = list.filter(t => t.BranchId === filterBranch.value);
+  }
 
   if (filterStatus.value)
     list = list.filter(t => t.Status === filterStatus.value);
@@ -315,7 +343,6 @@ const filteredTransactions = computed(() => {
     );
   }
 
-  // Sort
   list.sort((a, b) => {
     let av = a[sortBy.value], bv = b[sortBy.value];
     if (sortBy.value === 'CreatedAt') { av = new Date(av); bv = new Date(bv); }
@@ -327,33 +354,50 @@ const filteredTransactions = computed(() => {
   return list;
 });
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredTransactions.value.length / perPage.value)));
-const pageStart = computed(() => (page.value - 1) * perPage.value);
-const pageEnd = computed(() => Math.min(pageStart.value + perPage.value, filteredTransactions.value.length));
+const totalPages       = computed(() => Math.max(1, Math.ceil(filteredTransactions.value.length / perPage.value)));
+const pageStart        = computed(() => (page.value - 1) * perPage.value);
+const pageEnd          = computed(() => Math.min(pageStart.value + perPage.value, filteredTransactions.value.length));
 const pagedTransactions = computed(() => filteredTransactions.value.slice(pageStart.value, pageEnd.value));
 
-const totalRevenue = computed(() => filteredTransactions.value.reduce((s, t) => s + (t.FinalAmount ?? 0), 0));
-const avgSale = computed(() => filteredTransactions.value.length ? totalRevenue.value / filteredTransactions.value.length : 0);
+const totalRevenue  = computed(() => filteredTransactions.value.reduce((s, t) => s + (t.FinalAmount ?? 0), 0));
+const avgSale       = computed(() => filteredTransactions.value.length ? totalRevenue.value / filteredTransactions.value.length : 0);
 const totalDiscounts = computed(() => filteredTransactions.value.reduce((s, t) => s + (t.DiscountedAmount ?? 0), 0));
 
-// Reset to page 1 when filters change
+// ── Watchers ─────────────────────────────────────────────────────────────────
 watch([filterBranch, filterStatus, filterPayment, filterDateFrom, filterDateTo, filterSearch], () => {
   page.value = 1;
   expandedId.value = null;
 });
 
-// Data Fetching
+// Refresh orders when POS modal closes (new transaction may have been added)
+watch(showPOS, (isOpen) => {
+  if (!isOpen) fetchAllOrders();
+});
+
+// ── Data fetching ─────────────────────────────────────────────────────────────
 const fetchBranches = async () => {
   const { data } = await supabase
     .from('branch')
     .select('BranchId, BranchName, Location')
     .order('BranchName');
   if (data) branches.value = data;
+
+  const role = localStorage.getItem('role');
+  const slug = localStorage.getItem('branch');
+
+  if (role === 'manager' && slug && slug !== 'all') {
+    const match = data?.find(b => b.BranchName?.toLowerCase().includes(slug.toLowerCase()));
+    if (match) {
+      lockedBranchId.value = match.BranchId;
+      filterBranch.value   = match.BranchId;
+    }
+  }
 };
 
 const fetchAllOrders = async () => {
   loading.value = true;
-  const { data, error } = await supabase
+
+  let query = supabase
     .from('orders')
     .select(`
       OrderId,
@@ -380,12 +424,18 @@ const fetchAllOrders = async () => {
     `)
     .order('CreatedAt', { ascending: false });
 
+  // Enforce branch at DB level for managers — not just client-side
+  if (isManager.value && lockedBranchId.value) {
+    query = query.eq('BranchId', lockedBranchId.value);
+  }
+
+  const { data, error } = await query;
   if (error) console.error('Error fetching orders:', error.message);
   else allTransactions.value = data ?? [];
   loading.value = false;
 };
 
-// Helpers
+// ── Helpers ──────────────────────────────────────────────────────────────────
 const getBranchName = (id) => {
   const b = branches.value.find(b => b.BranchId === id);
   return b ? b.BranchName : (id ? `Branch ${id}` : '—');
@@ -411,17 +461,24 @@ const toggleExpand = (id) => {
 };
 
 const clearFilters = () => {
-  filterBranch.value = '';
-  filterStatus.value = '';
-  filterPayment.value = '';
+  filterStatus.value   = '';
+  filterPayment.value  = '';
   filterDateFrom.value = '';
-  filterDateTo.value = '';
-  filterSearch.value = '';
+  filterDateTo.value   = '';
+  filterSearch.value   = '';
+  // Don't clear branch for managers — it's locked
+  if (!isManager.value) filterBranch.value = '';
 };
 
-// Init
+const onTransactionComplete = () => {
+  // Called by POSView emit when a sale is finalized
+  fetchAllOrders();
+};
+
+// ── Init ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  await Promise.all([fetchBranches(), fetchAllOrders()]);
+  await fetchBranches();
+  await fetchAllOrders();
 });
 </script>
 
@@ -430,8 +487,18 @@ onMounted(async () => {
 
 /* HEADER */
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.header-text h1 { font-size: 26px; color: #31201D; margin: 0; }
+.header-text h1 { font-size: 26px; color: #31201D; margin: 0; font-weight: 800; }
 .header-text p { color: #888; font-size: 14px; margin: 4px 0 0; }
+
+.launch-pos-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: #31201D; color: white; border: none;
+  padding: 11px 22px; border-radius: 10px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: 0.2s; font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+}
+.launch-pos-btn:hover { background: #4a3330; }
 
 /* STATS */
 .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
@@ -456,25 +523,14 @@ onMounted(async () => {
 }
 .select-wrap select:focus { border-color: #31201D; }
 .sel-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #999; pointer-events: none; }
-.date-input {
-  padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px;
-  font-size: 14px; outline: none; transition: border-color 0.2s;
-}
+.date-input { padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; }
 .date-input:focus { border-color: #31201D; }
 .search-group { flex: 1; min-width: 200px; }
 .search-wrap { position: relative; }
 .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999; }
-.search-input {
-  width: 100%; padding: 9px 12px 9px 32px; border: 1px solid #ddd;
-  border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box;
-  transition: border-color 0.2s;
-}
+.search-input { width: 100%; padding: 9px 12px 9px 32px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; box-sizing: border-box; transition: border-color 0.2s; }
 .search-input:focus { border-color: #31201D; }
-.clear-btn {
-  display: flex; align-items: center; gap: 6px; padding: 9px 16px;
-  background: #fee2e2; color: #dc2626; border: none; border-radius: 8px;
-  font-weight: 700; font-size: 13px; cursor: pointer; transition: 0.2s; align-self: flex-end;
-}
+.clear-btn { display: flex; align-items: center; gap: 6px; padding: 9px 16px; background: #fee2e2; color: #dc2626; border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer; transition: 0.2s; align-self: flex-end; }
 .clear-btn:hover { background: #fecaca; }
 
 /* TABLE SECTION */
@@ -494,10 +550,7 @@ onMounted(async () => {
 
 /* MAIN TABLE */
 .main-table { width: 100%; border-collapse: collapse; }
-.main-table th {
-  text-align: left; padding: 11px 12px; color: #666; font-size: 12px;
-  font-weight: 700; border-bottom: 2px solid #f5f5f5; text-transform: uppercase; letter-spacing: 0.04em;
-}
+.main-table th { text-align: left; padding: 11px 12px; color: #666; font-size: 12px; font-weight: 700; border-bottom: 2px solid #f5f5f5; text-transform: uppercase; letter-spacing: 0.04em; }
 .main-table th.sortable { cursor: pointer; user-select: none; }
 .main-table th.sortable:hover { color: #31201D; }
 .sort-arrows { margin-left: 4px; font-size: 9px; display: inline-flex; flex-direction: column; line-height: 1; gap: 1px; vertical-align: middle; }
@@ -507,11 +560,9 @@ onMounted(async () => {
 .expanded-row { background: #fdfaf8 !important; }
 
 .id-tag { background: #f0f0f0; padding: 4px 9px; border-radius: 4px; font-family: monospace; font-weight: 700; font-size: 13px; }
-.date-cell { }
 .date-main { display: block; font-size: 14px; font-weight: 600; }
 .date-time { display: block; font-size: 13px; color: #999; margin-top: 2px; }
 .branch-pill { font-size: 15px; font-weight: 600; color: #31201D; }
-.items-preview { }
 .item-chip { display: block; font-size: 14px; color: #555; line-height: 1.7; }
 .more-chip { display: block; font-size: 13px; color: #aaa; font-style: italic; margin-top: 2px; }
 .discount-badge { color: #15803d; font-size: 14px; font-weight: 600; }
@@ -519,9 +570,7 @@ onMounted(async () => {
 .no-discount { color: #ddd; }
 .amount-cell { color: #666; }
 .total-cell { font-weight: 800; color: #31201D; }
-.payment-badge { font-size: 15px; font-weight: 500; color: #444; text-transform: capitalize; background: none; border: none; outline: none; }
-.payment-badge.cash { color: #444; }
-.payment-badge.card { color: #444; }
+.payment-badge { font-size: 15px; font-weight: 500; color: #444; text-transform: capitalize; }
 .status-badge { font-size: 15px; font-weight: 600; }
 .status-badge.completed { color: #15803d; }
 .status-badge.pending { color: #a16207; }
@@ -537,7 +586,6 @@ onMounted(async () => {
 .inner-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .inner-table th { text-align: left; padding: 8px 10px; color: #999; font-size: 12px; border-bottom: 1px solid #eee; }
 .inner-table td { padding: 8px 10px; border-bottom: 1px dotted #f0f0f0; }
-.summary-col { }
 .summary-rows { background: white; border-radius: 10px; border: 1px solid #eee; padding: 16px; }
 .s-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #555; border-bottom: 1px dotted #f5f5f5; }
 .s-row:last-child { border-bottom: none; }
@@ -552,4 +600,34 @@ onMounted(async () => {
 .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .page-label { font-size: 14px; color: #666; font-weight: 600; }
 .per-page-select { padding: 8px 12px; border: 1px solid #eee; border-radius: 8px; font-size: 13px; outline: none; cursor: pointer; }
+
+/* POS MODAL */
+.pos-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+  z-index: 2000; backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+}
+.pos-modal-wrap {
+  width: 96vw; height: 92vh; background: #f5f0eb;
+  border-radius: 16px; overflow: hidden; position: relative;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.3);
+  display: flex; flex-direction: column;
+}
+.pos-modal-close {
+  position: absolute; top: 14px; right: 14px; z-index: 10;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2);
+  color: white; width: 34px; height: 34px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: 0.2s;
+}
+.pos-modal-close:hover { background: rgba(255,255,255,0.28); }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .sales-container { padding: 16px; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .detail-cols { grid-template-columns: 1fr; }
+  .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .filters-bar { flex-direction: column; }
+}
 </style>
