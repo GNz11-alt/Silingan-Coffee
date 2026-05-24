@@ -66,10 +66,10 @@
               <Coffee :size="15" class="item-icon" />
               <h4>{{ item.ProductName }}</h4>
             </div>
-
           </div>
 
           <div class="recipe-status-area">
+            <!-- FIX: check _recipeCount directly on this specific item -->
             <button v-if="item._recipeCount > 0" class="recipe-btn view"
               @click="openRecipeModal(item)">
               <ChefHat :size="13" /> Recipe ({{ item._recipeCount }} ingredients)
@@ -160,7 +160,11 @@
           <button class="close-x-btn" @click="closeRecipeModal"><X :size="18" /></button>
         </header>
 
-        <div class="recipe-body">
+        <div v-if="loadingRecipe" class="loading-state" style="padding: 30px;">
+          <div class="spinner"></div> Loading recipe...
+        </div>
+
+        <div v-else class="recipe-body">
           <div class="ingredient-header">
             <label>Raw Material</label>
             <label>Qty Needed</label>
@@ -175,7 +179,7 @@
                   <select v-model="ing.rawproductid">
                     <option :value="null">Select raw material</option>
                     <option v-for="rp in rawProducts" :key="rp.rawproductid" :value="rp.rawproductid">
-                      {{ rp.name }} 
+                      {{ rp.name }}
                     </option>
                   </select>
                   <ChevronDown :size="12" class="sel-icon" />
@@ -218,7 +222,7 @@
       </div>
     </div>
 
-    <!-- ALL RECIPES MODAL -->
+    <!-- ALL RECIPES MODAL — redesigned with category tabs -->
     <div v-if="showAllRecipesModal" class="modal-overlay" @click.self="showAllRecipesModal = false">
       <div class="modal-content all-recipes-modal">
         <header class="modal-hdr">
@@ -233,23 +237,63 @@
           <div class="spinner"></div> Loading...
         </div>
 
-        <div v-else class="all-recipes-scroll">
-          <div v-if="allRecipesSummary.length === 0" class="empty-state" style="padding: 40px;">
-            <p>No recipes have been added yet.</p>
+        <div v-else-if="allRecipesSummary.length === 0" class="empty-state" style="padding: 40px;">
+          <p>No recipes have been added yet.</p>
+        </div>
+
+        <div v-else class="all-recipes-layout">
+          <!-- Category sidebar tabs -->
+          <div class="recipe-sidebar">
+            <button
+              v-for="cat in allRecipeCategories"
+              :key="cat"
+              class="cat-tab"
+              :class="{ active: activeRecipeCategory === cat }"
+              @click="activeRecipeCategory = cat"
+            >
+              <span class="cat-tab-name">{{ cat }}</span>
+              <span class="cat-tab-count">{{ allRecipesByCategory[cat]?.length ?? 0 }}</span>
+            </button>
           </div>
-          <div v-for="row in allRecipesSummary" :key="row.ProductId" class="recipe-summary-row">
-            <div class="summary-product">
-              <Coffee :size="14" class="item-icon" />
-              <strong>{{ row.ProductName }}</strong>
-              <span class="summary-cat">{{ row.Category }}</span>
-              <span class="summary-price">₱{{ row.Price?.toFixed(2) ?? '—' }}</span>
+
+          <!-- Items panel -->
+          <div class="recipe-panel">
+            <div class="recipe-search">
+              <SearchIcon :size="14" />
+              <input v-model="recipeSearch" placeholder="Search recipes..." />
             </div>
-            <ul class="summary-ingredients">
-              <li v-for="r in row.recipes" :key="r.recipeid">
-                <span class="ing-name">{{ r.rawName }}</span>
-                <span class="ing-qty">{{ r.quantityneeded }} {{ r.unit }}</span>
-              </li>
-            </ul>
+            <div class="recipe-panel-scroll">
+              <div
+                v-for="row in filteredRecipePanel"
+                :key="row.ProductId"
+                class="recipe-card"
+                :class="{ expanded: expandedRecipe === row.ProductId }"
+                @click="expandedRecipe = expandedRecipe === row.ProductId ? null : row.ProductId"
+              >
+                <div class="recipe-card-header">
+                  <div class="recipe-card-left">
+                    <Coffee :size="14" class="item-icon" />
+                    <span class="recipe-card-name">{{ row.ProductName }}</span>
+                    <span class="recipe-ing-pill">{{ row.recipes.length }} ingredients</span>
+                  </div>
+                  <div class="recipe-card-right">
+                    <span class="recipe-card-price">₱{{ row.Price?.toFixed(2) ?? '—' }}</span>
+                    <ChevronDown :size="14" class="expand-icon" :class="{ rotated: expandedRecipe === row.ProductId }" />
+                  </div>
+                </div>
+                <div v-if="expandedRecipe === row.ProductId" class="recipe-card-body">
+                  <div v-for="r in row.recipes" :key="r.recipeid" class="ing-row">
+                    <span class="ing-dot"></span>
+                    <span class="ing-name">{{ r.rawName }}</span>
+                    <span class="ing-qty">{{ r.quantityneeded }} {{ r.unit }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="filteredRecipePanel.length === 0" class="empty-recipe" style="padding: 32px;">
+                No recipes found.
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -266,39 +310,39 @@ import {
 } from 'lucide-vue-next';
 import { supabase } from '@/supabase';
 
-// State
+// State 
 const menuItems   = ref([]);
 const rawProducts = ref([]);
 const branches    = ref([]);
 const loading     = ref(false);
 
-const searchQuery   = ref('');
+const searchQuery    = ref('');
 const filterCategory = ref('');
-
-const filterBranch  = ref(null);
+const filterBranch   = ref(null);
 
 // Product modal
 const showModal  = ref(false);
 const isEditing  = ref(false);
 const editingId  = ref(null);
 const saving     = ref(false);
-const form       = ref({
-  ProductName: '', Category: '', Price: null, BranchId: null
-});
+const form       = ref({ ProductName: '', Category: '', Price: null, BranchId: null });
 
 // Recipe modal
-const showRecipeModal = ref(false);
-const activeItem      = ref(null);
-const recipeRows      = ref([]);
-const savingRecipe    = ref(false);
-const existingRecipeIds = ref([]); // track which rows already exist in DB
+const showRecipeModal   = ref(false);
+const loadingRecipe     = ref(false);
+const activeItem        = ref(null);
+const recipeRows        = ref([]);
+const savingRecipe      = ref(false);
 
 // All recipes modal
-const showAllRecipesModal = ref(false);
-const allRecipesSummary   = ref([]);
-const loadingAllRecipes   = ref(false);
+const showAllRecipesModal  = ref(false);
+const allRecipesSummary    = ref([]);
+const loadingAllRecipes    = ref(false);
+const activeRecipeCategory = ref('');
+const recipeSearch         = ref('');
+const expandedRecipe       = ref(null);
 
-// Computed
+// Computed 
 const categories = computed(() => {
   const cats = menuItems.value.map(i => i.Category).filter(Boolean);
   return [...new Set(cats)].sort();
@@ -306,17 +350,13 @@ const categories = computed(() => {
 
 const filteredGrouped = computed(() => {
   let list = [...menuItems.value];
-
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase();
     list = list.filter(i => i.ProductName?.toLowerCase().includes(q));
   }
-  if (filterCategory.value)
-    list = list.filter(i => i.Category === filterCategory.value);
-  if (filterBranch.value)
-    list = list.filter(i => i.BranchId === filterBranch.value);
+  if (filterCategory.value) list = list.filter(i => i.Category === filterCategory.value);
+  if (filterBranch.value)   list = list.filter(i => i.BranchId === filterBranch.value);
 
-  // Group by Category
   return list.reduce((acc, i) => {
     const cat = i.Category || 'Uncategorized';
     if (!acc[cat]) acc[cat] = [];
@@ -325,15 +365,35 @@ const filteredGrouped = computed(() => {
   }, {});
 });
 
-// Fetch
+// All recipes — deduplicated by ProductName (same product across branches shares one recipe)
+const allRecipeCategories = computed(() => {
+  const cats = allRecipesSummary.value.map(r => r.Category).filter(Boolean);
+  return [...new Set(cats)].sort();
+});
+
+const allRecipesByCategory = computed(() => {
+  return allRecipesSummary.value.reduce((acc, row) => {
+    const cat = row.Category || 'Uncategorized';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(row);
+    return acc;
+  }, {});
+});
+
+const filteredRecipePanel = computed(() => {
+  const catItems = allRecipesByCategory.value[activeRecipeCategory.value] ?? [];
+  if (!recipeSearch.value) return catItems;
+  const q = recipeSearch.value.toLowerCase();
+  return catItems.filter(r => r.ProductName?.toLowerCase().includes(q));
+});
+
+// Fetch 
 const fetchBranches = async () => {
-  const { data } = await supabase
-    .from('branch').select('BranchId, BranchName').order('BranchName');
+  const { data } = await supabase.from('branch').select('BranchId, BranchName').order('BranchName');
   if (data) branches.value = data;
 };
 
 const fetchRawProducts = async () => {
-  // rawproduct is now standalone with name, category, unit, stockquantity
   const { data, error } = await supabase
     .from('rawproduct')
     .select('rawproductid, name, category, unit, reorderlevel, stockquantity, expirationdate')
@@ -345,7 +405,6 @@ const fetchRawProducts = async () => {
 const fetchMenuItems = async () => {
   loading.value = true;
 
-  // Fetch all products
   const { data: products, error } = await supabase
     .from('product')
     .select('ProductId, ProductName, ProductType, Category, Price, BranchId, CreatedAt')
@@ -354,12 +413,12 @@ const fetchMenuItems = async () => {
 
   if (error) { console.error(error.message); loading.value = false; return; }
 
-  // Fetch recipe counts per finishedproductid
+  // Fetch ALL recipe rows once
   const { data: recipes } = await supabase
     .from('recipe')
     .select('recipeid, finishedproductid');
 
-  // Count recipes per product
+  // Count per ProductId
   const recipeCounts = {};
   (recipes ?? []).forEach(r => {
     recipeCounts[r.finishedproductid] = (recipeCounts[r.finishedproductid] || 0) + 1;
@@ -374,14 +433,11 @@ const fetchMenuItems = async () => {
   loading.value = false;
 };
 
-// Product CRUD 
+//Product CRUD
 const openAddModal = () => {
   isEditing.value = false;
   editingId.value = null;
-  form.value = {
-    ProductName: '', Category: '', Price: null,
-    BranchId: filterBranch.value
-  };
+  form.value = { ProductName: '', Category: '', Price: null, BranchId: filterBranch.value };
   showModal.value = true;
 };
 
@@ -405,21 +461,18 @@ const saveItem = async () => {
     return;
   }
   saving.value = true;
-
   const payload = {
     ProductName: form.value.ProductName,
     Category: form.value.Category || null,
     Price: form.value.Price ?? null,
     BranchId: form.value.BranchId,
   };
-
   let error;
   if (isEditing.value) {
     ({ error } = await supabase.from('product').update(payload).eq('ProductId', editingId.value));
   } else {
     ({ error } = await supabase.from('product').insert(payload));
   }
-
   if (error) alert('Failed to save: ' + error.message);
   else { await fetchMenuItems(); closeModal(); }
   saving.value = false;
@@ -427,62 +480,80 @@ const saveItem = async () => {
 
 const deleteItem = async (id) => {
   if (!confirm('Delete this product? This will also delete its recipes.')) return;
-  // Delete recipes first
   await supabase.from('recipe').delete().eq('finishedproductid', id);
   const { error } = await supabase.from('product').delete().eq('ProductId', id);
   if (error) alert('Failed to delete: ' + error.message);
   else await fetchMenuItems();
 };
 
-// Recipe CRUD
+// Recipe CRUD 
 const openRecipeModal = async (item) => {
   activeItem.value = item;
   recipeRows.value = [];
-  existingRecipeIds.value = [];
+  loadingRecipe.value = true;
+  showRecipeModal.value = true;
 
-  // Load existing recipe rows for this product
+  // find ALL ProductIds that share this ProductName (across all branches)
+  const { data: sameNameProducts } = await supabase
+    .from('product')
+    .select('ProductId')
+    .eq('ProductName', item.ProductName);
+
+  const allIds = (sameNameProducts ?? []).map(p => p.ProductId);
+
+  // Step 2: find any recipe row among those IDs (they should all be identical)
   const { data, error } = await supabase
     .from('recipe')
     .select('recipeid, finishedproductid, rawproductid, quantityneeded, unit')
-    .eq('finishedproductid', item.ProductId);
+    .in('finishedproductid', allIds.length > 0 ? allIds : [item.ProductId])
+    // deduplicate by rawproductid — take the first match per ingredient
+    .order('rawproductid');
 
-  if (!error && data) {
-    recipeRows.value = data.map(r => ({
-      recipeid: r.recipeid,
+  loadingRecipe.value = false;
+
+  if (!error && data && data.length > 0) {
+    // Deduplicate by rawproductid in JS
+    const seen = new Set();
+    const deduped = data.filter(r => {
+      if (seen.has(r.rawproductid)) return false;
+      seen.add(r.rawproductid);
+      return true;
+    });
+    recipeRows.value = deduped.map(r => ({
       rawproductid: r.rawproductid,
       quantityneeded: r.quantityneeded,
       unit: r.unit ?? 'g',
     }));
-    existingRecipeIds.value = data.map(r => r.recipeid);
+  } else {
+    recipeRows.value = [{ rawproductid: null, quantityneeded: 0, unit: 'g' }];
   }
-
-  // Start with one empty row if no recipes
-  if (recipeRows.value.length === 0) {
-    recipeRows.value.push({ rawproductid: null, quantityneeded: 0, unit: 'g' });
-  }
-
-  showRecipeModal.value = true;
 };
 
 const closeRecipeModal = () => { showRecipeModal.value = false; activeItem.value = null; };
 
 const saveRecipe = async () => {
   if (!activeItem.value) return;
-
   const validRows = recipeRows.value.filter(r => r.rawproductid && r.quantityneeded > 0);
   if (validRows.length === 0) {
     alert('Please add at least one ingredient with a valid quantity.');
     return;
   }
-
   savingRecipe.value = true;
 
-  // Delete all existing recipes for this product, then re-insert
-  // simplest approach for add edit remvove
+  // Find ALL ProductIds sharing this ProductName (all branches)
+  const { data: sameNameProducts } = await supabase
+    .from('product')
+    .select('ProductId')
+    .eq('ProductName', activeItem.value.ProductName);
+
+  const allIds = (sameNameProducts ?? []).map(p => p.ProductId);
+  const targetIds = allIds.length > 0 ? allIds : [activeItem.value.ProductId];
+
+  // Delete existing recipes for ALL matching ProductIds
   const { error: delError } = await supabase
     .from('recipe')
     .delete()
-    .eq('finishedproductid', activeItem.value.ProductId);
+    .in('finishedproductid', targetIds);
 
   if (delError) {
     alert('Failed to update recipe: ' + delError.message);
@@ -490,21 +561,19 @@ const saveRecipe = async () => {
     return;
   }
 
-  const inserts = validRows.map(r => ({
-    finishedproductid: activeItem.value.ProductId,
-    rawproductid: r.rawproductid,  // FK to rawproduct.rawproductid
-    quantityneeded: r.quantityneeded,
-    unit: r.unit,
-  }));
+  // Insert recipe rows for ALL branch ProductIds so every branch card reflects it
+  const inserts = targetIds.flatMap(pid =>
+    validRows.map(r => ({
+      finishedproductid: pid,
+      rawproductid: r.rawproductid,
+      quantityneeded: r.quantityneeded,
+      unit: r.unit,
+    }))
+  );
 
   const { error: insError } = await supabase.from('recipe').insert(inserts);
-
-  if (insError) {
-    alert('Failed to save recipe: ' + insError.message);
-  } else {
-    await fetchMenuItems();
-    closeRecipeModal();
-  }
+  if (insError) alert('Failed to save recipe: ' + insError.message);
+  else { await fetchMenuItems(); closeRecipeModal(); }
   savingRecipe.value = false;
 };
 
@@ -512,23 +581,22 @@ const saveRecipe = async () => {
 const openAllRecipes = async () => {
   showAllRecipesModal.value = true;
   loadingAllRecipes.value = true;
+  recipeSearch.value = '';
+  expandedRecipe.value = null;
 
-  // fetch all recipes with rawproductid
+  // Fetch all recipes
   const { data: recipes, error: recipeErr } = await supabase
     .from('recipe')
     .select('recipeid, finishedproductid, rawproductid, quantityneeded, unit');
 
   if (recipeErr) { console.error(recipeErr.message); loadingAllRecipes.value = false; return; }
 
-  // fetch all rawproducts for name lookup
-  const { data: raws } = await supabase
-    .from('rawproduct')
-    .select('rawproductid, name, unit');
-
+  // Raw product name map
+  const { data: raws } = await supabase.from('rawproduct').select('rawproductid, name, unit');
   const rawMap = {};
   (raws ?? []).forEach(r => { rawMap[r.rawproductid] = r; });
 
-  // fetch all products that have at least one recipe
+  // Get unique product IDs that have recipes
   const productIds = [...new Set((recipes ?? []).map(r => r.finishedproductid))];
   if (productIds.length === 0) {
     allRecipesSummary.value = [];
@@ -536,18 +604,38 @@ const openAllRecipes = async () => {
     return;
   }
 
+  // FIX: fetch products and deduplicate by ProductName — pick the lowest ProductId per name
+  // so we only show one entry per unique menu item regardless of branch duplication
   const { data: products } = await supabase
     .from('product')
     .select('ProductId, ProductName, Category, Price')
     .in('ProductId', productIds)
     .order('Category')
-    .order('ProductName');
+    .order('ProductName')
+    .order('ProductId'); // lowest ID first for dedup
 
-  // merge — attach recipe rows (with raw name) to each product
-  allRecipesSummary.value = (products ?? []).map(p => ({
+  // Deduplicate by ProductName — keep first occurrence
+  const seen = new Set();
+  const dedupedProducts = (products ?? []).filter(p => {
+    if (seen.has(p.ProductName)) return false;
+    seen.add(p.ProductName);
+    return true;
+  });
+
+  // For each unique product name, gather ALL recipe rows from any of its ProductIds
+  // (they should be the same, but this ensures we find them)
+  const nameToProductIds = {};
+  (products ?? []).forEach(p => {
+    if (!nameToProductIds[p.ProductName]) nameToProductIds[p.ProductName] = [];
+    nameToProductIds[p.ProductName].push(p.ProductId);
+  });
+
+  allRecipesSummary.value = dedupedProducts.map(p => ({
     ...p,
     recipes: (recipes ?? [])
-      .filter(r => r.finishedproductid === p.ProductId)
+      .filter(r => (nameToProductIds[p.ProductName] ?? []).includes(r.finishedproductid))
+      // deduplicate ingredient rows by rawproductid
+      .filter((r, i, arr) => arr.findIndex(x => x.rawproductid === r.rawproductid) === i)
       .map(r => ({
         ...r,
         rawName: rawMap[r.rawproductid]?.name ?? '—',
@@ -555,18 +643,22 @@ const openAllRecipes = async () => {
       }))
   }));
 
+  // Set default active category
+  if (allRecipeCategories.value.length > 0) {
+    activeRecipeCategory.value = allRecipeCategories.value[0];
+  }
+
   loadingAllRecipes.value = false;
 };
 
-//Helpers 
+//  Helpers 
 const getBranchName = (id) =>
   branches.value.find(b => b.BranchId === id)?.BranchName ?? '—';
 
-//Init 
+//  Init
 onMounted(async () => {
   await Promise.all([fetchBranches(), fetchRawProducts(), fetchMenuItems()]);
 
-  // Pre-select branch from logged-in user
   const branchSlug = localStorage.getItem('branch');
   if (branchSlug && branchSlug !== 'all') {
     const match = branches.value.find(b =>
@@ -619,19 +711,15 @@ onMounted(async () => {
 .menu-card { background: white; border: 1px solid #eee; border-radius: 14px; padding: 18px 20px; transition: box-shadow 0.2s; display: flex; flex-direction: column; gap: 10px; }
 .menu-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
 .item-disabled { opacity: 0.45; filter: grayscale(0.6); }
-
 .card-top { display: flex; align-items: center; gap: 7px; }
 .cat-label { font-size: 11px; font-weight: 700; color: #C49A6C; background: #FFF9F0; padding: 2px 8px; border-radius: 4px; }
 .branch-label { margin-left: auto; font-size: 11px; color: #bbb; font-weight: 500; }
-
 .card-body { }
 .name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
 .item-icon { color: #C49A6C; flex-shrink: 0; }
 .name-row h4 { margin: 0; font-size: 15px; font-weight: 700; color: #31201D; }
-.category-text { font-size: 12px; color: #aaa; margin: 0; padding-left: 23px; }
 
 /* RECIPE BUTTON */
-.recipe-status-area { }
 .recipe-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; }
 .recipe-btn.view { border: 1px solid #C49A6C; background: #FFF9F0; color: #C49A6C; }
 .recipe-btn.view:hover { background: #fff0dc; }
@@ -646,11 +734,10 @@ onMounted(async () => {
 .icon-btn.edit:hover { border-color: #31201D; color: #31201D; }
 .icon-btn.delete:hover { border-color: #dc2626; color: #dc2626; background: #fee2e2; }
 
-/* MODAL */
+/* MODAL BASE */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
 .modal-content { background: white; width: 500px; max-width: 95vw; border-radius: 16px; padding: 28px 32px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); max-height: 92vh; overflow-y: auto; }
 .modal-content.recipe-modal { width: 580px; }
-.modal-content.all-recipes-modal { width: 560px; }
 .modal-hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
 .modal-hdr h3 { font-size: 18px; font-weight: 700; color: #31201D; margin: 0 0 3px; }
 .modal-hdr p { font-size: 13px; color: #888; margin: 0; }
@@ -662,13 +749,10 @@ onMounted(async () => {
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .field label { font-size: 12px; font-weight: 700; color: #31201D; text-transform: uppercase; letter-spacing: 0.04em; }
-.field input, .field textarea { padding: 10px 13px; border: 1px solid #eee; border-radius: 8px; background: #fafafa; outline: none; font-size: 14px; transition: 0.2s; }
-.field input:focus, .field textarea:focus { border-color: #C49A6C; background: white; }
-.field input:hover, .field textarea:hover { border-color: #C49A6C; }
+.field input { padding: 10px 13px; border: 1px solid #eee; border-radius: 8px; background: #fafafa; outline: none; font-size: 14px; transition: 0.2s; }
+.field input:focus { border-color: #C49A6C; background: white; }
 .select-wrap.full select { width: 100%; appearance: none; padding: 10px 32px 10px 12px; border: 1px solid #eee; border-radius: 8px; font-size: 14px; background: #fafafa; outline: none; cursor: pointer; }
 .select-wrap.full select:focus { border-color: #C49A6C; }
-
-/* SUBMIT */
 .submit-full { width: 100%; background: #31201D; color: white; border: none; padding: 13px; border-radius: 8px; font-weight: 700; font-size: 15px; margin-top: 20px; cursor: pointer; transition: 0.2s; }
 .submit-full:hover:not(:disabled) { background: #4a3330; }
 .submit-full:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -679,7 +763,6 @@ onMounted(async () => {
 .ingredient-header label { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.04em; }
 .ingredient-list { max-height: 280px; overflow-y: auto; padding: 2px; }
 .ingredient-row { display: grid; grid-template-columns: 2fr 1fr 1fr 36px; gap: 10px; margin-bottom: 10px; align-items: center; }
-.field-item { }
 .ingredient-row input { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #eee; border-radius: 8px; background: #fafafa; font-size: 14px; outline: none; transition: 0.2s; box-sizing: border-box; }
 .ingredient-row input:focus { border-color: #C49A6C; background: white; }
 .ingredient-row .select-wrap.full select { height: 40px; padding: 0 28px 0 10px; }
@@ -694,19 +777,158 @@ onMounted(async () => {
 .submit-full-sm:hover:not(:disabled) { background: #4a3330; }
 .submit-full-sm:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ALL RECIPES */
-.all-recipes-scroll { max-height: 65vh; overflow-y: auto; }
-.recipe-summary-row { border-bottom: 1px solid #f0f0f0; padding: 16px 0; }
-.recipe-summary-row:last-child { border-bottom: none; }
-.summary-product { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-.summary-product strong { font-size: 14px; color: #31201D; }
-.summary-cat { font-size: 12px; color: #888; }
-.summary-price { font-size: 13px; font-weight: 700; color: #C49A6C; margin-left: auto; }
-.summary-ingredients { margin: 0; padding: 0 0 0 22px; list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.summary-ingredients li { display: flex; justify-content: space-between; font-size: 13px; color: #555; padding: 4px 8px; background: #fafafa; border-radius: 6px; }
-.ing-name { font-weight: 500; }
-.ing-qty { color: #999; font-size: 12px; }
+/* ── ALL RECIPES MODAL — redesigned ── */
+.modal-content.all-recipes-modal {
+  width: 780px;
+  max-width: 95vw;
+  padding: 28px 0 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+}
+.modal-content.all-recipes-modal .modal-hdr {
+  padding: 0 28px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 0;
+}
+
+.all-recipes-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.recipe-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid #f0f0f0;
+  overflow-y: auto;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cat-tab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  text-align: left;
+  transition: 0.15s;
+  gap: 8px;
+}
+.cat-tab:hover { background: #f5f5f5; color: #31201D; }
+.cat-tab.active { background: #FFF9F0; color: #31201D; font-weight: 700; }
+.cat-tab-name { flex: 1; }
+.cat-tab-count {
+  font-size: 11px;
+  font-weight: 700;
+  background: #f0f0f0;
+  color: #888;
+  padding: 1px 7px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+.cat-tab.active .cat-tab-count { background: #C49A6C22; color: #C49A6C; }
+
+/* Panel */
+.recipe-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.recipe-search {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f5f5f5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.recipe-search svg { color: #bbb; flex-shrink: 0; }
+.recipe-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  background: none;
+  color: #31201D;
+}
+.recipe-search input::placeholder { color: #ccc; }
+
+.recipe-panel-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Recipe accordion card */
+.recipe-card {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.recipe-card:hover { border-color: #C49A6C44; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.recipe-card.expanded { border-color: #C49A6C; }
+
+.recipe-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: white;
+  gap: 10px;
+}
+.recipe-card-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.recipe-card-name { font-size: 13px; font-weight: 600; color: #31201D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recipe-ing-pill {
+  font-size: 11px; font-weight: 600; background: #f0f0f0; color: #888;
+  padding: 2px 7px; border-radius: 10px; flex-shrink: 0;
+}
+.recipe-card.expanded .recipe-ing-pill { background: #C49A6C22; color: #C49A6C; }
+.recipe-card-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.recipe-card-price { font-size: 13px; font-weight: 700; color: #31201D; }
+.expand-icon { color: #bbb; transition: transform 0.2s; }
+.expand-icon.rotated { transform: rotate(180deg); color: #C49A6C; }
+
+.recipe-card-body {
+  padding: 0 14px 12px;
+  background: #FDFAF7;
+  border-top: 1px solid #f5ede0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid #f0ebe0;
+  font-size: 12px;
+}
+.ing-row:last-child { border-bottom: none; }
+.ing-dot { width: 5px; height: 5px; border-radius: 50%; background: #C49A6C; flex-shrink: 0; }
+.ing-name { flex: 1; color: #444; font-weight: 500; }
+.ing-qty { color: #C49A6C; font-weight: 600; font-size: 11px; background: #fff; padding: 2px 7px; border-radius: 4px; border: 1px solid #f0e0c8; }
 
 @media (max-width: 1024px) { .menu-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 640px) { .menu-grid { grid-template-columns: 1fr; } .field-row { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .menu-grid { grid-template-columns: 1fr; } .field-row { grid-template-columns: 1fr; } .all-recipes-layout { flex-direction: column; } .recipe-sidebar { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid #f0f0f0; } }
 </style>

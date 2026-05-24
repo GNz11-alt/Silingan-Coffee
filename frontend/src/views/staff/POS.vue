@@ -35,8 +35,8 @@
           :class="['cat-btn', activeCategory === cat ? 'active' : '']"
           @click="activeCategory = cat"
         >
-          <component :is="getCatIcon(cat)" :size="15" />
-          {{ cat }}
+          <component :is="getCatIcon(cat)" :size="14" />
+          <span>{{ cat }}</span>
         </button>
       </aside>
 
@@ -49,26 +49,36 @@
           </div>
         </div>
 
-        <div v-if="loadingMenu" class="menu-loading">
-          <div class="spin"></div> Loading menu...
-        </div>
+        <div v-if="loadingMenu" class="menu-loading"><div class="spin"></div> Loading menu...</div>
         <div v-else-if="filteredMenu.length === 0" class="menu-empty">No items found.</div>
         <div v-else class="menu-grid">
           <button
             v-for="item in filteredMenu" :key="item.ProductId"
-            class="menu-card" :class="{ 'in-cart': isInCart(item.ProductId) }"
-            @click="addToCart(item)"
+            class="menu-card"
+            :class="{ 'in-cart': isInCart(item.ProductId) }"
+            @click="handleMenuCardClick(item)"
           >
             <div class="menu-card-img">
-              <Coffee :size="30" class="menu-card-icon" />
+              <component :is="getCatIcon(item.Category)" :size="28" class="menu-card-icon" />
               <span v-if="isInCart(item.ProductId)" class="cart-qty-badge">
-                {{ getCartQty(item.ProductId) }}
+                {{ getCartTotalQty(item.ProductId) }}
+              </span>
+              <!-- Size indicator chip -->
+              <span v-if="getSizeType(item.Category) !== 'none'" class="size-chip">
+                {{ getSizeLabels(item.Category).join(' / ') }}
               </span>
             </div>
             <div class="menu-card-info">
               <span class="menu-card-name">{{ item.ProductName }}</span>
               <span class="menu-card-cat">{{ item.Category }}</span>
-              <span class="menu-card-price">₱{{ item.Price?.toFixed(2) }}</span>
+              <span class="menu-card-price">
+                <template v-if="getSizeType(item.Category) !== 'none'">
+                  from ₱{{ getBasePrice(item) }}
+                </template>
+                <template v-else>
+                  ₱{{ item.Price?.toFixed(2) }}
+                </template>
+              </span>
             </div>
           </button>
         </div>
@@ -87,7 +97,10 @@
           <div v-for="(item, i) in cart" :key="i" class="cart-item">
             <div class="ci-info">
               <span class="ci-name">{{ item.ProductName }}</span>
-              <span class="ci-price">₱{{ item.Price?.toFixed(2) }}</span>
+              <span v-if="item.size" class="ci-size-tag">{{ item.size }}</span>
+            </div>
+            <div class="ci-price-row">
+              <span class="ci-price">₱{{ item.effectivePrice?.toFixed(2) }} each</span>
             </div>
             <div class="ci-controls">
               <button class="qty-btn" @click="decreaseQty(i)"><Minus :size="11" /></button>
@@ -95,7 +108,7 @@
               <button class="qty-btn" @click="increaseQty(i)"><Plus :size="11" /></button>
               <button class="ci-remove" @click="removeFromCart(i)"><Trash2 :size="13" /></button>
             </div>
-            <div class="ci-subtotal">₱{{ (item.qty * item.Price).toFixed(2) }}</div>
+            <div class="ci-subtotal">₱{{ (item.qty * item.effectivePrice).toFixed(2) }}</div>
           </div>
         </div>
 
@@ -134,6 +147,32 @@
       </aside>
     </div>
 
+    <!-- ── SIZE PICKER MODAL ── -->
+    <div v-if="showSizePicker" class="overlay" @click.self="showSizePicker = false">
+      <div class="size-modal">
+        <div class="size-modal-header">
+          <div>
+            <h2>{{ sizePickerItem?.ProductName }}</h2>
+            <p>{{ sizePickerItem?.Category }}</p>
+          </div>
+          <button class="pv-close" @click="showSizePicker = false"><X :size="19" /></button>
+        </div>
+        <div class="size-options">
+          <button
+            v-for="opt in sizeOptions" :key="opt.label"
+            class="size-option-btn"
+            @click="addToCartWithSize(sizePickerItem, opt)"
+          >
+            <div class="so-top">
+              <span class="so-size">{{ opt.label }}</span>
+              <span class="so-oz">{{ opt.oz }}</span>
+            </div>
+            <span class="so-price">₱{{ opt.price?.toFixed(2) }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── PAYMENT MODAL ── -->
     <div v-if="showPayment" class="overlay" @click.self="showPayment = false">
       <div class="payment-modal">
@@ -153,9 +192,9 @@
             </div>
             <div class="r-divider"></div>
             <div class="r-items">
-              <div v-for="item in cart" :key="item.ProductId" class="r-item">
-                <span>{{ item.qty }}x {{ item.ProductName }}</span>
-                <span>₱{{ (item.qty * item.Price).toFixed(2) }}</span>
+              <div v-for="item in cart" :key="item.cartKey" class="r-item">
+                <span>{{ item.qty }}x {{ item.ProductName }}<span v-if="item.size"> ({{ item.size }})</span></span>
+                <span>₱{{ (item.qty * item.effectivePrice).toFixed(2) }}</span>
               </div>
             </div>
             <div class="r-divider"></div>
@@ -264,9 +303,7 @@
           </div>
         </div>
 
-        <div v-if="loadingTransactions" class="hm-empty">
-          <div class="spin"></div> Loading...
-        </div>
+        <div v-if="loadingTransactions" class="hm-empty"><div class="spin"></div> Loading...</div>
         <div v-else-if="transactions.length === 0" class="hm-empty">No transactions today yet.</div>
         <div v-else class="hm-table-wrap">
           <table class="hm-table">
@@ -311,10 +348,67 @@ import { ref, computed, onMounted } from 'vue';
 import {
   Coffee, History, Search, ShoppingCart, Plus, Minus, Trash2, X,
   Tag, ChevronDown, CreditCard, Banknote, Smartphone, ArrowLeft,
-  Cookie, Layers, UtensilsCrossed
+  Cookie, Layers, UtensilsCrossed, Sandwich, Leaf
 } from 'lucide-vue-next';
 import { supabase } from '@/supabase';
 
+// ── Size configuration ─────────────────────────────────────────────────────────
+// Categories that have sizes and how the prices work:
+// Hot Drinks: Small 8oz = Price, Regular 12oz = Price + 10 (approx from menu)
+// Iced Coffee, Non-Coffee, Frap, Smoothies, Cream Frap: Regular 16oz = Price, Big 22oz = Price + 15-20
+// Fixed: Others (Sprite, Royal...), Sandwiches, Pastry, Rice Meal, Pika-pika, Add Ons
+
+const HOT_DRINKS_CATS    = ['Hot Drinks', 'Hot Drink\'s', 'Hot Drink', 'Hot']
+const ICED_COFFEE_CATS   = ['Iced Coffee', 'Iced Coffees']
+const NON_COFFEE_CATS    = ['Non Coffee', 'Non-Coffee']
+const FRAP_CATS          = ['Coffee Based Frap', 'Coffee-Based Frap', 'Frap']
+const CREAM_FRAP_CATS    = ['Cream Based Frap', 'Cream-Based Frap', 'Cream Frap']
+const SMOOTHIE_CATS      = ['Smoothies', 'Smoothie']
+
+// normalise category to size type
+const getSizeType = (cat) => {
+  if (!cat) return 'none'
+  const c = cat.toLowerCase()
+  if (c.includes('hot drink')) return 'hot'
+  if (c.includes('iced coffee')) return 'iced'
+  if (c.includes('non') && c.includes('coffee')) return 'iced'
+  if (c.includes('cream') && c.includes('frap')) return 'iced'
+  if (c.includes('frap')) return 'iced'
+  if (c.includes('smoothie')) return 'iced'
+  return 'none'
+}
+
+const getSizeLabels = (cat) => {
+  const t = getSizeType(cat)
+  if (t === 'hot') return ['Small', 'Regular']
+  if (t === 'iced') return ['Regular', 'Big']
+  return []
+}
+
+// Build size options for the modal based on product base price
+// Hot: Small(8oz) = base price, Regular(12oz) = base + ~10
+// Iced: Regular(16oz) = base price, Big(22oz) = base + ~20
+const buildSizeOptions = (item) => {
+  const t = getSizeType(item.Category)
+  const base = item.Price ?? 0
+  if (t === 'hot') {
+    return [
+      { label: 'Small',   oz: '8oz',  price: base },
+      { label: 'Regular', oz: '12oz', price: base + 10 },
+    ]
+  }
+  if (t === 'iced') {
+    return [
+      { label: 'Regular', oz: '16oz', price: base },
+      { label: 'Big',     oz: '22oz', price: base + 20 },
+    ]
+  }
+  return []
+}
+
+const getBasePrice = (item) => item.Price?.toFixed(2) ?? '0.00'
+
+// ── State ──────────────────────────────────────────────────────────────────────
 const menu = ref([]); const discounts = ref([]); const transactions = ref([]);
 const loadingMenu = ref(false); const loadingTransactions = ref(false);
 const cart = ref([]); const selectedDiscount = ref(null);
@@ -323,19 +417,28 @@ const showPayment = ref(false); const showReceipt = ref(false); const showHistor
 const paymentMethod = ref('cash'); const cashReceived = ref(0); const saving = ref(false);
 const currentUser = ref(null); const branchRecord = ref(null);
 
-const cashierName  = computed(() => currentUser.value?.username ?? localStorage.getItem('username') ?? 'Staff');
-const branchId     = computed(() => branchRecord.value?.BranchId ?? null);
+// Size picker
+const showSizePicker = ref(false)
+const sizePickerItem = ref(null)
+const sizeOptions    = ref([])
+
+// ── Computed ───────────────────────────────────────────────────────────────────
+const cashierName   = computed(() => currentUser.value?.username ?? localStorage.getItem('username') ?? 'Staff');
+const branchId      = computed(() => branchRecord.value?.BranchId ?? null);
 const branchAddress = computed(() => branchRecord.value?.Location ?? '');
-const currentDate  = new Date().toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+const currentDate   = new Date().toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
 const menuCategories = computed(() => [...new Set(menu.value.map(i => i.Category).filter(Boolean))].sort());
+
 const filteredMenu = computed(() => {
   let list = menu.value;
   if (activeCategory.value !== 'All') list = list.filter(i => i.Category === activeCategory.value);
   if (menuSearch.value) list = list.filter(i => i.ProductName?.toLowerCase().includes(menuSearch.value.toLowerCase()));
   return list;
 });
-const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.Price * i.qty, 0));
+
+const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.effectivePrice * i.qty, 0));
+
 const discountAmount = computed(() => {
   if (!selectedDiscount.value || cartTotal.value === 0) return 0;
   const d = selectedDiscount.value;
@@ -343,17 +446,65 @@ const discountAmount = computed(() => {
     ? parseFloat(((cartTotal.value * d.discountvalue) / 100).toFixed(2))
     : Math.min(d.discountvalue, cartTotal.value);
 });
+
 const finalTotal   = computed(() => Math.max(0, cartTotal.value - discountAmount.value));
 const changeAmount = computed(() => cashReceived.value - finalTotal.value);
 const totalRevenue = computed(() => transactions.value.reduce((s, t) => s + (t.FinalAmount ?? 0), 0));
 const avgSale      = computed(() => transactions.value.length ? totalRevenue.value / transactions.value.length : 0);
+
 const quickAmounts = computed(() => {
   const t = Math.ceil(finalTotal.value / 50) * 50;
   return [...new Set([t, 100, 200, 500, 1000, 2000])].sort((a,b)=>a-b).slice(0,6);
 });
 
+// ── Cart helpers ───────────────────────────────────────────────────────────────
+// Cart key = ProductId + size (so same product in different sizes = different cart rows)
+const makeCartKey  = (item, size) => `${item.ProductId}-${size ?? 'none'}`
+const isInCart     = (id) => cart.value.some(i => i.ProductId === id)
+const getCartTotalQty = (id) => cart.value.filter(i => i.ProductId === id).reduce((s,i) => s + i.qty, 0)
+
+// ── Handle menu card tap ───────────────────────────────────────────────────────
+const handleMenuCardClick = (item) => {
+  const t = getSizeType(item.Category)
+  if (t === 'none') {
+    // No size — add directly
+    addToCartDirect(item)
+  } else {
+    // Has sizes — open picker
+    sizePickerItem.value = item
+    sizeOptions.value = buildSizeOptions(item)
+    showSizePicker.value = true
+  }
+}
+
+const addToCartDirect = (item) => {
+  const key = makeCartKey(item, null)
+  const ex = cart.value.find(i => i.cartKey === key)
+  if (ex) { ex.qty++; return }
+  cart.value.push({ ...item, qty: 1, size: null, effectivePrice: item.Price ?? 0, cartKey: key })
+}
+
+const addToCartWithSize = (item, sizeOpt) => {
+  showSizePicker.value = false
+  const key = makeCartKey(item, sizeOpt.label)
+  const ex = cart.value.find(i => i.cartKey === key)
+  if (ex) { ex.qty++; return }
+  cart.value.push({
+    ...item,
+    qty: 1,
+    size: `${sizeOpt.label} (${sizeOpt.oz})`,
+    effectivePrice: sizeOpt.price,
+    cartKey: key
+  })
+}
+
+const increaseQty    = (i) => cart.value[i].qty++
+const decreaseQty    = (i) => { if (cart.value[i].qty > 1) cart.value[i].qty--; else removeFromCart(i) }
+const removeFromCart = (i) => cart.value.splice(i, 1)
+
+// ── Fetch ──────────────────────────────────────────────────────────────────────
 const fetchCurrentUser = async () => {
-  const username = localStorage.getItem('username');
+  const username   = localStorage.getItem('username');
   const branchSlug = localStorage.getItem('branch');
   if (!username) return;
   const { data: u } = await supabase.from('users').select('id, username, role, branch').eq('username', username).single();
@@ -365,6 +516,7 @@ const fetchCurrentUser = async () => {
     if (bl) branchRecord.value = bl;
   }
 };
+
 const fetchMenu = async () => {
   loadingMenu.value = true;
   let q = supabase.from('product').select('ProductId, ProductName, Category, Price, BranchId');
@@ -373,14 +525,16 @@ const fetchMenu = async () => {
   if (data) menu.value = data;
   loadingMenu.value = false;
 };
+
 const fetchDiscounts = async () => {
   const { data } = await supabase.from('discount').select('discountid, discountname, discounttype, discountvalue').order('discountname');
   if (data) discounts.value = data;
 };
+
 const fetchTransactions = async () => {
   loadingTransactions.value = true;
   const today = new Date(); today.setHours(0,0,0,0);
-  const tom = new Date(today); tom.setDate(tom.getDate()+1);
+  const tom   = new Date(today); tom.setDate(tom.getDate()+1);
   let q = supabase.from('orders').select(`
     OrderId, TotalAmount, DiscountId, DiscountedAmount, FinalAmount,
     cashpaid, changegiven, PaymentMethod, Status, CreatedAt,
@@ -393,16 +547,7 @@ const fetchTransactions = async () => {
   loadingTransactions.value = false;
 };
 
-const addToCart = (item) => {
-  const ex = cart.value.find(i => i.ProductId === item.ProductId);
-  if (ex) ex.qty++; else cart.value.push({ ...item, qty: 1 });
-};
-const increaseQty  = (i) => cart.value[i].qty++;
-const decreaseQty  = (i) => { if (cart.value[i].qty > 1) cart.value[i].qty--; else removeFromCart(i); };
-const removeFromCart = (i) => cart.value.splice(i, 1);
-const isInCart     = (id) => cart.value.some(i => i.ProductId === id);
-const getCartQty   = (id) => cart.value.find(i => i.ProductId === id)?.qty ?? 0;
-
+// ── Payment ────────────────────────────────────────────────────────────────────
 const openPayment = () => { cashReceived.value = 0; paymentMethod.value = 'cash'; showReceipt.value = false; showPayment.value = true; };
 
 const finishTransaction = async () => {
@@ -417,12 +562,22 @@ const finishTransaction = async () => {
     };
     if (branchId.value) payload.BranchId = branchId.value;
     if (currentUser.value?.id) payload.CashierId = currentUser.value.id;
+
     const { data: order, error: oErr } = await supabase.from('orders').insert(payload).select().single();
     if (oErr) throw new Error(oErr.message);
+
+    // Insert order items — use effectivePrice (size-adjusted) as UnitPrice
     const { error: iErr } = await supabase.from('orderitem').insert(
-      cart.value.map(i => ({ OrderId: order.OrderId, ProductId: i.ProductId, Quantity: i.qty, UnitPrice: i.Price, Subtotal: i.qty * i.Price }))
+      cart.value.map(i => ({
+        OrderId:  order.OrderId,
+        ProductId: i.ProductId,
+        Quantity:  i.qty,
+        UnitPrice: i.effectivePrice,
+        Subtotal:  i.qty * i.effectivePrice,
+      }))
     );
     if (iErr) throw new Error(iErr.message);
+
     await fetchTransactions();
     cart.value = []; selectedDiscount.value = null;
     showPayment.value = false; showReceipt.value = false;
@@ -430,13 +585,20 @@ const finishTransaction = async () => {
   finally { saving.value = false; }
 };
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
 const getCatIcon = (cat) => {
-  if (cat === 'All') return Layers;
-  const c = cat?.toLowerCase() ?? '';
-  if (c.includes('pastry') || c.includes('pastries') || c.includes('bake')) return Cookie;
-  if (c.includes('food') || c.includes('meal')) return UtensilsCrossed;
-  return Coffee;
+  if (!cat || cat === 'All') return Layers;
+  const c = cat.toLowerCase();
+  if (c.includes('hot'))        return Coffee;
+  if (c.includes('iced'))       return Coffee;
+  if (c.includes('non'))        return Coffee;
+  if (c.includes('frap'))       return Coffee;
+  if (c.includes('smoothie'))   return Leaf;
+  if (c.includes('sandwich'))   return Sandwich;
+  if (c.includes('pastry') || c.includes('rice') || c.includes('pika')) return Cookie;
+  return UtensilsCrossed;
 };
+
 const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '—';
 
 onMounted(async () => {
@@ -446,7 +608,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.pos-root { display:flex; flex-direction:column; height:100vh; overflow:hidden; background:#f5f0eb; font-family: 'Inter', sans-serif; }
+.pos-root { display:flex; flex-direction:column; height:100vh; overflow:hidden; background:#f5f0eb; font-family:'Inter',sans-serif; }
 
 /* TOPBAR */
 .pos-topbar { display:flex; justify-content:space-between; align-items:center; padding:0 24px; height:54px; background:#31201D; color:white; flex-shrink:0; }
@@ -455,73 +617,89 @@ onMounted(async () => {
 .topbar-meta { font-size:12px; color:rgba(255,255,255,0.5); display:flex; align-items:center; gap:8px; }
 .meta-branch { color:rgba(255,255,255,0.8); font-weight:600; }
 .meta-sep { opacity:0.3; }
-.history-btn { display:flex; align-items:center; gap:7px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:white; padding:7px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:0.2s; position:relative; }
+.history-btn { display:flex; align-items:center; gap:7px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:white; padding:7px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:0.2s; }
 .history-btn:hover { background:rgba(255,255,255,0.2); }
 .history-count { background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:20px; }
 
 /* LAYOUT */
-.pos-layout { display:grid; grid-template-columns:156px 1fr 330px; flex:1; overflow:hidden; }
+.pos-layout { display:grid; grid-template-columns:152px 1fr 320px; flex:1; overflow:hidden; }
 
 /* CATEGORY SIDEBAR */
-.category-sidebar { background:#2a1b18; padding:18px 10px; display:flex; flex-direction:column; gap:5px; overflow-y:auto; }
+.category-sidebar { background:#2a1b18; padding:16px 8px; display:flex; flex-direction:column; gap:4px; overflow-y:auto; }
 .sidebar-label { font-size:10px; color:rgba(255,255,255,0.28); text-transform:uppercase; letter-spacing:0.12em; margin:0 0 8px 4px; }
-.cat-btn { display:flex; align-items:center; gap:8px; padding:10px 12px; background:transparent; border:none; border-radius:9px; color:rgba(255,255,255,0.5); font-size:13px; font-weight:600; cursor:pointer; text-align:left; font-family:inherit; transition:0.15s; width:100%; }
+.cat-btn { display:flex; align-items:center; gap:7px; padding:9px 10px; background:transparent; border:none; border-radius:8px; color:rgba(255,255,255,0.5); font-size:12px; font-weight:600; cursor:pointer; text-align:left; font-family:inherit; transition:0.15s; width:100%; }
 .cat-btn:hover { background:rgba(255,255,255,0.08); color:white; }
 .cat-btn.active { background:#C49A6C; color:white; }
 
 /* MENU AREA */
-.menu-area { padding:18px; overflow-y:auto; background:#f5f0eb; display:flex; flex-direction:column; gap:14px; }
+.menu-area { padding:16px; overflow-y:auto; background:#f5f0eb; display:flex; flex-direction:column; gap:12px; }
 .menu-search { display:flex; align-items:center; gap:9px; background:white; border:1px solid #e8e0d5; border-radius:10px; padding:9px 14px; max-width:320px; }
 .menu-search input { flex:1; border:none; outline:none; font-size:14px; background:transparent; font-family:inherit; }
 .menu-search svg { color:#bbb; }
 .menu-loading,.menu-empty { display:flex; align-items:center; gap:12px; justify-content:center; padding:60px; color:#bbb; font-size:14px; }
-.menu-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(145px,1fr)); gap:12px; }
-.menu-card { background:white; border:2px solid transparent; border-radius:13px; padding:0; cursor:pointer; font-family:inherit; transition:all 0.15s; overflow:hidden; text-align:left; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+.menu-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:11px; }
+.menu-card { background:white; border:2px solid transparent; border-radius:12px; padding:0; cursor:pointer; font-family:inherit; transition:all 0.15s; overflow:hidden; text-align:left; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
 .menu-card:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,0.1); border-color:#C49A6C; }
 .menu-card.in-cart { border-color:#31201D; background:#fdfaf7; }
-.menu-card-img { background:#f9f4ef; height:96px; display:flex; align-items:center; justify-content:center; position:relative; }
+.menu-card-img { background:#f9f4ef; height:88px; display:flex; align-items:center; justify-content:center; position:relative; }
 .menu-card-icon { color:#C49A6C; opacity:0.65; }
-.cart-qty-badge { position:absolute; top:7px; right:7px; background:#31201D; color:white; font-size:11px; font-weight:700; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
-.menu-card-info { padding:9px 11px 11px; }
-.menu-card-name { display:block; font-size:13px; font-weight:700; color:#31201D; line-height:1.3; margin-bottom:2px; }
-.menu-card-cat { display:block; font-size:11px; color:#bbb; margin-bottom:5px; }
-.menu-card-price { display:block; font-size:15px; font-weight:800; color:#31201D; }
+.cart-qty-badge { position:absolute; top:7px; right:7px; background:#31201D; color:white; font-size:11px; font-weight:700; width:21px; height:21px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.size-chip { position:absolute; bottom:5px; left:6px; background:rgba(49,32,29,0.75); color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:8px; letter-spacing:0.03em; white-space:nowrap; }
+.menu-card-info { padding:8px 10px 10px; }
+.menu-card-name { display:block; font-size:12px; font-weight:700; color:#31201D; line-height:1.3; margin-bottom:2px; }
+.menu-card-cat { display:block; font-size:10px; color:#bbb; margin-bottom:4px; }
+.menu-card-price { display:block; font-size:14px; font-weight:800; color:#31201D; }
 
 /* CART PANEL */
 .cart-panel { background:white; border-left:1px solid #ede8e2; display:flex; flex-direction:column; overflow:hidden; }
-.cart-panel-header { display:flex; justify-content:space-between; align-items:center; padding:16px 18px; border-bottom:1px solid #f0ebe4; flex-shrink:0; }
-.cart-panel-header h2 { font-size:16px; font-weight:700; color:#31201D; margin:0; }
-.clear-cart-btn { display:flex; align-items:center; gap:5px; background:#fee2e2; border:none; color:#dc2626; font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px; cursor:pointer; font-family:inherit; }
-.cart-items { flex:1; overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; gap:9px; }
-.cart-item { background:#fdfaf7; border:1px solid #ede8e2; border-radius:9px; padding:9px 11px; display:flex; flex-direction:column; gap:5px; }
-.ci-info { display:flex; justify-content:space-between; }
-.ci-name { font-size:13px; font-weight:700; color:#31201D; }
-.ci-price { font-size:12px; color:#bbb; }
-.ci-controls { display:flex; align-items:center; gap:7px; }
-.qty-btn { width:24px; height:24px; border-radius:5px; border:1px solid #e8e0d5; background:white; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#31201D; transition:0.15s; }
+.cart-panel-header { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid #f0ebe4; flex-shrink:0; }
+.cart-panel-header h2 { font-size:15px; font-weight:700; color:#31201D; margin:0; }
+.clear-cart-btn { display:flex; align-items:center; gap:5px; background:#fee2e2; border:none; color:#dc2626; font-size:11px; font-weight:600; padding:4px 9px; border-radius:6px; cursor:pointer; font-family:inherit; }
+.cart-items { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+.cart-item { background:#fdfaf7; border:1px solid #ede8e2; border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:4px; }
+.ci-info { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.ci-name { font-size:12px; font-weight:700; color:#31201D; flex:1; }
+.ci-size-tag { background:#31201D; color:white; font-size:10px; font-weight:700; padding:2px 7px; border-radius:8px; white-space:nowrap; }
+.ci-price-row { }
+.ci-price { font-size:11px; color:#bbb; }
+.ci-controls { display:flex; align-items:center; gap:6px; }
+.qty-btn { width:22px; height:22px; border-radius:5px; border:1px solid #e8e0d5; background:white; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#31201D; transition:0.15s; }
 .qty-btn:hover { background:#31201D; color:white; border-color:#31201D; }
 .ci-qty { font-size:13px; font-weight:700; color:#31201D; min-width:18px; text-align:center; }
 .ci-remove { margin-left:auto; background:none; border:none; color:#dc2626; cursor:pointer; padding:3px; }
 .ci-subtotal { font-size:13px; font-weight:800; color:#31201D; text-align:right; }
-.cart-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ccc; gap:7px; padding:40px 20px; }
+.cart-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ccc; gap:6px; padding:30px 20px; }
 .cart-empty-icon { opacity:0.18; }
 .cart-empty p { font-size:14px; font-weight:600; margin:0; color:#bbb; }
 .cart-empty span { font-size:12px; color:#ddd; }
-.cart-discount { padding:10px 14px; border-top:1px solid #f0ebe4; flex-shrink:0; }
-.discount-lbl { font-size:12px; font-weight:600; color:#888; display:flex; align-items:center; gap:5px; margin-bottom:7px; }
+.cart-discount { padding:9px 12px; border-top:1px solid #f0ebe4; flex-shrink:0; }
+.discount-lbl { font-size:11px; font-weight:600; color:#888; display:flex; align-items:center; gap:5px; margin-bottom:6px; }
 .sel-wrap { position:relative; }
-.discount-sel { width:100%; appearance:none; padding:8px 30px 8px 11px; border:1px solid #e8e0d5; border-radius:8px; font-size:13px; background:white; outline:none; cursor:pointer; font-family:inherit; }
-.sel-icon { position:absolute; right:9px; top:50%; transform:translateY(-50%); color:#999; pointer-events:none; }
-.cart-totals { padding:10px 14px; border-top:1px solid #f0ebe4; display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
-.ct-row { display:flex; justify-content:space-between; font-size:13px; color:#666; }
+.discount-sel { width:100%; appearance:none; padding:7px 28px 7px 10px; border:1px solid #e8e0d5; border-radius:8px; font-size:12px; background:white; outline:none; cursor:pointer; font-family:inherit; }
+.sel-icon { position:absolute; right:8px; top:50%; transform:translateY(-50%); color:#999; pointer-events:none; }
+.cart-totals { padding:9px 12px; border-top:1px solid #f0ebe4; display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
+.ct-row { display:flex; justify-content:space-between; font-size:12px; color:#666; }
 .ct-row.disc-line { color:#16a34a; }
-.ct-row.grand { font-size:17px; font-weight:800; color:#31201D; padding-top:8px; border-top:1px solid #f0ebe4; margin-top:3px; }
-.checkout-btn { margin:10px 14px 14px; display:flex; align-items:center; justify-content:center; gap:9px; background:#31201D; color:white; border:none; padding:14px; border-radius:11px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.2s; flex-shrink:0; }
+.ct-row.grand { font-size:16px; font-weight:800; color:#31201D; padding-top:7px; border-top:1px solid #f0ebe4; margin-top:3px; }
+.checkout-btn { margin:9px 12px 12px; display:flex; align-items:center; justify-content:center; gap:9px; background:#31201D; color:white; border:none; padding:13px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.2s; flex-shrink:0; }
 .checkout-btn:hover:not(:disabled) { background:#4a3330; }
 .checkout-btn:disabled { opacity:0.4; cursor:not-allowed; }
 
 /* OVERLAY */
 .overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; backdrop-filter:blur(4px); }
+
+/* SIZE PICKER MODAL */
+.size-modal { background:white; border-radius:20px; width:400px; max-width:95vw; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,0.22); }
+.size-modal-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; }
+.size-modal-header h2 { font-size:19px; font-weight:700; color:#31201D; margin:0 0 3px; }
+.size-modal-header p { font-size:13px; color:#888; margin:0; }
+.size-options { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.size-option-btn { background:#f9f4ef; border:2px solid #e8d5c4; border-radius:14px; padding:20px 16px; cursor:pointer; font-family:inherit; transition:0.2s; text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.size-option-btn:hover { border-color:#31201D; background:#fdfaf7; transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,0.08); }
+.so-top { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.so-size { font-size:16px; font-weight:800; color:#31201D; }
+.so-oz { font-size:12px; color:#bbb; font-weight:600; }
+.so-price { font-size:20px; font-weight:800; color:#C49A6C; }
 
 /* PAYMENT MODAL */
 .payment-modal { background:white; border-radius:20px; width:460px; max-width:95vw; max-height:92vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.22); }
@@ -546,7 +724,6 @@ onMounted(async () => {
 .change-row { font-size:16px; font-weight:800; padding-top:9px; border-top:1px solid #e8e0d5; margin-top:3px; }
 .change-row.sufficient { color:#16a34a; }
 .change-row.insufficient { color:#ef4444; }
-.gcash-fields { }
 .gcash-badge { background:linear-gradient(135deg,#0064E0 0%,#00A3FF 100%); border-radius:14px; padding:30px; text-align:center; color:white; }
 .gcash-badge svg { opacity:0.9; margin-bottom:10px; }
 .gcash-badge p { font-size:17px; font-weight:700; margin:0 0 5px; }
@@ -564,9 +741,7 @@ onMounted(async () => {
 .r-meta { margin-bottom:2px; }
 .r-row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
 .r-divider { border-top:1px dashed #ccc; margin:11px 0; }
-.r-items { }
 .r-item { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
-.r-totals { }
 .r-total { font-weight:800; font-size:13px; color:#31201D; }
 .r-change { color:#16a34a; font-weight:700; }
 .r-gcash { color:#0064E0; font-weight:700; }
@@ -597,13 +772,13 @@ onMounted(async () => {
 .muted { color:#bbb; font-size:12px; }
 .h-item-line { line-height:1.7; }
 .pm-badge { font-size:12px; font-weight:700; padding:2px 8px; border-radius:20px; }
-.pm-badge.cash {font-size:14px; color:#a16207; }
-.pm-badge.gcash { font-size:14px; color:#1d4ed8; }
-.disc-badge { font-size:14px; color:#15803d; padding:2px 8px; border-radius:20px; font-weight:600; }
+.pm-badge.cash  { background:#fef9c3; color:#a16207; }
+.pm-badge.gcash { background:#dbeafe; color:#1d4ed8; }
+.disc-badge { font-size:11px; background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:20px; font-weight:600; }
 .total-col { font-weight:800; color:#31201D; }
-.st-badge { font-size:14px; font-weight:600; padding:2px 9px; border-radius:20px; }
-.st-badge.completed { color:#15803d; }
-.st-badge.pending { background:#fef9c3; color:#a16207; }
+.st-badge { font-size:11px; font-weight:600; padding:2px 9px; border-radius:20px; }
+.st-badge.completed { background:#dcfce7; color:#15803d; }
+.st-badge.pending   { background:#fef9c3; color:#a16207; }
 .st-badge.cancelled { background:#fee2e2; color:#dc2626; }
 .spin { width:17px; height:17px; border:2px solid #eee; border-top-color:#C49A6C; border-radius:50%; animation:spin 0.7s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
