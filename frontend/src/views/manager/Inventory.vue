@@ -674,8 +674,6 @@ import { supabase } from '@/supabase.js'
 
 const route = useRoute()
 
-const route = useRoute()
-
 // ─── BRANCH LOCK ──────────────────────────────────────────────────────────────
 // Manager's branch is read from localStorage and NEVER changeable.
 // All fetches are hard-filtered to this branchId.
