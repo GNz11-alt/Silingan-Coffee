@@ -260,11 +260,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   Plus, Search as SearchIcon, ChevronDown, Edit2, Trash2,
   X, Coffee, ChefHat, BookOpen
 } from 'lucide-vue-next';
 import { supabase } from '@/supabase';
+
+const route = useRoute();
 
 // State
 const menuItems   = ref([]);
@@ -562,7 +565,7 @@ const openAllRecipes = async () => {
 const getBranchName = (id) =>
   branches.value.find(b => b.BranchId === id)?.BranchName ?? '—';
 
-//Init 
+//Init
 onMounted(async () => {
   await Promise.all([fetchBranches(), fetchRawProducts(), fetchMenuItems()]);
 
@@ -573,6 +576,13 @@ onMounted(async () => {
       b.BranchName?.toLowerCase().includes(branchSlug.toLowerCase())
     );
     if (match) filterBranch.value = match.BranchId;
+  }
+
+  // Auto-open edit modal from search result click
+  const editId = route.query.edit;
+  if (editId) {
+    const item = menuItems.value.find(p => String(p.ProductId) === editId);
+    if (item) openEditModal(item);
   }
 });
 </script>

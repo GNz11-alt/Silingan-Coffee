@@ -1,6 +1,6 @@
 <template>
   <div class="results-list">
-    <div v-for="result in results" :key="result.id" class="result-card">
+    <div v-for="result in results" :key="result.id" class="result-card" @click="$emit('select', result)">
       <div class="result-main">
         <div class="icon-box">
           <component :is="getIcon(result.type)" :size="20" />
@@ -30,6 +30,7 @@ const props = defineProps({
   results: { type: Array, default: () => [] },
   query: { type: String, default: '' },
 })
+defineEmits(['select'])
 
 const getIcon = (type) => ({ product: Package, employee: Users, sale: Receipt, rawmaterial: Box }[type] || Search)
 
@@ -53,6 +54,7 @@ const highlight = (text) => {
   border-radius: 12px;
   margin-bottom: 12px;
   transition: transform 0.1s;
+  cursor: pointer;
 }
 
 .result-card:hover {

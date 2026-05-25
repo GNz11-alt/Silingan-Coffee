@@ -1044,13 +1044,14 @@ export default {
 
 .today-badge {
   display: inline-block;
-  background: #5d4037;
-  color: #fff;
+  background: #FFF4E5;
+  color: #8B4513;
   font-size: 0.65rem;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 3px;
   margin-left: auto;
+  border: 1px solid #F1E6D2;
 }
 
 .day-shifts {

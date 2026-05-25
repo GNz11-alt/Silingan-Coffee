@@ -671,11 +671,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   Plus, Package, AlertCircle, Search, Trash2, TrendingUp, Layers,
   ChevronDown, CalendarX, XCircle, RefreshCw, Info
 } from 'lucide-vue-next'
 import { supabase } from '@/supabase.js'
+
+const route = useRoute()
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 
@@ -1360,6 +1363,11 @@ onMounted(async () => {
   // Fetch batches first so branch-filtered stock calc has data
   await fetchBatches()
   await fetchRawMaterials()
+  const editId = route.query.edit
+  if (editId) {
+    const item = allRawItems.value.find(r => String(r.rawproductid) === editId)
+    if (item) openRestockModal(item)
+  }
 })
 </script>
 

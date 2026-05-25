@@ -1116,5 +1116,8 @@ export function exportPDF(reportType, rows, meta, insights) {
   });
 
   // 6. Generate and download
-  pdfMake.createPdf(docDefinition).download(`silingan-${reportType.replace(/[^a-z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`);
+  const pdfDoc = pdfMake.createPdf(docDefinition);
+  const filename = `silingan-${reportType.replace(/[^a-z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+  pdfDoc.download(filename);
+  return pdfDoc.getBlob();
 }

@@ -143,6 +143,7 @@
       v-else-if="search.results.value.length > 0"
       :results="search.results.value"
       :query="search.query.value"
+      @select="onResultSelect"
     />
 
     <!-- Initial state -->
@@ -163,6 +164,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   Search as SearchIcon, MapPin, ChevronDown, Check,
   SlidersHorizontal,
@@ -176,6 +178,7 @@ import SearchResults from '@/components/SearchResults.vue'
 
 const { allItems, isLoading: dataLoading } = useSearchData()
 const { branches } = useBranches()
+const router = useRouter()
 
 const search = useSearch(allItems)
 
@@ -205,6 +208,20 @@ const closeOnOutsideClick = (e) => {
   if (containerRef.value && !containerRef.value.contains(e.target)) {
     isDropdownOpen.value = false
   }
+}
+
+const ROUTE_MAP = {
+  product:     { path: '/admin/menu-pricing' },
+  rawmaterial: { path: '/admin/inventory' },
+  employee:    { path: '/admin/employees' },
+  sale:        { path: '/admin/sales' },
+}
+
+function onResultSelect(result) {
+  const route = ROUTE_MAP[result.type]
+  if (!route) return
+  const entityId = result.id.split('-')[1]
+  router.push({ path: route.path, query: { edit: entityId } })
 }
 
 // --- AUTOCOMPLETE ---

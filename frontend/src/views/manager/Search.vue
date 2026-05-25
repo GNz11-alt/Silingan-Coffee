@@ -8,54 +8,9 @@
         </p>
       </div>
 
-      <div class="branch-selector-wrapper">
-        <div class="selector-label">
-          <MapPin class="pin-icon" :size="16" />
-          <span>Branch:</span>
-        </div>
-
-        <div class="custom-select-container" ref="containerRef">
-          <button
-            type="button"
-            class="selector-button"
-            @click.stop="toggleDropdown"
-          >
-            <span v-if="selectedBranchId === 'overall'" class="overall-tag">Overall</span>
-            <span class="selected-text">{{ selectedBranchName }}</span>
-            <ChevronDown :size="16" :class="{ 'rotate': isDropdownOpen }" />
-          </button>
-
-          <div v-if="isDropdownOpen" class="dropdown-menu">
-            <div
-              class="dropdown-item"
-              :class="{ 'selected': selectedBranchId === 'overall' }"
-              @click="selectBranch('overall')"
-            >
-              <div class="item-content">
-                <span class="overall-tag">Overall</span>
-                <span class="branch-name">All Branches</span>
-              </div>
-              <Check v-if="selectedBranchId === 'overall'" :size="16" />
-            </div>
-
-            <div
-              v-for="branch in branches"
-              :key="branch.id"
-              class="dropdown-item"
-              :class="{ 'selected': selectedBranchId === branch.id }"
-              @click="selectBranch(branch.id)"
-            >
-              <div class="item-content">
-                <div class="branch-info">
-                  <span class="branch-name">{{ branch.name }}</span>
-                  <span class="branch-location">{{ branch.address }}</span>
-                </div>
-                <span class="status-pill-small">Active</span>
-              </div>
-              <Check v-if="selectedBranchId === branch.id" :size="16" />
-            </div>
-          </div>
-        </div>
+      <div class="branch-indicator">
+        <MapPin class="pin-icon" :size="16" />
+        <span>{{ selectedBranchName }}</span>
       </div>
     </header>
 
@@ -138,6 +93,7 @@
       v-else-if="search.results.value.length > 0"
       :results="search.results.value"
       :query="search.query.value"
+      @select="onResultSelect"
     />
 
     <div v-else class="empty-state">
@@ -156,49 +112,46 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
-  Search as SearchIcon, MapPin, ChevronDown, Check,
+  Search as SearchIcon, MapPin,
   SlidersHorizontal,
 } from 'lucide-vue-next'
 import { useSearch } from '@/composables/useSearch.js'
 import { useBranches } from '@/composables/useBranches.js'
 import { useSearchData } from '@/composables/useSearchData.js'
+import { useUserBranch } from '@/composables/useUserBranch.js'
 import SearchAutocomplete from '@/components/SearchAutocomplete.vue'
 import SearchFilters from '@/components/SearchFilters.vue'
 import SearchResults from '@/components/SearchResults.vue'
 
 const { allItems, isLoading: dataLoading } = useSearchData()
 const { branches } = useBranches()
+const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch()
+const router = useRouter()
 
 const search = useSearch(allItems)
 
-const containerRef = ref(null)
-const isDropdownOpen = ref(false)
-const selectedBranchId = ref('overall')
+const ROUTE_MAP = {
+  product:     { path: '/manager/menu-pricing' },
+  rawmaterial: { path: '/manager/inventory' },
+  sale:        { path: '/manager/sales' },
+}
+
+function onResultSelect(result) {
+  const route = ROUTE_MAP[result.type]
+  if (!route) return
+  const entityId = result.id.split('-')[1]
+  router.push({ path: route.path, query: { edit: entityId } })
+}
+
+const selectedBranchId = ref(userBranchId.value)
 
 const selectedBranchName = computed(() => {
-  if (selectedBranchId.value === 'overall') return 'All Branches'
-  return branches.value.find(b => b.id === selectedBranchId.value)?.name || 'Unknown'
+  if (!selectedBranchId.value) return 'All Branches'
+  return userBranchName.value || branches.value.find(b => b.id === selectedBranchId.value)?.name || 'Unknown'
 })
-
-const toggleDropdown = () => { isDropdownOpen.value = !isDropdownOpen.value }
-
-const selectBranch = (id) => {
-  selectedBranchId.value = id
-  isDropdownOpen.value = false
-  if (id === 'overall') {
-    search.setScopes({ branches: [] })
-  } else {
-    search.setScopes({ branches: [id] })
-  }
-}
-
-const closeOnOutsideClick = (e) => {
-  if (containerRef.value && !containerRef.value.contains(e.target)) {
-    isDropdownOpen.value = false
-  }
-}
 
 const inputContainerRef = ref(null)
 const searchInputRef = ref(null)
@@ -267,12 +220,12 @@ const handleKeydown = (e) => {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('click', closeOnOutsideClick)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('click', closeOnOutsideClick)
+onMounted(async () => {
+  await resolveBranch()
+  selectedBranchId.value = userBranchId.value
+  if (selectedBranchId.value) {
+    search.setScopes({ branches: [selectedBranchId.value] })
+  }
 })
 </script>
 
@@ -284,34 +237,8 @@ onUnmounted(() => {
 .search-context { color: #8B4513; margin: 4px 0 0; font-size: 14px; }
 .active-context { font-weight: 600; color: #C49A6C; }
 
-.branch-selector-wrapper { display: flex; align-items: center; gap: 12px; }
-.selector-label { display: flex; align-items: center; gap: 6px; color: #31201D; font-size: 14px; font-weight: 500; }
+.branch-indicator { display: flex; align-items: center; gap: 8px; color: #C49A6C; font-weight: 600; font-size: 14px; }
 .pin-icon { color: #C49A6C; }
-.custom-select-container { position: relative; width: 240px; z-index: 1001; }
-.selector-button {
-  width: 100%; display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px; background: white; border: 1px solid #F1E6D2; border-radius: 8px;
-  cursor: pointer; font-size: 14px; color: #31201D; transition: border-color 0.2s;
-}
-.selector-button:hover { border-color: #C49A6C; }
-.rotate { transform: rotate(180deg); transition: transform 0.2s; }
-.dropdown-menu {
-  position: absolute; top: calc(100% + 8px); right: 0; width: 320px; background: white;
-  border-radius: 12px; box-shadow: 0 10px 30px rgba(49, 32, 29, 0.15); border: 1px solid #F1E6D2;
-  padding: 8px; z-index: 1002;
-}
-.dropdown-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px; border-radius: 8px; cursor: pointer; margin-bottom: 2px;
-}
-.dropdown-item:hover { background: #FFFAF5; }
-.dropdown-item.selected { background: #FFF9F0; }
-.item-content { display: flex; align-items: center; gap: 12px; flex: 1; }
-.branch-info { display: flex; flex-direction: column; }
-.branch-name { font-weight: 600; color: #31201D; font-size: 14px; }
-.branch-location { font-size: 11px; color: #888; line-height: 1.2; }
-.overall-tag { background: #FFF4E5; color: #C49A6C; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; border: 1px solid #F1E6D2; margin-right: 6px; }
-.status-pill-small { background: #31201D; color: white; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; }
 
 .universal-search-card { background: white; border: 1px solid #F1E6D2; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
 .card-header { display: flex; gap: 12px; margin-bottom: 16px; }

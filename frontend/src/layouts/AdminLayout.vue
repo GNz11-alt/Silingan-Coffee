@@ -135,11 +135,17 @@
       </nav>
 
       <div class="sidebar-bottom">
-        <button class="nav-item notification-btn" @click="showNotifications">
+        <button class="nav-item notification-btn" @click="toggleNotifications">
           <component :is="Bell" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Notifications</span>
-          <span class="notification-badge" v-if="!isSidebarCollapsed">3</span>
+          <span class="notification-badge" v-if="unreadCount && !isSidebarCollapsed">{{ unreadCount }}</span>
         </button>
+        <NotificationPanel
+          v-if="showNotifPanel"
+          :branch-id="null"
+          @close="showNotifPanel = false"
+          @update-count="unreadCount = $event"
+        />
 
         <button class="nav-item logout-btn" @click="logout">
           <component :is="LogOut" class="nav-icon" :size="20" />
@@ -155,7 +161,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import {
   Home,
@@ -175,17 +181,22 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-vue-next";
+import NotificationPanel from "@/components/NotificationPanel.vue";
+import { useNotifications } from "@/composables/useNotifications.js";
 
 const router = useRouter();
 const isSidebarCollapsed = ref(false);
+const unreadCount = ref(0);
+const showNotifPanel = ref(false);
+const { fetchNotifications } = useNotifications();
 
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
   localStorage.setItem("sidebarCollapsed", isSidebarCollapsed.value);
 };
 
-const showNotifications = () => {
-  alert("You have 3 new notifications");
+const toggleNotifications = () => {
+  showNotifPanel.value = !showNotifPanel.value;
 };
 
 const logout = () => {
@@ -201,6 +212,11 @@ const savedState = localStorage.getItem("sidebarCollapsed");
 if (savedState !== null) {
   isSidebarCollapsed.value = savedState === "true";
 }
+
+onMounted(async () => {
+  const notifs = await fetchNotifications(null)
+  unreadCount.value = notifs.length
+})
 </script>
 
 <style scoped>

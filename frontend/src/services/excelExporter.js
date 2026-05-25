@@ -342,6 +342,7 @@ export async function exportExcel(reportType, rows, meta) {
   a.download = `silingan-${reportType.replace(/[^a-z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`;
   a.click();
   window.URL.revokeObjectURL(url);
+  return buffer;
 }
 
 /**
