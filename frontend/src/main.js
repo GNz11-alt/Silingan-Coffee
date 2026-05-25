@@ -1,4 +1,5 @@
 import './assets/main.css'
+import 'chart.js/auto' // For auto-registration of Chart.js components
 
 import { createApp } from 'vue'
 import App from './App.vue'
