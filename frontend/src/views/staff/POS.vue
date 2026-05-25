@@ -59,7 +59,7 @@
             @click="handleMenuCardClick(item)"
           >
             <div class="menu-card-img">
-              <component :is="getCatIcon(item.Category)" :size="28" class="menu-card-icon" />
+              <component :is="getCatIcon(item.Category)" :size="40" class="menu-card-icon" />
               <span v-if="isInCart(item.ProductId)" class="cart-qty-badge">
                 {{ getCartTotalQty(item.ProductId) }}
               </span>
@@ -408,7 +408,7 @@ const buildSizeOptions = (item) => {
 
 const getBasePrice = (item) => item.Price?.toFixed(2) ?? '0.00'
 
-// ── State ──────────────────────────────────────────────────────────────────────
+// State 
 const menu = ref([]); const discounts = ref([]); const transactions = ref([]);
 const loadingMenu = ref(false); const loadingTransactions = ref(false);
 const cart = ref([]); const selectedDiscount = ref(null);
@@ -422,7 +422,7 @@ const showSizePicker = ref(false)
 const sizePickerItem = ref(null)
 const sizeOptions    = ref([])
 
-// ── Computed ───────────────────────────────────────────────────────────────────
+// Computed 
 const cashierName   = computed(() => currentUser.value?.username ?? localStorage.getItem('username') ?? 'Staff');
 const branchId      = computed(() => branchRecord.value?.BranchId ?? null);
 const branchAddress = computed(() => branchRecord.value?.Location ?? '');
@@ -502,7 +502,7 @@ const increaseQty    = (i) => cart.value[i].qty++
 const decreaseQty    = (i) => { if (cart.value[i].qty > 1) cart.value[i].qty--; else removeFromCart(i) }
 const removeFromCart = (i) => cart.value.splice(i, 1)
 
-// ── Fetch ──────────────────────────────────────────────────────────────────────
+// Fetch 
 const fetchCurrentUser = async () => {
   const username   = localStorage.getItem('username');
   const branchSlug = localStorage.getItem('branch');
@@ -547,7 +547,7 @@ const fetchTransactions = async () => {
   loadingTransactions.value = false;
 };
 
-// ── Payment ────────────────────────────────────────────────────────────────────
+// Payment 
 const openPayment = () => { cashReceived.value = 0; paymentMethod.value = 'cash'; showReceipt.value = false; showPayment.value = true; };
 
 const finishTransaction = async () => {
@@ -585,7 +585,7 @@ const finishTransaction = async () => {
   finally { saving.value = false; }
 };
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// Helpers 
 const getCatIcon = (cat) => {
   if (!cat || cat === 'All') return Layers;
   const c = cat.toLowerCase();
@@ -637,16 +637,16 @@ onMounted(async () => {
 .menu-search input { flex:1; border:none; outline:none; font-size:14px; background:transparent; font-family:inherit; }
 .menu-search svg { color:#bbb; }
 .menu-loading,.menu-empty { display:flex; align-items:center; gap:12px; justify-content:center; padding:60px; color:#bbb; font-size:14px; }
-.menu-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:11px; }
+.menu-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; }
 .menu-card { background:white; border:2px solid transparent; border-radius:12px; padding:0; cursor:pointer; font-family:inherit; transition:all 0.15s; overflow:hidden; text-align:left; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
 .menu-card:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,0.1); border-color:#C49A6C; }
 .menu-card.in-cart { border-color:#31201D; background:#fdfaf7; }
-.menu-card-img { background:#f9f4ef; height:88px; display:flex; align-items:center; justify-content:center; position:relative; }
+.menu-card-img { background:#f9f4ef; height:120px; display:flex; align-items:center; justify-content:center; position:relative; }
 .menu-card-icon { color:#C49A6C; opacity:0.65; }
 .cart-qty-badge { position:absolute; top:7px; right:7px; background:#31201D; color:white; font-size:11px; font-weight:700; width:21px; height:21px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
 .size-chip { position:absolute; bottom:5px; left:6px; background:rgba(49,32,29,0.75); color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:8px; letter-spacing:0.03em; white-space:nowrap; }
 .menu-card-info { padding:8px 10px 10px; }
-.menu-card-name { display:block; font-size:12px; font-weight:700; color:#31201D; line-height:1.3; margin-bottom:2px; }
+.menu-card-name { display:block; font-size:17px; font-weight:700; color:#31201D; line-height:1.3; margin-bottom:2px; }
 .menu-card-cat { display:block; font-size:10px; color:#bbb; margin-bottom:4px; }
 .menu-card-price { display:block; font-size:14px; font-weight:800; color:#31201D; }
 

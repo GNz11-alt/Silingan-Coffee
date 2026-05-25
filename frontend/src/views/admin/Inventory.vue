@@ -177,7 +177,7 @@
             <tr>
               <th>Item</th>
               <th>Category</th>
-              <th>Stock (this branch)</th>
+              <th>Stock</th>
               <th>Unit</th>
               <th>Reorder Point</th>
               <th>EOQ Suggest</th>
@@ -384,6 +384,19 @@
             </div>
           </div>
 
+          <!-- Hasexpiry toggle -->
+          <div class="hasexpiry-toggle-row">
+            <input
+              type="checkbox"
+              id="hasexpiry-toggle"
+              v-model="newItemForm.hasexpiry"
+            />
+            <label for="hasexpiry-toggle">This item has an expiration date</label>
+            <span class="hasexpiry-hint">
+              {{ newItemForm.hasexpiry ? 'e.g. milk, syrups, dairy' : 'e.g. cups, straws, napkins' }}
+            </span>
+          </div>
+
           <div class="divider-label">Initial Stock Batch</div>
 
           <div class="form-row">
@@ -391,9 +404,20 @@
               <label>Initial Quantity</label>
               <input type="number" v-model.number="newItemForm.stockquantity" min="0" placeholder="0" />
             </div>
-            <div class="form-group">
-              <label>Expiration Date <span class="optional">(if applicable)</span></label>
+            <!-- Expiry date only shown when hasexpiry is true -->
+            <div class="form-group" v-if="newItemForm.hasexpiry">
+              <label>
+                Expiration Date
+                <span class="label-hint" style="color:#dc2626"> * required</span>
+              </label>
               <input type="date" v-model="newItemForm.expirationdate" />
+              <span v-if="newItemErrors.expirationdate" class="field-error">{{ newItemErrors.expirationdate }}</span>
+            </div>
+            <div class="form-group" v-else>
+              <label>Expiration Date</label>
+              <div class="no-expiry-note">
+                <span>Non-perishable — no expiry needed</span>
+              </div>
             </div>
           </div>
 
@@ -521,10 +545,25 @@
                 <span v-if="restockErrors.quantity" class="field-error">{{ restockErrors.quantity }}</span>
               </div>
 
-              <div class="bfg-card">
-                <label class="bfg-label">Expiry Date <span class="label-hint">— for FEFO tracking</span></label>
-                <input type="date" v-model="restockForm.expirationdate" class="bfg-date-input" />
-                <p class="bfg-note">Leave blank for non-perishables (e.g. cups, straws)</p>
+              <!-- Expiry date card: required if hasexpiry=true, hidden if false -->
+              <div class="bfg-card" v-if="restockPreviewItem?.hasexpiry !== false">
+                <label class="bfg-label">
+                  Expiry Date
+                  <span class="label-hint" style="color:#dc2626"> * required</span>
+                </label>
+                <input
+                  type="date"
+                  v-model="restockForm.expirationdate"
+                  class="bfg-date-input"
+                  :style="restockErrors.expiry ? 'border-color:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.08)' : ''"
+                />
+                <span v-if="restockErrors.expiry" class="field-error">{{ restockErrors.expiry }}</span>
+              </div>
+              <div class="bfg-card" v-else>
+                <label class="bfg-label">Expiry Date</label>
+                <div class="no-expiry-note" style="margin-top:8px">
+                  <span><strong>{{ restockPreviewItem?.name }}</strong> is non-perishable — no expiry date needed.</span>
+                </div>
               </div>
             </div>
 
@@ -669,7 +708,7 @@ import {
 } from 'lucide-vue-next'
 import { supabase } from '@/supabase.js'
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
+// STATE
 const isLoading          = ref(false)
 const loadingBatches     = ref(false)
 const loadingItemBatches = ref(false)
@@ -680,8 +719,8 @@ const fetchBatchError    = ref('')
 
 const branches         = ref([])
 const selectedBranchId = ref(null)
-const allRawItems      = ref([])   // rawproduct rows, enriched with _dailyUsage
-const allBatches       = ref([])   // all rawproducttransaction restock rows
+const allRawItems      = ref([])
+const allBatches       = ref([])
 
 const activeTab         = ref('items')
 const searchQuery       = ref('')
@@ -695,7 +734,8 @@ const newItemErrors    = ref({})
 const newItemForm      = ref({
   name: '', category: '', unit: 'g',
   stockquantity: 0, reorderlevel: 0,
-  expirationdate: '', leadtimedays: 2
+  expirationdate: '', leadtimedays: 2,
+  hasexpiry: true
 })
 
 const showRestockModal  = ref(false)
@@ -714,8 +754,7 @@ const itemBatches        = ref([])
 
 const toast = ref({ show: false, message: '', type: 'success' })
 
-// ─── BATCH LABELLING ──────────────────────────────────────────────────────────
-// B{rawproductid} for first, B{rawproductid}-2 for second, etc. (insertion order)
+// BATCH LABELLING 
 const buildBatchLabels = (batches) => {
   const groups = {}
   const sorted = [...batches].sort((a, b) => a.rawtransactionid - b.rawtransactionid)
@@ -738,33 +777,21 @@ const attachLabels = (batches, labelMap) =>
   batches.map(b => ({ ...b, batchLabel: labelMap[b.rawtransactionid] ?? `#${b.rawtransactionid}` }))
 
 // ─── EOQ CALCULATION ─────────────────────────────────────────────────────────
-// EOQ = Economic Order Quantity
-// Formula: sqrt(2 * D * S / H) — but simplified for small food businesses:
-//   we use: order_qty = daily_usage * lead_time * safety_factor (1.5)
-//   daily_usage is computed from: recipe.quantityneeded × actual orders sold in last 30 days
-//
-// If no sales data: fall back to reorderlevel / 3 * lead_time * safety_factor
 const calculateEOQ = (item) => {
   if (!item.reorderlevel) return 0
   const dailyUsage = item._dailyUsage > 0
     ? item._dailyUsage
-    : (item.reorderlevel / 14)                        // fallback: assume 14-day supply covers reorder
+    : (item.reorderlevel / 14)
   const leadTime = item.leadtimedays ?? 2
-  // Safety stock = 1.5 × lead_time demand; order enough to cover lead time + safety stock
   return Math.ceil(dailyUsage * leadTime * 1.5 + dailyUsage * leadTime)
 }
 
-// ─── FETCH: DAILY USAGE FROM SALES ───────────────────────────────────────────
-// Joins: recipe (rawproductid, finishedproductid, quantityneeded)
-//       + orderitem (ProductId, Quantity)
-//       + orders (OrderId, CreatedAt) — last 30 days
-// Returns: Map<rawproductid, dailyUsage>
+// FETCH: DAILY USAGE FROM SALES 
 const fetchDailyUsageFromSales = async () => {
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
   const since = thirtyDaysAgo.toISOString()
 
-  // 1. Pull recent order items (ProductId = finishedproductid)
   const { data: orderItems, error: oi_err } = await supabase
     .from('orderitem')
     .select(`
@@ -780,14 +807,12 @@ const fetchDailyUsageFromSales = async () => {
     return {}
   }
 
-  // 2. Sum units sold per product
   const unitsSold = {}
   for (const row of (orderItems ?? [])) {
     const pid = row.ProductId
     unitsSold[pid] = (unitsSold[pid] ?? 0) + (row.Quantity ?? 0)
   }
 
-  // 3. Pull all recipes
   const { data: recipes, error: r_err } = await supabase
     .from('recipe')
     .select('rawproductid, finishedproductid, quantityneeded')
@@ -797,7 +822,6 @@ const fetchDailyUsageFromSales = async () => {
     return {}
   }
 
-  // 4. Compute raw material usage over 30 days, then per day
   const usageMap = {}
   for (const recipe of (recipes ?? [])) {
     const sold = unitsSold[recipe.finishedproductid] ?? 0
@@ -805,7 +829,6 @@ const fetchDailyUsageFromSales = async () => {
     usageMap[recipe.rawproductid] = (usageMap[recipe.rawproductid] ?? 0) + totalUsed
   }
 
-  // Convert 30-day total → daily usage
   const dailyMap = {}
   for (const [rid, total] of Object.entries(usageMap)) {
     dailyMap[rid] = total / 30
@@ -814,7 +837,7 @@ const fetchDailyUsageFromSales = async () => {
   return dailyMap
 }
 
-// ─── COMPUTED ─────────────────────────────────────────────────────────────────
+// COMPUTED 
 const selectedBranchName = computed(() =>
   branches.value.find(b => b.BranchId === selectedBranchId.value)?.BranchName ?? ''
 )
@@ -832,8 +855,6 @@ const filteredItems = computed(() => {
   return list
 })
 
-// FEFO sort: earliest expiry first, no-expiry batches at end
-// Also filter by selectedBranchId when one is chosen
 const sortedBatches = computed(() => {
   const labelled = attachLabels(allBatches.value, batchLabelMap.value)
   let list = labelled
@@ -889,7 +910,7 @@ const restockPreviewItem = computed(() => {
   return null
 })
 
-// ─── BATCH COUNT HELPERS ──────────────────────────────────────────────────────
+//  BATCH COUNT HELPERS 
 const getBatchCountForItem = (id) => {
   let batches = allBatches.value.filter(b => b.rawproductid === id)
   if (selectedBranchId.value) batches = batches.filter(b => b.branchid === selectedBranchId.value)
@@ -904,7 +925,7 @@ const getExpiringBatchCount = (id) => {
   return batches.length
 }
 
-// ─── FETCH FUNCTIONS ──────────────────────────────────────────────────────────
+// FETCH FUNCTIONS 
 const fetchBranches = async () => {
   const { data } = await supabase.from('branch').select('BranchId, BranchName').order('BranchName')
   if (data) branches.value = data
@@ -919,9 +940,10 @@ const fetchRawMaterials = async () => {
   isLoading.value = true
   const dailyUsageMap = await fetchDailyUsageFromSales()
 
+  //  hasexpiry included in select
   const { data, error } = await supabase
     .from('rawproduct')
-    .select('rawproductid, name, category, unit, reorderlevel, leadtimedays, expirationdate, createdat, updatedat')
+    .select('rawproductid, name, category, unit, reorderlevel, leadtimedays, expirationdate, createdat, updatedat, hasexpiry')
     .order('name')
 
   if (error) {
@@ -932,7 +954,6 @@ const fetchRawMaterials = async () => {
 
   const items = data ?? []
 
-  // Always compute stock from batches — never trust rawproduct.stockquantity
   items.forEach(item => {
     let batches = allBatches.value.filter(b => b.rawproductid === item.rawproductid)
     if (selectedBranchId.value) {
@@ -943,13 +964,14 @@ const fetchRawMaterials = async () => {
 
   allRawItems.value = items.map(item => ({
     ...item,
+    // Default hasexpiry to true if null (safety net for older rows)
+    hasexpiry: item.hasexpiry ?? true,
     _dailyUsage: dailyUsageMap[item.rawproductid] ?? 0
   }))
 
   isLoading.value = false
 }
 
-// ⚠️  KEY FIX: rawproducttransaction DOES have branchid per the DB schema
 const fetchBatches = async () => {
   loadingBatches.value = true
   fetchBatchError.value = ''
@@ -982,7 +1004,6 @@ const fetchBatches = async () => {
 }
 
 const onBranchChange = async () => {
-  // Re-compute per-branch stock when branch filter changes
   await fetchRawMaterials()
 }
 
@@ -991,13 +1012,14 @@ const handleBatchTab = async () => {
   await fetchBatches()
 }
 
-// ─── NEW ITEM ─────────────────────────────────────────────────────────────────
+// NEW ITEM ─
 const openNewItemModal = () => {
   newItemErrors.value = {}
   newItemForm.value = {
     name: '', category: '', unit: 'g',
     stockquantity: 0, reorderlevel: 0,
-    expirationdate: '', leadtimedays: 2
+    expirationdate: '', leadtimedays: 2,
+    hasexpiry: true
   }
   showNewItemModal.value = true
 }
@@ -1007,12 +1029,15 @@ const saveNewItem = async () => {
   const e = {}
   if (!newItemForm.value.name.trim()) e.name = 'Name is required.'
   if (!newItemForm.value.unit)        e.unit = 'Unit is required.'
+  // Require expiry date on initial stock if item has expiry and qty > 0
+  if (newItemForm.value.hasexpiry && newItemForm.value.stockquantity > 0 && !newItemForm.value.expirationdate) {
+    e.expirationdate = 'Expiration date is required for perishable items.'
+  }
   newItemErrors.value = e
   if (Object.keys(e).length > 0) return
 
   savingNewItem.value = true
 
-  // 1. Insert rawproduct row
   const { data: newItem, error: itemErr } = await supabase
     .from('rawproduct')
     .insert([{
@@ -1023,6 +1048,7 @@ const saveNewItem = async () => {
       reorderlevel:  newItemForm.value.reorderlevel || null,
       leadtimedays:  newItemForm.value.leadtimedays || 2,
       expirationdate: newItemForm.value.expirationdate || null,
+      hasexpiry:     newItemForm.value.hasexpiry,
     }])
     .select()
     .single()
@@ -1033,9 +1059,8 @@ const saveNewItem = async () => {
     return
   }
 
-  // 2. If initial qty > 0, log it as the first batch
   if (newItemForm.value.stockquantity > 0 && newItem) {
-    const branchId = selectedBranchId.value  // can be null if All Branches — that's OK
+    const branchId = selectedBranchId.value
     const { error: txErr } = await supabase
       .from('rawproducttransaction')
       .insert([{
@@ -1054,12 +1079,7 @@ const saveNewItem = async () => {
   savingNewItem.value = false
 }
 
-// ─── RESTOCK (ADD STOCK) ─────────────────────────────────────────────────────
-// LOGIC:
-//   rawproduct.stockquantity = grand total across ALL branches (SUM of all batch quantities)
-//   Each restock: +batch_qty to rawproduct.stockquantity AND insert a batch row with branchid
-//   Each batch delete: -batch_qty from rawproduct.stockquantity AND delete the row
-//   Per-branch stock is computed on the client by filtering batches by branchid
+//  RESTOCK (ADD STOCK)
 const openRestockModal = (item) => {
   restockErrors.value = {}
   restockForm.value = {
@@ -1091,6 +1111,9 @@ const saveRestock = async () => {
       e.quantity = 'Enter a valid quantity.'
     if (!selectedBranchId.value && !restockForm.value.branchId)
       e.branch = 'Please select a destination branch.'
+    // Require expiry date for perishable items
+    if (restockPreviewItem.value.hasexpiry !== false && !restockForm.value.expirationdate)
+      e.expiry = 'Expiration date is required for this item.'
   }
   restockErrors.value = e
   if (Object.keys(e).length > 0) return
@@ -1099,12 +1122,7 @@ const saveRestock = async () => {
   const item = restockPreviewItem.value
   const targetBranchId = selectedBranchId.value ?? restockForm.value.branchId
 
-  // STEP 1 — Increment rawproduct.stockquantity (grand total, all branches combined)
-  const newTotal = (item.stockquantity ?? 0) + restockForm.value.quantity
-
-  // If branch is selected, we need the TRUE grand total (not branch-filtered stock)
-  // So we fetch it fresh to avoid stale state
-  let actualTotal = newTotal
+  let actualTotal = (item.stockquantity ?? 0) + restockForm.value.quantity
   if (selectedBranchId.value) {
     const { data: fresh } = await supabase
       .from('rawproduct')
@@ -1125,10 +1143,9 @@ const saveRestock = async () => {
     return
   }
 
-  // STEP 2 — Insert a new batch row WITH branchid
   const batchRow = {
     rawproductid:    item.rawproductid,
-    branchid:        targetBranchId,               // ← KEY FIX: include branchid
+    branchid:        targetBranchId,
     transactiontype: 'in',
     quantity:        restockForm.value.quantity,
     expirationdate:  restockForm.value.expirationdate || null,
@@ -1154,7 +1171,6 @@ const saveRestock = async () => {
 
   await Promise.all([fetchBatches(), fetchRawMaterials()])
 
-  // Refresh batch detail if open for this item
   if (showBatchDetail.value && batchDetailItem.value?.rawproductid === item.rawproductid) {
     await openBatchDetail(batchDetailItem.value)
   }
@@ -1163,7 +1179,7 @@ const saveRestock = async () => {
   savingRestock.value = false
 }
 
-// ─── BATCH DETAIL MODAL ───────────────────────────────────────────────────────
+// BATCH DETAIL MODAL
 const openBatchDetail = async (item) => {
   batchDetailItem.value    = item
   showBatchDetail.value    = true
@@ -1178,7 +1194,6 @@ const openBatchDetail = async (item) => {
     .gt('quantity', 0)
     .order('rawtransactionid', { ascending: true })
 
-  // If a branch is selected, only show that branch's batches
   if (selectedBranchId.value) {
     query = query.eq('branchid', selectedBranchId.value)
   }
@@ -1193,14 +1208,12 @@ const openBatchDetail = async (item) => {
   }
 
   const rows = data ?? []
-  // Assign batch labels (within this item's scope)
   const labelled = rows.map((b, i) => ({
     ...b,
     rawproduct: { name: item.name, unit: item.unit },
     batchLabel: i === 0 ? `B${item.rawproductid}` : `B${item.rawproductid}-${i + 1}`
   }))
 
-  // Sort FEFO (earliest expiry first, no-expiry at end)
   itemBatches.value = labelled.sort((a, b) => {
     if (!a.expirationdate && !b.expirationdate) return 0
     if (!a.expirationdate) return 1
@@ -1213,7 +1226,7 @@ const openBatchDetail = async (item) => {
 
 const markBatchExpired = (batch) => confirmDeleteBatch(batch)
 
-// ─── DELETE ───────────────────────────────────────────────────────────────────
+//  DELETE 
 const confirmDelete      = (item)  => { deleteTarget.value = item;  deleteType.value = 'item';  showDeleteConfirm.value = true }
 const confirmDeleteBatch = (batch) => { deleteTarget.value = batch; deleteType.value = 'batch'; showDeleteConfirm.value = true }
 
@@ -1223,7 +1236,6 @@ const doDelete = async () => {
   if (deleteType.value === 'batch') {
     const batch = deleteTarget.value
 
-    // Fetch the TRUE grand total stockquantity (not branch-filtered)
     const { data: fresh } = await supabase
       .from('rawproduct')
       .select('stockquantity')
@@ -1252,7 +1264,6 @@ const doDelete = async () => {
     }
 
   } else {
-    // Delete all batches first, then the product
     await supabase.from('rawproducttransaction')
       .delete()
       .eq('rawproductid', deleteTarget.value.rawproductid)
@@ -1273,7 +1284,7 @@ const doDelete = async () => {
   showDeleteConfirm.value = false
 }
 
-// ─── STATUS HELPERS ───────────────────────────────────────────────────────────
+// STATUS HELPERS 
 const getStatus = (item) => {
   if ((item.stockquantity ?? 0) <= 0) return 'out'
   if (item.reorderlevel && item.stockquantity <= item.reorderlevel) return 'low'
@@ -1295,7 +1306,7 @@ const getStatusTextAfterRestock = (item, qty) => {
   return s === 'good' ? 'In Stock' : s === 'low' ? 'Low Stock' : 'Out of Stock'
 }
 
-// ─── EXPIRY HELPERS ───────────────────────────────────────────────────────────
+//  EXPIRY HELPERS 
 const getDaysUntilExpiry = (date) => {
   if (!date) return 9999
   return Math.floor((new Date(date) - new Date()) / (1000 * 60 * 60 * 24))
@@ -1333,10 +1344,9 @@ const showToast = (msg, type = 'success') => {
   setTimeout(() => { toast.value.show = false }, 4000)
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
+// INIT
 onMounted(async () => {
   await fetchBranches()
-  // Fetch batches first so branch-filtered stock calc has data
   await fetchBatches()
   await fetchRawMaterials()
 })
@@ -1350,7 +1360,6 @@ onMounted(async () => {
 .ph-left h1 { font-size: 26px; font-weight: 800; color: #31201D; margin: 0 0 4px; }
 .ph-left p  { font-size: 14px; color: #888; margin: 0; }
 .ph-left strong { color: #31201D; }
-.system-badge { background: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; border: 1px solid #bae6fd; }
 
 /* ─── BRANCH SELECTOR ──────────────────────────────────── */
 .branch-selector { background: white; padding: 14px 20px; border-radius: 12px; border: 1px solid #E9ECEF; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
@@ -1463,13 +1472,15 @@ onMounted(async () => {
 
 .product-info  { display: flex; align-items: center; gap: 8px; }
 .product-icon  { color: #8B4513; flex-shrink: 0; }
-.item-name-text{ font-size: 15px; font-weight: 700; color: #212529; }
-.td-text   { color: #555; font-size: 14px; }
-.sku-label { display: block; font-size: 11px; color: #bbb; font-family: monospace; margin-top: 3px; }
-.empty-row { text-align: center; color: #bbb; padding: 40px !important; font-size: 14px; }
+
+/* ── BIGGER TABLE TEXT ── */
+.item-name-text { font-size: 17px; font-weight: 700; color: #212529; }
+.td-text        { color: #555; font-size: 15px; }
+.sku-label      { display: block; font-size: 12px; color: #bbb; font-family: monospace; margin-top: 3px; }
+.empty-row      { text-align: center; color: #bbb; padding: 40px !important; font-size: 14px; }
 
 .stock-cell { display: flex; flex-direction: column; gap: 4px; }
-.qty-val { font-weight: 800; font-size: 16px; }
+.qty-val { font-weight: 800; font-size: 18px; }
 .qty-val.good     { color: #2E7D32; }
 .qty-val.low      { color: #F57C00; }
 .qty-val.out      { color: #C62828; }
@@ -1483,33 +1494,33 @@ onMounted(async () => {
 .stock-bar.low  { background: #fb923c; }
 .stock-bar.out  { background: #f87171; }
 
-.eoq-chip { background: #e0f2fe; color: #0369a1; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+.eoq-chip { background: #e0f2fe; color: #0369a1; font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
 
 .batch-summary { cursor: pointer; }
 .batch-summary:hover .batch-count { text-decoration: underline; }
-.batch-count        { font-size: 14px; font-weight: 600; color: #555; display: block; }
+.batch-count        { font-size: 15px; font-weight: 600; color: #555; display: block; }
 .batch-expiring-warn{ font-size: 12px; color: #d97706; font-weight: 700; display: block; }
 
-.status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+.status-badge { display: inline-block; padding: 5px 13px; border-radius: 20px; font-size: 14px; font-weight: 600; }
 .status-badge.good { background: #E8F5E9; color: #2E7D32; }
 .status-badge.low  { background: #FFF3E0; color: #F57C00; }
 .status-badge.out  { background: #FFEBEE; color: #C62828; }
 
 .batch-id-tag { background: #f0ebe4; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-weight: 700; font-size: 13px; color: #5c3317; }
 
-.expiry-val { font-size: 14px; font-weight: 700; }
+.expiry-val { font-size: 15px; font-weight: 700; }
 .expiry-val.ok       { color: #2E7D32; }
 .expiry-val.warning  { color: #d97706; }
 .expiry-val.critical { color: #dc2626; }
 .expiry-val.expired  { color: #dc2626; }
 
-.days-chip { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 6px; }
+.days-chip { font-size: 13px; font-weight: 700; padding: 4px 11px; border-radius: 6px; }
 .days-chip.ok       { background: #E8F5E9; color: #2E7D32; }
 .days-chip.warning  { background: #FFF3E0; color: #d97706; }
 .days-chip.critical { background: #FEF0E8; color: #dc2626; }
 .days-chip.expired  { background: #FFEBEE; color: #dc2626; }
 
-.fefo-status-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+.fefo-status-badge { font-size: 13px; font-weight: 700; padding: 4px 11px; border-radius: 20px; }
 .fefo-status-badge.ok       { background: #E8F5E9; color: #2E7D32; }
 .fefo-status-badge.warning  { background: #FFF3E0; color: #d97706; }
 .fefo-status-badge.critical { background: #FEF0E8; color: #dc2626; }
@@ -1545,6 +1556,51 @@ onMounted(async () => {
 .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .field-error{ font-size: 12px; color: #dc3545; margin-top: 4px; display: block; }
 .divider-label { font-size: 12px; font-weight: 700; color: #8B4513; text-transform: uppercase; letter-spacing: 0.06em; margin: 20px 0 14px; padding-bottom: 6px; border-bottom: 1px solid #f0ebe4; }
+
+/* ─── HASEXPIRY TOGGLE ─────────────────────────────────── */
+.hasexpiry-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8f9fa;
+  border: 1px solid #E9ECEF;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+.hasexpiry-toggle-row input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: #8B4513;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.hasexpiry-toggle-row label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #212529;
+  cursor: pointer;
+  margin: 0;
+  flex: 1;
+}
+.hasexpiry-hint {
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+/* ─── NO EXPIRY NOTE ───────────────────────────────────── */
+.no-expiry-note {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #0369a1;
+  margin-top: 2px;
+}
 
 /* ─── STEP PICKER ──────────────────────────────────────── */
 .step-block { margin-bottom: 4px; }
@@ -1640,5 +1696,7 @@ onMounted(async () => {
   .filters-bar, .header-actions { flex-direction: column; }
   .fefo-row, .eoq-row { flex-direction: column; align-items: flex-start; }
   .fefo-legend { flex-wrap: wrap; gap: 8px; }
+  .hasexpiry-toggle-row { flex-wrap: wrap; }
+  .hasexpiry-hint { width: 100%; }
 }
 </style>
