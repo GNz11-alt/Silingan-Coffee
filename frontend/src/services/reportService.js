@@ -261,3 +261,28 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
 export async function getBranches() {
   return supabase.from('branch').select('branchid:BranchId, branchname:BranchName').order('BranchName')
 }
+
+//STORAGE — Upload a file buffer/blob to the reports bucket
+export async function uploadReportFile(buffer, fileName, contentType) {
+  const filePath = `reports/${fileName}`
+  const { error } = await supabase.storage
+    .from('reports')
+    .upload(filePath, buffer, {
+      contentType,
+      upsert: true,
+    })
+  if (error) {
+    console.error('[Storage] upload failed:', error)
+    return { error }
+  }
+  const { data: publicUrl } = supabase.storage
+    .from('reports')
+    .getPublicUrl(filePath)
+  return { filePath, publicUrl: publicUrl?.publicUrl || null, error: null }
+}
+
+export async function deleteReportFile(filePath) {
+  const { error } = await supabase.storage.from('reports').remove([filePath])
+  if (error) console.error('[Storage] delete failed:', error)
+  return { error }
+}

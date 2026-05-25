@@ -166,16 +166,6 @@
             style="width: 180px"
           />
           <select
-            v-model="schedBranchFilter"
-            class="form-select fc-brand"
-            style="width: 200px"
-          >
-            <option value="">All Branches</option>
-            <option v-for="b in branches" :key="b.id" :value="b.id">
-              {{ b.name }}
-            </option>
-          </select>
-          <select
             v-model="schedStatusFilter"
             class="form-select fc-brand"
             style="width: 150px"
@@ -528,6 +518,7 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { supabase } from "@/supabase.js";
+import { useUserBranch } from "@/composables/useUserBranch.js";
 
 const isLoading = ref(true);
 const activeTab = ref("availability");
@@ -538,12 +529,11 @@ const tabs = [
   { key: "change", label: "Change Inquiries" },
 ];
 
-// Branch scoping for manager
+const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
 const managerBranchId = ref(null);
 
 const schedSearch = ref("");
 const schedDateFilter = ref("");
-const schedBranchFilter = ref("");
 const schedStatusFilter = ref("");
 const schedViewMode = ref("table"); // "table" or "calendar"
 const monthOffset = ref(0); // 0 = current month, -1 = last month, +1 = next month
@@ -607,11 +597,9 @@ const filteredSchedules = computed(() => {
       s.role.toLowerCase().includes(q);
     const matchDate =
       !schedDateFilter.value || s.shiftDate === schedDateFilter.value;
-    const matchBranch =
-      !schedBranchFilter.value || s.branchId === schedBranchFilter.value;
     const matchStatus =
       !schedStatusFilter.value || s.status === schedStatusFilter.value;
-    return matchSearch && matchDate && matchBranch && matchStatus;
+    return matchSearch && matchDate && matchStatus;
   });
 });
 
@@ -668,27 +656,7 @@ const fetchBranches = async () => {
     branches.value = data.map((b) => ({ id: b.BranchId, name: b.BranchName }));
 };
 
-const resolveBranchId = async () => {
-  const branchCode = localStorage.getItem("branch");
-  if (!branchCode) return false;
 
-  try {
-    const { data } = await supabase
-      .from("branch")
-      .select("BranchId")
-      .eq("Location", branchCode)
-      .single();
-
-    if (data) {
-      managerBranchId.value = data.BranchId;
-      return true;
-    }
-    return false;
-  } catch (err) {
-    console.error("resolveBranchId:", err);
-    return false;
-  }
-};
 
 const updateInquiryStatus = async (inq, status) => {
   const { error } = await supabase
@@ -717,10 +685,16 @@ const fetchEmployees = async () => {
 };
 
 const fetchAvailability = async () => {
-  const { data: allEmps } = await supabase.from("employee").select("EmployeeId, FirstName, LastName");
+  const { data: branchEmps } = await supabase
+    .from("employee")
+    .select("EmployeeId, FirstName, LastName")
+    .eq("BranchAssigned", managerBranchId.value);
+
   const empMap = {};
-  if (allEmps) {
-    allEmps.forEach(e => {
+  const empIds = [];
+  if (branchEmps) {
+    branchEmps.forEach(e => {
+      empIds.push(e.EmployeeId);
       empMap[e.EmployeeId] = {
         name: `${e.FirstName || ''} ${e.LastName || ''}`.trim() || 'Unknown',
         initials: `${(e.FirstName?.[0] || '')}${(e.LastName?.[0] || '')}`.toUpperCase() || '?',
@@ -728,9 +702,15 @@ const fetchAvailability = async () => {
     });
   }
 
+  if (!empIds.length) {
+    availability.value = [];
+    return;
+  }
+
   const { data } = await supabase
     .from("availability")
     .select("*")
+    .in("employeeid", empIds)
     .order("availabilityid", { ascending: false });
 
   if (data) {
@@ -753,10 +733,16 @@ const fetchAvailability = async () => {
 };
 
 const fetchChangeInquiries = async () => {
-  const { data: allEmps } = await supabase.from("employee").select("EmployeeId, FirstName, LastName");
+  const { data: branchEmps } = await supabase
+    .from("employee")
+    .select("EmployeeId, FirstName, LastName")
+    .eq("BranchAssigned", managerBranchId.value);
+
   const empMap = {};
-  if (allEmps) {
-    allEmps.forEach(e => {
+  const empIds = [];
+  if (branchEmps) {
+    branchEmps.forEach(e => {
+      empIds.push(e.EmployeeId);
       empMap[e.EmployeeId] = {
         name: `${e.FirstName || ''} ${e.LastName || ''}`.trim() || 'Unknown',
         initials: `${(e.FirstName?.[0] || '')}${(e.LastName?.[0] || '')}`.toUpperCase() || '?',
@@ -764,9 +750,15 @@ const fetchChangeInquiries = async () => {
     });
   }
 
+  if (!empIds.length) {
+    changeInquiries.value = [];
+    return;
+  }
+
   const { data } = await supabase
     .from("changeinquiry")
     .select("*")
+    .in("employeeid", empIds)
     .order("inquiryid", { ascending: false });
 
   if (data) {
@@ -794,6 +786,7 @@ const fetchSchedules = async () => {
     )
     .eq("BranchId", managerBranchId.value)
     .neq("Status", "Cancelled")
+    .neq("Status", "Archived")
     .order("ScheduleId", { ascending: false });
 
   if (data) {
@@ -896,9 +889,11 @@ const confirmDelete = (sched) => {
 };
 
 const deleteSchedule = async () => {
+  const currentUser = localStorage.getItem("username") || "Unknown";
+  const now = new Date().toISOString();
   const { error } = await supabase
     .from("schedule")
-    .update({ Status: "Archived" })
+    .update({ Status: "Archived", ArchivedAt: now, ArchivedBy: currentUser })
     .eq("ScheduleId", deleteTarget.value.id);
 
   if (error) showToast("Failed to archive schedule.", "error");
@@ -956,7 +951,6 @@ const updateAvailStatus = async (avail, status) => {
 const clearSchedFilters = () => {
   schedSearch.value = "";
   schedDateFilter.value = "";
-  schedBranchFilter.value = "";
   schedStatusFilter.value = "";
 };
 
@@ -998,9 +992,9 @@ const showToast = (message, type = "success") => {
 };
 
 onMounted(async () => {
-  // Resolve manager's branch first
-  const branchResolved = await resolveBranchId();
-  if (!branchResolved) {
+  await resolveBranch();
+  managerBranchId.value = userBranchId.value;
+  if (!managerBranchId.value) {
     showToast("Unable to determine your branch. Contact admin.", "error");
     isLoading.value = false;
     return;
@@ -1517,13 +1511,14 @@ onMounted(async () => {
 
 .today-badge {
   display: inline-block;
-  background: var(--brand-primary);
-  color: #fff;
+  background: #FFF4E5;
+  color: #8B4513;
   font-size: 0.65rem;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 3px;
   margin-left: auto;
+  border: 1px solid #F1E6D2;
 }
 
 .day-shifts {

@@ -241,11 +241,14 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   DollarSign, TrendingUp, Tag, ShoppingBag, ChevronDown,
   ChevronLeft, ChevronRight, Search, X
 } from 'lucide-vue-next';
 import { supabase } from '@/supabase';
+
+const route = useRoute();
 
 // Sort icon inline component
 const SortIcon = {
@@ -422,6 +425,12 @@ const clearFilters = () => {
 // Init
 onMounted(async () => {
   await Promise.all([fetchBranches(), fetchAllOrders()]);
+  const viewId = route.query.edit;
+  if (viewId) {
+    const idNum = Number(viewId);
+    const order = allTransactions.value.find(o => o.OrderId === idNum);
+    if (order) expandedId.value = idNum;
+  }
 });
 </script>
 

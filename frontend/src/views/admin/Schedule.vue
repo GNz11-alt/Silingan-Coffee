@@ -748,6 +748,7 @@ const fetchSchedules = async () => {
       "ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, employee(FirstName, LastName)",
     )
     .neq("Status", "Cancelled")
+    .neq("Status", "Archived")
     .order("ScheduleId", { ascending: false });
 
   if (data) {
@@ -849,9 +850,11 @@ const confirmDelete = (sched) => {
 };
 
 const deleteSchedule = async () => {
+  const currentUser = localStorage.getItem("username") || "Unknown";
+  const now = new Date().toISOString();
   const { error } = await supabase
     .from("schedule")
-    .update({ Status: "Archived" })
+    .update({ Status: "Archived", ArchivedAt: now, ArchivedBy: currentUser })
     .eq("ScheduleId", deleteTarget.value.id);
 
   if (error) showToast("Failed to archive schedule.", "error");
@@ -1469,13 +1472,14 @@ onMounted(async () => {
 
 .today-badge {
   display: inline-block;
-  background: var(--brand-primary);
-  color: #fff;
+  background: #FFF4E5;
+  color: #8B4513;
   font-size: 0.65rem;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 3px;
   margin-left: auto;
+  border: 1px solid #F1E6D2;
 }
 
 .day-shifts {

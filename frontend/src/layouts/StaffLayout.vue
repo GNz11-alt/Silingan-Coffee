@@ -109,11 +109,17 @@
       </nav>
 
       <div class="sidebar-bottom">
-        <button class="nav-item notification-btn" @click="showNotifications">
+        <button class="nav-item notification-btn" @click="toggleNotifications">
           <component :is="Bell" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Notifications</span>
-          <span class="notification-badge" v-if="!isSidebarCollapsed">3</span>
+          <span class="notification-badge" v-if="unreadCount && !isSidebarCollapsed">{{ unreadCount }}</span>
         </button>
+        <NotificationPanel
+          v-if="showNotifPanel"
+          :branch-id="userBranchId"
+          @close="showNotifPanel = false"
+          @update-count="unreadCount = $event"
+        />
 
         <button class="nav-item logout-btn" @click="logout">
           <component :is="LogOut" class="nav-icon" :size="20" />
@@ -129,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import {
   Home,
@@ -146,18 +152,26 @@ import {
   Info,
   Search as SearchIcon,
 } from "lucide-vue-next";
+import { useUserBranch } from "@/composables/useUserBranch.js";
+import NotificationPanel from "@/components/NotificationPanel.vue";
+import { useNotifications } from "@/composables/useNotifications.js";
 
 const router = useRouter();
 const isSidebarCollapsed = ref(false);
-const branch = ref(localStorage.getItem("branch") || "");
+const branch = ref("");
+const unreadCount = ref(0);
+const showNotifPanel = ref(false);
+const { fetchNotifications } = useNotifications();
+
+const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
 
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
   localStorage.setItem("sidebarCollapsed", isSidebarCollapsed.value);
 };
 
-const showNotifications = () => {
-  alert("You have 3 new notifications");
+const toggleNotifications = () => {
+  showNotifPanel.value = !showNotifPanel.value;
 };
 
 const logout = () => {
@@ -173,6 +187,15 @@ const savedState = localStorage.getItem("sidebarCollapsed");
 if (savedState !== null) {
   isSidebarCollapsed.value = savedState === "true";
 }
+
+onMounted(async () => {
+  await resolveBranch();
+  branch.value = userBranchName.value;
+  if (userBranchId.value) {
+    const notifs = await fetchNotifications(userBranchId.value)
+    unreadCount.value = notifs.length
+  }
+});
 </script>
 
 <style scoped>

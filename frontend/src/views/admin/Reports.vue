@@ -65,10 +65,7 @@
         @click="mainTab = 'generate'">
         <i class="bi bi-file-earmark-plus me-1"></i> Generate Reports
       </button>
-      <button class="tab-btn" :class="{ active: mainTab === 'insights' }"
-        @click="mainTab = 'insights'; loadInsights()">
-        <i class="bi bi-cpu me-1"></i> Management Insights
-      </button>
+
     </div>
 
     <!-- ════════════════════════════════════════════════════════
@@ -530,6 +527,13 @@
               </div>
             </div>
 
+            <div class="mb-3">
+              <label class="d-flex align-items-center gap-2" style="cursor:pointer;font-size:.82rem">
+                <input type="checkbox" v-model="genForm.saveToCloud" class="form-check-input" />
+                <span>Save to cloud storage after generation</span>
+              </label>
+            </div>
+
             <button class="btn btn-generate w-100 mb-2" @click="generateReport" :disabled="generating">
               <span v-if="generating" class="spinner-border spinner-border-sm me-2"></span>
               <i v-else class="bi bi-file-earmark-arrow-down me-2"></i>
@@ -559,95 +563,6 @@
           </div>
         </div>
 
-      </div>
-    </div>
-
-    <!-- ════════════════════════════════════════════════════════
-         TAB 4 — AI INSIGHTS
-    ═════════════════════════════════════════════════════════ -->
-    <div v-show="mainTab === 'insights'">
-      <div v-if="insightsLoading" class="chart-loading py-5">
-        <div class="spinner-border text-primary-brand"></div>
-        <span class="ms-3 text-muted fw-600">Analyzing data...</span>
-      </div>
-
-      <template v-else-if="insightsData">
-        <div class="alert alert-brand mb-3" v-if="insightsData.summary">
-          {{ insightsData.summary }}
-        </div>
-
-        <div class="row g-3 mb-4">
-          <div class="col-12">
-            <div class="chart-card">
-              <div class="chart-card-header">
-                <div class="chart-title">Data Analysis & Findings</div>
-                <div class="chart-sub">Narrative overview of key observations from current data</div>
-              </div>
-              <div v-if="!insightsData.findings.length" class="text-center text-muted py-4">
-                <i class="bi bi-check-circle fs-3"></i>
-                <p class="mt-2">No notable issues found — all operational metrics appear healthy.</p>
-              </div>
-              <div v-else class="narrative-list">
-                <div v-for="(f, i) in insightsData.findings" :key="i"
-                  class="narrative-card" :class="'narrative--' + f.severity"
-                  :style="f.link ? { cursor: 'pointer' } : {}"
-                  @click="f.link && applyReportLink(f.link)">
-                  <div class="narrative-header">
-                    <div class="narrative-title">{{ f.title }}</div>
-                    <span class="severity-badge" :class="'sev-' + f.severity">{{ f.severity.toUpperCase() }}</span>
-                  </div>
-                  <div class="narrative-body">{{ f.description }}</div>
-                  <div class="narrative-footer">
-                    <span class="narrative-category">{{ f.category }}</span>
-                    <span v-if="f.link" class="narrative-link"><i class="bi bi-box-arrow-up-right"></i> {{ f.link.label }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-3 mb-4" v-if="insightsData.priorities.length">
-          <div class="col-12">
-            <div class="chart-card">
-              <div class="chart-card-header">
-                <div class="chart-title">Priority Actions Summary</div>
-                <div class="chart-sub">Recommended next steps organized by urgency</div>
-              </div>
-              <div class="priority-list">
-                <div v-for="(p, i) in insightsData.priorities" :key="i" class="priority-item"
-                  :class="'priority--' + p.severity"
-                  :style="p.link ? { cursor: 'pointer' } : {}"
-                  @click="p.link && applyReportLink(p.link)">
-                  <div class="priority-body">
-                    <div class="priority-action">{{ p.title }}</div>
-                    <div class="priority-desc">{{ p.description }}</div>
-                    <div class="priority-meta">
-                      <span class="severity-badge" :class="'sev-' + p.severity">{{ p.severity.toUpperCase() }}</span>
-                      <span class="priority-due">Due: {{ p.due }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-3">
-          <div class="col-12">
-            <div class="insights-footer">
-              <small class="text-muted">
-                <i class="bi bi-cpu me-1"></i> Rule-based analysis — no external AI used.
-                <span v-if="insightsLastRun"> Last updated: {{ insightsLastRun }}</span>
-              </small>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <div v-else class="text-center py-5 text-muted">
-        <i class="bi bi-cpu fs-1 d-block mb-2"></i>
-        <p>No data available. Make sure analytics data is loaded first.</p>
       </div>
     </div>
 
@@ -712,6 +627,7 @@ import {
   saveReportRecord,
   fetchReportData,
   getBranches,
+  uploadReportFile,
 } from '../../services/reportService.js'
 import { exportPDF }   from '../../services/pdfExporter.js'
 import { exportExcel } from '../../services/excelExporter.js'
@@ -796,7 +712,7 @@ export default {
       viewDateTo:   '',
 
       // Generate
-      genForm: { category: '', type: '', dateFrom: weekAgo, dateTo: today, branchId: null, format: 'pdf' },
+      genForm: { category: '', type: '', dateFrom: weekAgo, dateTo: today, branchId: null, format: 'pdf', saveToCloud: false },
       genErrors: {},
 
       toast: { show: false, message: '', type: 'success' },
@@ -875,6 +791,7 @@ export default {
     await this.loadBranches()
     await this.loadAnalyticsData()
     this.$nextTick(() => this.renderActiveCharts())
+    this.loadInsights() // generate notifications silently
   },
 
   beforeUnmount() {
@@ -892,7 +809,7 @@ export default {
     async onPeriodChange() {
       await this.loadAnalyticsData()
       this.$nextTick(() => this.renderActiveCharts())
-      if (this.mainTab === 'insights') await this.loadInsights()
+      this.loadInsights() // generate notifications silently
     },
 
     async loadAnalyticsData() {
@@ -1062,6 +979,26 @@ export default {
           scheduleData: schedRes.data || [],
         })
         this.insightsLastRun = new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
+        // Bridge high/medium findings to notifications
+        const role = localStorage.getItem('role') || 'admin'
+        const notifBranchId = branch || null
+        for (const f of (this.insightsData?.findings || [])) {
+          if (f.severity !== 'high' && f.severity !== 'medium') continue
+          const linkPath = f.link?.module
+            ? `/${role}/${f.link.module}`
+            : null
+          await supabase.from('notifications').insert({
+            role,
+            branch_id: notifBranchId,
+            category: f.category,
+            title: f.title,
+            message: f.description,
+            severity: f.severity,
+            link: linkPath,
+            is_read: false,
+            created_at: new Date().toISOString(),
+          }).maybeSingle()
+        }
       } catch (err) {
         console.error('[Insights] Failed:', err)
         this.insightsData = { findings: [], priorities: [], summary: 'Failed to analyze data.' }
@@ -1220,16 +1157,38 @@ export default {
 
         // 3. Export — triggers browser download
         const insightsData = this.insightsData || undefined
-        if (this.genForm.format === 'pdf')   exportPDF(this.genForm.type, rawRows || rows, meta, insightsData)
-        if (this.genForm.format === 'excel') await exportExcel(this.genForm.type, rows, meta)
+        let fileBuffer = null
+        let contentType = ''
+        if (this.genForm.format === 'pdf') {
+          fileBuffer = await exportPDF(this.genForm.type, rawRows || rows, meta, insightsData)
+          contentType = 'application/pdf'
+        }
+        if (this.genForm.format === 'excel') {
+          fileBuffer = await exportExcel(this.genForm.type, rows, meta)
+          contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
 
-        // 4. Save record in Supabase
+        // 4. Upload to cloud storage if opted in
+        let filePath = null
+        if (this.genForm.saveToCloud && fileBuffer) {
+          const ts = Date.now()
+          const ext = this.genForm.format === 'pdf' ? 'pdf' : 'xlsx'
+          const fileName = `${this.genForm.type.replace(/[^a-z0-9]/g, '-')}-${ts}.${ext}`
+          const { filePath: uploadedPath, publicUrl, error: uploadErr } = await uploadReportFile(fileBuffer, fileName, contentType)
+          if (uploadErr) {
+            console.error('[Reports] Storage upload failed:', uploadErr)
+          } else {
+            filePath = publicUrl || uploadedPath
+          }
+        }
+
+        // 5. Save record in Supabase
         const { error: saveErr } = await saveReportRecord({
           type:        this.genForm.type,
           title:       meta.title + ` (${this.genForm.dateFrom} – ${this.genForm.dateTo})`,
           branchId:    this.genForm.branchId,
           generatedBy: Number(localStorage.getItem('userId')) || null,
-          filePath:    null,
+          filePath:    filePath,
         })
         if (saveErr) console.error('[Reports] Failed to save report record:', saveErr)
 
@@ -1267,7 +1226,7 @@ export default {
     resetGenForm() {
       const today   = new Date().toISOString().split('T')[0]
       const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
-      this.genForm  = { category: '', type: '', dateFrom: weekAgo, dateTo: today, branchId: null, format: 'pdf' }
+      this.genForm  = { category: '', type: '', dateFrom: weekAgo, dateTo: today, branchId: null, format: 'pdf', saveToCloud: false }
       this.genErrors = {}
     },
 

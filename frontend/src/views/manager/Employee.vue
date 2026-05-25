@@ -6,12 +6,9 @@
         <h4 class="page-title mb-1">Employee Management</h4>
         <p class="page-sub mb-0">
           Manage hourly employees and availability ·
-          {{ employees.length }} total employees across all branches
+          {{ employees.length }} total employees{{ branchName ? ' at ' + branchName : '' }}
         </p>
       </div>
-      <button class="btn btn-brown" @click="openAddModal">
-        <i class="bi bi-plus-lg me-1"></i> Add Employee
-      </button>
     </div>
 
     <!-- ── STATS CARDS ─────────────────────────────────────── -->
@@ -46,12 +43,6 @@
         <option value="Active">Active</option>
         <option value="On Leave">On Leave</option>
         <option value="Inactive">Inactive</option>
-      </select>
-      <select v-model="filterBranch" class="form-select filter-select">
-        <option value="">All Branches</option>
-        <option v-for="b in branches" :key="b.id" :value="b.id">
-          {{ b.name }}
-        </option>
       </select>
       <button class="btn btn-outline-secondary btn-sm" @click="clearFilters">
         Clear Filters
@@ -129,21 +120,15 @@
       <p class="mt-3 text-muted">No employees match your filters.</p>
     </div>
 
-    <!-- ── ADD / EDIT MODAL ────────────────────────────────── -->
+    <!-- ── EDIT MODAL ──────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
         <div class="modal-panel">
           <div class="modal-panel-header">
             <div>
-              <h5 class="mb-0">
-                {{ isEditing ? "Edit Employee" : "Add New Employee" }}
-              </h5>
+              <h5 class="mb-0">Edit Employee</h5>
               <p class="modal-sub mb-0">
-                {{
-                  isEditing
-                    ? "Update employee information"
-                    : "Add a new hourly employee to the system"
-                }}
+                Update employee information
               </p>
             </div>
             <button class="btn-close-panel" @click="closeModal">
@@ -273,7 +258,7 @@
                 </div>
               </div>
 
-              <div v-if="isEditing" class="col-6">
+              <div class="col-6">
                 <label class="form-label-sm">Status</label>
                 <select v-model="form.status" class="form-select fc-brand">
                   <option value="Active">Active</option>
@@ -295,7 +280,7 @@
                 v-if="saving"
                 class="spinner-border spinner-border-sm me-1"
               ></span>
-              {{ isEditing ? "Save Changes" : "Add Employee" }}
+              Save Changes
             </button>
           </div>
         </div>
@@ -352,19 +337,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { useRoute } from "vue-router";
 import { supabase } from "@/supabase.js";
-
-const route = useRoute();
+import { useUserBranch } from "@/composables/useUserBranch.js";
 
 const isLoading = ref(true);
 const search = ref("");
 const filterDept = ref("");
 const filterStatus = ref("");
-const filterBranch = ref("");
 const showModal = ref(false);
 const showDeleteConfirm = ref(false);
-const isEditing = ref(false);
 const saving = ref(false);
 const deleteTarget = ref(null);
 const toast = ref({ show: false, message: "", type: "success" });
@@ -372,6 +353,9 @@ const errors = ref({});
 const employees = ref([]);
 
 const branches = ref([]);
+const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
+const managerBranchId = ref(null);
+const branchName = ref("");
 const departments = ["Kitchen", "Service", "Management", "Maintenance"];
 const positions = [
   "Store Manager",
@@ -409,16 +393,21 @@ const fetchBranches = async () => {
   }
 };
 
-// Fetch employees from Supabase
+// Fetch employees from Supabase (optionally scoped to branch)
 const fetchEmployees = async () => {
   isLoading.value = true;
-  const { data, error } = await supabase
+  let query = supabase
     .from("employee")
     .select(
       "EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status",
     )
-    .neq("Status", "Archived")
-    .order("EmployeeId", { ascending: true });
+    .neq("Status", "Archived");
+
+  if (managerBranchId.value) {
+    query = query.eq("BranchAssigned", managerBranchId.value);
+  }
+
+  const { data, error } = await query.order("EmployeeId", { ascending: true });
 
   if (data) {
     employees.value = data.map((e) => ({
@@ -449,9 +438,7 @@ const filteredEmployees = computed(() => {
       (e.position || "").toLowerCase().includes(q);
     const matchDept = !filterDept.value || e.department === filterDept.value;
     const matchStatus = !filterStatus.value || e.status === filterStatus.value;
-    const matchBranch =
-      !filterBranch.value || e.branchId === filterBranch.value;
-    return matchSearch && matchDept && matchStatus && matchBranch;
+    return matchSearch && matchDept && matchStatus;
   });
 });
 
@@ -488,17 +475,9 @@ const stats = computed(() => {
   ];
 });
 
-const openAddModal = () => {
-  form.value = emptyForm();
-  errors.value = {};
-  isEditing.value = false;
-  showModal.value = true;
-};
-
 const openEditModal = (emp) => {
   form.value = { ...emp };
   errors.value = {};
-  isEditing.value = true;
   showModal.value = true;
 };
 
@@ -541,70 +520,33 @@ const saveEmployee = async () => {
     Status: form.value.status,
   };
 
-  if (isEditing.value) {
-    const { error } = await supabase
-      .from("employee")
-      .update(payload)
-      .eq("EmployeeId", form.value.id);
+  const { error } = await supabase
+    .from("employee")
+    .update(payload)
+    .eq("EmployeeId", form.value.id);
 
-    if (error) {
-      showToast("Failed to update employee.", "error");
-    } else {
-      // Update corresponding user record if branch changed
-      const originalEmployee = employees.value.find(e => e.id === form.value.id);
-      if (originalEmployee && originalEmployee.branchId !== form.value.branchId) {
-        const { data: userRecord } = await supabase
-          .from("users")
-          .select("id")
-          .eq("username", form.value.email)
-          .maybeSingle();
-        
-        if (userRecord) {
-          await supabase
-            .from("users")
-            .update({ branch: form.value.branchId })
-            .eq("id", userRecord.id);
-        }
-      }
-      showToast("Employee updated successfully.", "success");
-      await fetchEmployees();
-    }
+  if (error) {
+    showToast("Failed to update employee.", "error");
   } else {
-    const { error: empError } = await supabase.from("employee").insert([payload]);
-
-    if (empError) {
-      showToast("Failed to add employee.", "error");
-    } else {
-      // Determine role based on position
-      const roleMap = {
-        "Store Manager": "manager",
-        "Supervisor": "manager"
-      };
-      const userRole = roleMap[form.value.position] || "staff";
-      
-      // Generate a default password
-      const defaultPassword = Math.random().toString(36).slice(-8);
-      
-      // Create user account
-      const userPayload = {
-        username: form.value.email,
-        password: defaultPassword,
-        role: userRole,
-        branch: form.value.branchId,
-        last_active: new Date().toISOString()
-      };
-
-      const { error: userError } = await supabase
+    // Update corresponding user record if branch changed
+    const originalEmployee = employees.value.find(e => e.id === form.value.id);
+    if (originalEmployee && originalEmployee.branchId !== form.value.branchId) {
+      const { data: userRecord } = await supabase
         .from("users")
-        .insert([userPayload]);
+        .select("id")
+        .eq("username", form.value.email)
+        .maybeSingle();
 
-      if (userError) {
-        showToast("Employee added but user account creation failed.", "error");
-      } else {
-        showToast("Employee and user account created successfully.", "success");
+      if (userRecord) {
+        await supabase
+          .from("users")
+          .update({ branch: form.value.branchId })
+          .eq("id", userRecord.id);
       }
-      await fetchEmployees();
     }
+
+    showToast("Employee updated successfully.", "success");
+    await fetchEmployees();
   }
 
   saving.value = false;
@@ -633,14 +575,14 @@ const deleteEmployee = async () => {
       .select("id")
       .eq("username", deleteTarget.value.email)
       .maybeSingle();
-    
+
     if (userRecord) {
       await supabase
         .from("users")
         .update({ status: "archived" })
         .eq("id", userRecord.id);
     }
-    
+
     showToast("Employee deleted.", "success");
     await fetchEmployees();
   }
@@ -651,7 +593,6 @@ const clearFilters = () => {
   search.value = "";
   filterDept.value = "";
   filterStatus.value = "";
-  filterBranch.value = "";
 };
 
 const branchName = (id) => branches.value.find((b) => b.id === id)?.name || "—";
@@ -699,13 +640,11 @@ const showToast = (message, type = "success") => {
 };
 
 onMounted(async () => {
+  await resolveBranch();
+  managerBranchId.value = userBranchId.value;
+  branchName.value = userBranchName.value;
   await fetchBranches();
   await fetchEmployees();
-  const editId = route.query.edit;
-  if (editId) {
-    const emp = employees.value.find(e => String(e.EmployeeId) === editId);
-    if (emp) openEditModal(emp);
-  }
 });
 </script>
 

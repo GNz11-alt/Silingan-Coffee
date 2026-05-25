@@ -73,7 +73,7 @@ function engineAnomalies(data) {
       category: 'stock',
       link: { module: 'inventory', label: 'View Inventory' },
       title: 'Critical Stockout Alert',
-      description: `${outOfStock.length} item(s) — ${list}${names.length > 5 ? ` and ${names.length - 5} others` : ''} — are currently out of stock with zero quantity on hand. This means these materials are unavailable for production or sale, directly impacting the business's ability to fulfill orders. Immediate restocking is necessary to prevent service disruption and revenue loss.`
+      description: `${outOfStock.length} raw material(s) — ${list}${names.length > 5 ? ` and ${names.length - 5} others` : ''} — are currently out of stock with zero quantity on hand. This means these materials are unavailable for production or sale, directly impacting the business's ability to fulfill orders. Immediate restocking is necessary to prevent service disruption and revenue loss.`
     })
   }
 
@@ -83,7 +83,7 @@ function engineAnomalies(data) {
       severity: 'high',
       category: 'stock',
       link: { module: 'inventory', label: 'View Inventory' },
-      title: 'Items Below Minimum Stock Threshold',
+      title: 'Raw Materials Below Minimum Stock Threshold',
       description: `${lowItems.length} raw material(s) — ${names}${lowItems.length > 3 ? ` and ${lowItems.length - 3} others` : ''} — have fallen below their established reorder levels. These items are still available but risk stockout if not replenished soon. At the current rate of consumption, the remaining stock will be depleted quickly, making timely reordering a priority.`
     })
   }
@@ -99,8 +99,8 @@ function engineAnomalies(data) {
       severity: 'high',
       category: 'inventory',
       link: { module: 'inventory', label: 'View Inventory' },
-      title: 'Items Approaching Expiration',
-      description: `${expiring.length} inventory item(s) are set to expire within ${r.expirationDays} days. Perishable goods that pass their expiration date become unusable, resulting in direct waste and financial loss. It is recommended to conduct a physical audit of these items and prioritize their use, consider markdowns, or prepare for disposal as appropriate.`
+      title: 'Raw Materials Approaching Expiration',
+      description: `${expiring.length} raw material(s) are set to expire within ${r.expirationDays} days. Perishable goods that pass their expiration date become unusable, resulting in direct waste and financial loss. It is recommended to conduct a physical audit of these items and prioritize their use, consider markdowns, or prepare for disposal as appropriate.`
     })
   }
 
@@ -112,8 +112,8 @@ function engineAnomalies(data) {
       severity: 'high',
       category: 'stock',
       link: { module: 'inventory', label: 'View Inventory' },
-      title: 'Critically Low Stock Days Remaining',
-      description: `${critical.length} item(s) — ${names}${critical.length > 3 ? ` and ${critical.length - 3} others` : ''} — have ${r.stockCriticalDays} or fewer days of stock remaining at current usage rates. This metric combines consumption velocity with available quantity to project when each item will run out. Even if current stock levels appear adequate, the rate of consumption means these items will be exhausted soon without prompt replenishment.`
+      title: 'Critically Low Stock — Raw Materials',
+      description: `${critical.length} raw material(s) — ${names}${critical.length > 3 ? ` and ${critical.length - 3} others` : ''} — have ${r.stockCriticalDays} or fewer days of stock remaining at current usage rates. This metric combines consumption velocity with available quantity to project when each item will run out. Even if current stock levels appear adequate, the rate of consumption means these items will be exhausted soon without prompt replenishment.`
     })
   }
 
