@@ -2,7 +2,9 @@
   <div class="dashboard-content">
     <div class="welcome-header">
       <h1>Dashboard</h1>
-      <p class="welcome-message">Welcome back, {{ username }}!</p>
+      <p class="welcome-message">
+        Welcome back, <strong>{{ username }}!</strong>
+      </p>
     </div>
 
     <div class="stats-grid">
@@ -15,7 +17,30 @@
           <p class="stat-value">
             {{ isLoading ? "..." : formatCurrency(totalRevenue) }}
           </p>
-          <span class="stat-trend positive">Today across all branches</span>
+          <span
+            :class="[
+              'stat-trend',
+              totalRevenue === 0
+                ? 'danger'
+                : yesterdayRevenue > 0 && totalRevenue < yesterdayRevenue * 0.5
+                  ? 'danger'
+                  : yesterdayRevenue > 0 &&
+                      totalRevenue < yesterdayRevenue * 0.8
+                    ? 'warning'
+                    : 'positive',
+            ]"
+          >
+            {{
+              totalRevenue === 0
+                ? "No revenue today"
+                : yesterdayRevenue > 0 && totalRevenue < yesterdayRevenue * 0.5
+                  ? "Well below yesterday"
+                  : yesterdayRevenue > 0 &&
+                      totalRevenue < yesterdayRevenue * 0.8
+                    ? "Slightly below yesterday"
+                    : "Today across all branches"
+            }}
+          </span>
         </div>
       </div>
 
@@ -26,7 +51,28 @@
         <div class="stat-info">
           <h3>Total Orders</h3>
           <p class="stat-value">{{ isLoading ? "..." : totalOrders }}</p>
-          <span class="stat-trend positive">Today across all branches</span>
+          <span
+            :class="[
+              'stat-trend',
+              totalOrders === 0
+                ? 'danger'
+                : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.5
+                  ? 'danger'
+                  : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.8
+                    ? 'warning'
+                    : 'positive',
+            ]"
+          >
+            {{
+              totalOrders === 0
+                ? "No orders today"
+                : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.5
+                  ? "Well below yesterday"
+                  : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.8
+                    ? "Slightly below yesterday"
+                    : "Today across all branches"
+            }}
+          </span>
         </div>
       </div>
 
@@ -39,7 +85,24 @@
           <p class="stat-value">
             {{ isLoading ? "..." : `${activeBranches}/5` }}
           </p>
-          <span class="stat-trend">locations operating</span>
+          <span
+            :class="[
+              'stat-trend',
+              activeBranches < 3
+                ? 'danger'
+                : activeBranches < 5
+                  ? 'warning'
+                  : 'positive',
+            ]"
+          >
+            {{
+              activeBranches < 3
+                ? "Several branches offline"
+                : activeBranches < 5
+                  ? "Some branches inactive"
+                  : "Locations operating"
+            }}
+          </span>
         </div>
       </div>
 
@@ -50,18 +113,52 @@
         <div class="stat-info">
           <h3>Low Stock Items</h3>
           <p class="stat-value">{{ isLoading ? "..." : lowStockCount }}</p>
-          <span class="stat-trend warning">across all branches</span>
+          <span
+            :class="[
+              'stat-trend',
+              lowStockCount > 10
+                ? 'danger'
+                : lowStockCount > 0
+                  ? 'warning'
+                  : 'positive',
+            ]"
+          >
+            {{
+              lowStockCount > 10
+                ? "Critical — needs attention"
+                : lowStockCount > 0
+                  ? "Across all branches"
+                  : "All items stocked"
+            }}
+          </span>
         </div>
       </div>
 
-      <div class="stat-card growth-card">
+      <div class="stat-card">
         <div class="stat-icon">
           <component :is="TrendingUp" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">
           <h3>Total Employees</h3>
           <p class="stat-value">{{ isLoading ? "..." : totalEmployees }}</p>
-          <span class="stat-trend">across all branches</span>
+          <span
+            :class="[
+              'stat-trend',
+              totalEmployees < 10
+                ? 'danger'
+                : totalEmployees < 20
+                  ? 'warning'
+                  : 'positive',
+            ]"
+          >
+            {{
+              totalEmployees < 10
+                ? "Critically understaffed"
+                : totalEmployees < 20
+                  ? "Below ideal headcount"
+                  : "Across all branches"
+            }}
+          </span>
         </div>
       </div>
     </div>
@@ -69,7 +166,6 @@
     <div class="branch-section">
       <h2>Branch Performance Summary</h2>
       <p class="section-subtitle">Today's performance across all locations</p>
-
       <div class="branch-grid">
         <div
           class="branch-card"
@@ -79,8 +175,7 @@
           <div class="branch-info">
             <h4>{{ branch.name }}</h4>
             <p class="branch-revenue">{{ formatCurrency(branch.revenue) }}</p>
-            <p class="branch-orders">{{ branch.orders }} orders</p>
-            <span :class="['branch-status', branch.status]">{{
+            <span :class="['branch-trend', branch.status]">{{
               branch.statusText
             }}</span>
           </div>
@@ -91,11 +186,14 @@
     <div class="bottom-section">
       <div class="recent-orders">
         <h2>Recent Orders</h2>
-        <p class="section-subtitle">Latest transactions across all branches</p>
-
+        <p class="section-subtitle">Today's transactions across all branches</p>
         <div class="orders-list">
           <div v-if="recentOrders.length === 0" class="empty-state">
-            No orders yet today.
+            <ShoppingBag :size="32" class="empty-icon" />
+            <p>No recent orders today.</p>
+            <span
+              >Orders will appear here once customers start purchasing.</span
+            >
           </div>
           <div
             class="order-item"
@@ -117,7 +215,6 @@
       <div class="quick-actions">
         <h2>Quick Actions</h2>
         <p class="section-subtitle">Common tasks</p>
-
         <div class="actions-list">
           <button
             class="action-item"
@@ -159,6 +256,8 @@ const totalOrders = ref(0);
 const activeBranches = ref(0);
 const lowStockCount = ref(0);
 const totalEmployees = ref(0);
+const yesterdayRevenue = ref(0);
+const yesterdayOrders = ref(0);
 
 // Data
 const branchPerformance = ref([]);
@@ -182,6 +281,7 @@ const fetchDashboardData = async () => {
   isLoading.value = true;
 
   const today = new Date().toISOString().split("T")[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
 
   // Fetch today's completed orders
   const { data: ordersData } = await supabase
@@ -199,6 +299,19 @@ const fetchDashboardData = async () => {
     );
   }
 
+  const { data: yesterdayData } = await supabase
+    .from("orders")
+    .select("FinalAmount")
+    .gte("CreatedAt", `${yesterday}T00:00:00`)
+    .lte("CreatedAt", `${yesterday}T23:59:59`)
+    .eq("Status", "completed");
+
+  yesterdayRevenue.value = (yesterdayData ?? []).reduce(
+    (sum, o) => sum + Number(o.FinalAmount),
+    0,
+  );
+  yesterdayOrders.value = yesterdayData?.length ?? 0;
+
   // Fetch branches
   const { data: branchData } = await supabase
     .from("branch")
@@ -206,19 +319,36 @@ const fetchDashboardData = async () => {
 
   activeBranches.value = branchData?.length || 0;
 
-  // Fetch inventory for all branches
-  const { data: inventoryData } = await supabase
-    .from("inventory")
-    .select("BranchId, Quantity, LowStockThreshold");
+  // Fetch raw inventory grouped by branch + product
+  const { data: rawInventory } = await supabase
+    .from("rawproducttransaction")
+    .select("branchid, rawproductid, quantity, rawproduct(reorderlevel)")
+    .eq("transactiontype", "in")
+    .gt("quantity", 0);
 
-  if (inventoryData) {
-    lowStockCount.value = inventoryData.filter(
-      (item) =>
-        item.LowStockThreshold && item.Quantity <= item.LowStockThreshold,
-    ).length;
+  // Group quantity by branchid + rawproductid
+  const branchItemStock = {};
+  for (const row of rawInventory ?? []) {
+    const key = `${row.branchid}__${row.rawproductid}`;
+    if (!branchItemStock[key]) {
+      branchItemStock[key] = {
+        branchid: row.branchid,
+        rawproductid: row.rawproductid,
+        quantity: 0,
+        reorderlevel: row.rawproduct?.reorderlevel ?? null,
+      };
+    }
+    branchItemStock[key].quantity += row.quantity;
   }
 
-  // Build branch performance with real status
+  const branchStockList = Object.values(branchItemStock);
+
+  // Global low stock count
+  lowStockCount.value = branchStockList.filter(
+    (i) => i.reorderlevel && i.quantity <= i.reorderlevel && i.quantity > 0,
+  ).length;
+
+  // Build branch performance
   if (branchData) {
     branchPerformance.value = branchData.map((branch) => {
       const branchOrders = (ordersData || []).filter(
@@ -229,29 +359,24 @@ const fetchDashboardData = async () => {
         0,
       );
 
-      const branchInventory = (inventoryData || []).filter(
-        (i) => i.BranchId === branch.BranchId,
+      const branchItems = branchStockList.filter(
+        (i) => i.branchid === branch.BranchId,
       );
-      const hasZeroStock = branchInventory.some((i) => i.Quantity === 0);
-      const hasLowStock = branchInventory.some(
-        (i) =>
-          i.LowStockThreshold &&
-          i.Quantity <= i.LowStockThreshold &&
-          i.Quantity > 0,
-      );
+
+      const zeroStockCount = branchItems.filter((i) => i.quantity <= 0).length;
+      const branchLowStock = branchItems.filter(
+        (i) => i.reorderlevel && i.quantity <= i.reorderlevel && i.quantity > 0,
+      ).length;
 
       let status = "good";
       let statusText = "Good";
 
-      if (hasZeroStock) {
+      if (zeroStockCount > 0) {
         status = "critical";
-        statusText = "Out of Stock";
-      } else if (hasLowStock) {
+        statusText = `${zeroStockCount} Out of Stock`;
+      } else if (branchLowStock > 0) {
         status = "warning";
-        statusText = "Low Stock";
-      } else if (branchOrders.length === 0) {
-        status = "inactive";
-        statusText = "No Orders";
+        statusText = `${branchLowStock} Low Stock Item${branchLowStock > 1 ? "s" : ""}`;
       }
 
       return {
@@ -272,10 +397,13 @@ const fetchDashboardData = async () => {
 
   totalEmployees.value = count || 0;
 
-  // Fetch recent orders with branch name
+  // Fetch recent orders — today only
   const { data: recentData } = await supabase
     .from("orders")
     .select("OrderId, FinalAmount, BranchId, CreatedAt, branch(BranchName)")
+    .gte("CreatedAt", `${today}T00:00:00`)
+    .lte("CreatedAt", `${today}T23:59:59`)
+    .eq("Status", "completed")
     .order("CreatedAt", { ascending: false })
     .limit(5);
 
@@ -320,6 +448,9 @@ onMounted(() => {
 <style scoped>
 .dashboard-content {
   padding: 24px 32px;
+  background: #fafafa;
+  min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
 
 .welcome-header {
@@ -327,15 +458,20 @@ onMounted(() => {
 }
 
 .welcome-header h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0;
+}
+
+.welcome-header strong {
+  color: #31201d;
 }
 
 .welcome-message {
   font-size: 14px;
-  color: #6c757d;
+  color: #888;
+  margin: 4px 0 0;
 }
 
 .stats-grid {
@@ -382,23 +518,37 @@ onMounted(() => {
   font-size: 11px;
   color: #adb5bd;
 }
+.stat-trend.danger {
+  color: #dc2626;
+}
+.stat-trend.warning {
+  color: #f59e0b;
+}
 .stat-trend.positive {
   color: #28a745;
 }
-.stat-trend.warning {
-  color: #ffc107;
-}
 
-.growth-card {
-  background: linear-gradient(135deg, #8b4513, #a0522d);
-  border: none;
+.empty-state {
+  text-align: center;
+  padding: 28px 0;
+  color: #adb5bd;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
-
-.growth-card .stat-icon,
-.growth-card .stat-value,
-.growth-card .stat-info h3,
-.growth-card .stat-trend {
-  color: #ffffff;
+.empty-state p {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6c757d;
+  margin: 0;
+}
+.empty-state span {
+  font-size: 12px;
+  color: #adb5bd;
+}
+.empty-icon {
+  opacity: 0.3;
 }
 
 .branch-section {
@@ -456,29 +606,20 @@ onMounted(() => {
   margin-bottom: 8px;
 }
 
-.branch-status {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 20px;
+.branch-trend {
   font-size: 11px;
   font-weight: 500;
 }
-
-/* Status colors */
-.branch-status.good {
-  background: #e8f5e9;
-  color: #2e7d32;
+.branch-trend.good {
+  color: #28a745;
 }
-.branch-status.warning {
-  background: #fff3e0;
+.branch-trend.warning {
   color: #f57c00;
 }
-.branch-status.critical {
-  background: #ffebee;
+.branch-trend.critical {
   color: #c62828;
 }
-.branch-status.inactive {
-  background: #f5f5f5;
+.branch-trend.inactive {
   color: #9e9e9e;
 }
 

@@ -39,7 +39,12 @@
         <div class="section-title mb-3">Employee Availability</div>
         <div v-if="pendingOrFading.length" class="avail-list">
           <TransitionGroup name="fade-slide">
-            <div v-for="avail in pendingOrFading" :key="avail.id" class="avail-row" :class="{ 'is-fading': fadingIds.has(avail.id) }">
+            <div
+              v-for="avail in pendingOrFading"
+              :key="avail.id"
+              class="avail-row"
+              :class="{ 'is-fading': fadingIds.has(avail.id) }"
+            >
               <div class="avail-left">
                 <div
                   class="emp-avatar"
@@ -189,7 +194,11 @@
             <option value="Completed">Completed</option>
             <option value="Cancelled">Cancelled</option>
           </select>
-          <button v-if="schedViewMode === 'table'" class="btn btn-ghost btn-sm" @click="clearSchedFilters">
+          <button
+            v-if="schedViewMode === 'table'"
+            class="btn btn-ghost btn-sm"
+            @click="clearSchedFilters"
+          >
             Clear
           </button>
         </div>
@@ -262,14 +271,25 @@
 
         <!-- CALENDAR VIEW -->
         <div v-if="schedViewMode === 'calendar'">
-          <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
+          <div
+            class="d-flex justify-content-center align-items-center gap-3 mb-4"
+          >
             <button class="btn btn-ghost btn-sm" @click="monthOffset -= 1">
               <i class="bi bi-chevron-left"></i> Previous
             </button>
-            <span style="min-width: 200px; text-align: center; font-weight: 600; font-size: 1.1rem">
+            <span
+              style="
+                min-width: 200px;
+                text-align: center;
+                font-weight: 600;
+                font-size: 1.1rem;
+              "
+            >
               {{ monthYearLabel }}
             </span>
-            <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">Today</button>
+            <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">
+              Today
+            </button>
             <button class="btn btn-ghost btn-sm" @click="monthOffset += 1">
               Next <i class="bi bi-chevron-right"></i>
             </button>
@@ -277,7 +297,11 @@
 
           <div class="calendar-container">
             <div class="calendar-header">
-              <div class="calendar-day-header" v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="day">
+              <div
+                class="calendar-day-header"
+                v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
+                :key="day"
+              >
                 {{ day }}
               </div>
             </div>
@@ -286,14 +310,22 @@
                 v-for="day in monthDays"
                 :key="day.dateStr"
                 class="calendar-day"
-                :class="{ 'is-today': day.isToday, 'is-other-month': day.isOtherMonth }"
+                :class="{
+                  'is-today': day.isToday,
+                  'is-other-month': day.isOtherMonth,
+                }"
               >
                 <div class="day-number">
                   {{ day.dayOfMonth }}
                   <span v-if="day.isToday" class="today-badge">Today</span>
                 </div>
                 <div class="day-shifts">
-                  <div v-for="shift in day.shifts" :key="shift.id" class="shift-badge" :style="{ background: avatarColor(shift.employeeId) }">
+                  <div
+                    v-for="shift in day.shifts"
+                    :key="shift.id"
+                    class="shift-badge"
+                    :style="{ background: avatarColor(shift.employeeId) }"
+                  >
                     <div class="shift-badge-time">{{ shift.startTime }}</div>
                     <div class="shift-badge-name">{{ shift.initials }}</div>
                   </div>
@@ -589,7 +621,9 @@ const pendingCount = computed(
 );
 
 const resolvedAvail = computed(() =>
-  availability.value.filter((a) => a.status === "Confirmed" || a.status === "Cancelled"),
+  availability.value.filter(
+    (a) => a.status === "Confirmed" || a.status === "Cancelled",
+  ),
 );
 
 const fadingIds = ref(new Set());
@@ -641,7 +675,9 @@ const monthDays = computed(() => {
   // Start from Monday of the week containing the 1st
   const startDate = new Date(start);
   const dayOfWeek = startDate.getDay();
-  startDate.setDate(startDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  startDate.setDate(
+    startDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1),
+  );
 
   for (let i = 0; i < 42; i++) {
     const d = new Date(startDate);
@@ -672,16 +708,19 @@ const fetchBranches = async () => {
 
 const updateInquiryStatus = async (inq, status) => {
   const { error } = await supabase
-    .from('changeinquiry')
+    .from("changeinquiry")
     .update({ status: status })
-    .eq('inquiryid', inq.id)
+    .eq("inquiryid", inq.id);
 
-  if (error) showToast('Failed to update inquiry.', 'error')
+  if (error) showToast("Failed to update inquiry.", "error");
   else {
-    inq.status = status
-    showToast(`Inquiry ${status === 'Approved' ? 'approved' : 'denied'}.`, 'success')
+    inq.status = status;
+    showToast(
+      `Inquiry ${status === "Approved" ? "approved" : "denied"}.`,
+      "success",
+    );
   }
-}
+};
 
 const fetchEmployees = async () => {
   const { data } = await supabase
@@ -707,8 +746,13 @@ const fetchAvailability = async () => {
     availability.value = data.map((a) => ({
       id: a.availabilityid,
       employeeId: a.employeeid,
-      employeeName: a.employee ? `${a.employee.FirstName || ''} ${a.employee.LastName || ''}`.trim() : 'Unknown',
-      initials: a.employee ? `${(a.employee.FirstName?.[0] || '')}${(a.employee.LastName?.[0] || '')}`.toUpperCase() || '?' : '?',
+      employeeName: a.employee
+        ? `${a.employee.FirstName || ""} ${a.employee.LastName || ""}`.trim()
+        : "Unknown",
+      initials: a.employee
+        ? `${a.employee.FirstName?.[0] || ""}${a.employee.LastName?.[0] || ""}`.toUpperCase() ||
+          "?"
+        : "?",
       role: "—",
       availableDate: a.availabledate,
       startTime: a.starttime?.slice(0, 5),
@@ -731,8 +775,13 @@ const fetchChangeInquiries = async () => {
     changeInquiries.value = data.map((c) => ({
       id: c.inquiryid,
       employeeId: c.employeeid,
-      employeeName: c.employee ? `${c.employee.FirstName || ''} ${c.employee.LastName || ''}`.trim() : 'Unknown',
-      initials: c.employee ? `${(c.employee.FirstName?.[0] || '')}${(c.employee.LastName?.[0] || '')}`.toUpperCase() || '?' : '?',
+      employeeName: c.employee
+        ? `${c.employee.FirstName || ""} ${c.employee.LastName || ""}`.trim()
+        : "Unknown",
+      initials: c.employee
+        ? `${c.employee.FirstName?.[0] || ""}${c.employee.LastName?.[0] || ""}`.toUpperCase() ||
+          "?"
+        : "?",
       role: "—",
       requestDate: c.requestdate,
       reason: c.reason,
@@ -755,8 +804,13 @@ const fetchSchedules = async () => {
     schedules.value = data.map((s) => ({
       id: s.ScheduleId,
       employeeId: s.EmployeeId,
-      employeeName: s.employee ? `${s.employee.FirstName || ''} ${s.employee.LastName || ''}`.trim() : 'Unknown',
-      initials: s.employee ? `${(s.employee.FirstName?.[0] || '')}${(s.employee.LastName?.[0] || '')}`.toUpperCase() || '?' : '?',
+      employeeName: s.employee
+        ? `${s.employee.FirstName || ""} ${s.employee.LastName || ""}`.trim()
+        : "Unknown",
+      initials: s.employee
+        ? `${s.employee.FirstName?.[0] || ""}${s.employee.LastName?.[0] || ""}`.toUpperCase() ||
+          "?"
+        : "?",
       role: s.Role,
       shiftDate: s.ShiftDate,
       startTime: s.StartTime?.slice(0, 5),
@@ -852,27 +906,35 @@ const confirmDelete = (sched) => {
 const deleteSchedule = async () => {
   const currentUser = localStorage.getItem("username") || "Unknown";
   const now = new Date().toISOString();
+
   const { error } = await supabase
     .from("schedule")
-    .update({ Status: "Archived", ArchivedAt: now, ArchivedBy: currentUser })
+    .update({
+      Status: "Archived",
+      ArchivedAt: now,
+      ArchivedBy: currentUser,
+    })
     .eq("ScheduleId", deleteTarget.value.id);
 
-  if (error) showToast("Failed to archive schedule.", "error");
-  else {
-    showToast("Schedule archived.", "success");
-    await fetchSchedules();
-  }
   showDeleteConfirm.value = false;
+
+  if (error) {
+    showToast("Failed to archive schedule: " + error.message, "error");
+    return;
+  }
+
+  showToast("Schedule archived.", "success");
+  await fetchSchedules();
 };
 
 const updateAvailStatus = async (avail, status) => {
   const { error } = await supabase
-    .from('availability')
+    .from("availability")
     .update({ status })
-    .eq('availabilityid', avail.id);
+    .eq("availabilityid", avail.id);
 
   if (error) {
-    showToast('Failed to update availability.', 'error');
+    showToast("Failed to update availability.", "error");
     return;
   }
 
@@ -881,14 +943,13 @@ const updateAvailStatus = async (avail, status) => {
   if (status === "Confirmed") {
     // Look up employee's branch
     const { data: emp } = await supabase
-      .from('employee')
-      .select('BranchAssigned')
-      .eq('EmployeeId', avail.employeeId)
+      .from("employee")
+      .select("BranchAssigned")
+      .eq("EmployeeId", avail.employeeId)
       .maybeSingle();
 
-    const { error: schedErr } = await supabase
-      .from("schedule")
-      .insert([{
+    const { error: schedErr } = await supabase.from("schedule").insert([
+      {
         EmployeeId: avail.employeeId,
         Role: avail.role,
         ShiftDate: avail.availableDate,
@@ -897,14 +958,18 @@ const updateAvailStatus = async (avail, status) => {
         Status: "Scheduled",
         BranchId: emp?.BranchAssigned || null,
         BasedOnAvailabilityId: avail.id,
-      }]);
+      },
+    ]);
 
     if (schedErr) {
-      showToast('Availability approved but failed to create schedule.', 'error');
+      showToast(
+        "Availability approved but failed to create schedule.",
+        "error",
+      );
       return;
     }
     await fetchSchedules();
-    showToast('Availability approved and schedule created.', 'success');
+    showToast("Availability approved and schedule created.", "success");
   } else {
     showToast(`Availability rejected.`, "success");
   }
@@ -912,7 +977,9 @@ const updateAvailStatus = async (avail, status) => {
   // Start 20-second fade-out before removing from pending view
   fadingIds.value = new Set([...fadingIds.value, avail.id]);
   setTimeout(() => {
-    fadingIds.value = new Set([...fadingIds.value].filter(id => id !== avail.id));
+    fadingIds.value = new Set(
+      [...fadingIds.value].filter((id) => id !== avail.id),
+    );
   }, 20000);
 };
 
@@ -983,18 +1050,21 @@ onMounted(async () => {
 }
 
 .schedule-page {
-  padding: 1.5rem;
-  background: #f4f1ef;
+  padding: 24px 32px;
+  background: #fafafa;
   min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
 .page-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--text-main);
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0 0 4px;
 }
 .page-sub {
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  font-size: 14px;
+  color: #888;
+  margin: 0;
 }
 
 .tab-bar {
@@ -1441,7 +1511,7 @@ onMounted(async () => {
   border-right: none;
 }
 
-.calendar-day:nth-last-child(-n+7) {
+.calendar-day:nth-last-child(-n + 7) {
   border-bottom: none;
 }
 
@@ -1472,14 +1542,14 @@ onMounted(async () => {
 
 .today-badge {
   display: inline-block;
-  background: #FFF4E5;
-  color: #8B4513;
+  background: #fff4e5;
+  color: #8b4513;
   font-size: 0.65rem;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 3px;
   margin-left: auto;
-  border: 1px solid #F1E6D2;
+  border: 1px solid #f1e6d2;
 }
 
 .day-shifts {
