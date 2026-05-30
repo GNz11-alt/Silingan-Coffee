@@ -114,7 +114,7 @@ export async function getSavedReports({ types, branchId, dateFrom, dateTo } = {}
       reportdate,
       filepath,
       createdat,
-      branchid,
+      branch:branchid(BranchName),
       generatedby
     `)
     .order('createdat', { ascending: false })
@@ -136,7 +136,11 @@ export async function saveReportRecord({ type, title, branchId, generatedBy, fil
   if (!recordBranchId) {
     const { data: branches } = await supabase.from('branch').select('BranchId').limit(1)
     recordBranchId = branches?.[0]?.BranchId ?? null
-    if (!recordBranchId) { console.warn('[Reports] Skipping save — no branches in DB'); return }
+    if (!recordBranchId) {
+      console.warn('[Reports] Skipping save — no branches in DB')
+      return
+    }
+    console.warn('[Reports] branchId was null, fell back to branch', recordBranchId)
   }
 
   const record = {
@@ -250,6 +254,12 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
     p_date_to:   dateTo,
     p_branch_id: branchId,
   })
+  
+  if (error) {
+    console.error(`[reportService] ${fnName} RPC failed:`, error)
+  } else if (!data || data.length === 0) {
+    console.warn(`[reportService] ${fnName} returned empty set`, { dateFrom, dateTo, branchId })
+  }
   
   // Transform to human-friendly column headers using column map
   const transformed = transformRowData(reportType, data || [])
