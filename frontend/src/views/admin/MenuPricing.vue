@@ -24,14 +24,18 @@
       <div class="select-wrap">
         <select v-model="filterCategory" class="filter-sel">
           <option value="">All Categories</option>
-          <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+          <option v-for="cat in categories" :key="cat" :value="cat">
+            {{ cat }}
+          </option>
         </select>
         <ChevronDown :size="13" class="sel-icon" />
       </div>
       <div class="select-wrap">
         <select v-model="filterBranch" class="filter-sel">
           <option :value="null">All Branches</option>
-          <option v-for="b in branches" :key="b.BranchId" :value="b.BranchId">{{ b.BranchName }}</option>
+          <option v-for="b in branches" :key="b.BranchId" :value="b.BranchId">
+            {{ b.BranchName }}
+          </option>
         </select>
         <ChevronDown :size="13" class="sel-icon" />
       </div>
@@ -39,26 +43,44 @@
 
     <!-- Loading -->
     <div v-if="loading" class="loading-state">
-      <div class="spinner"></div> Loading menu items...
+      <div class="spinner"></div>
+      Loading menu items...
     </div>
 
     <!-- Empty -->
-    <div v-else-if="Object.keys(filteredGrouped).length === 0" class="empty-state">
-      <Coffee :size="40" style="opacity:0.2; display:block; margin: 0 auto 12px;" />
+    <div
+      v-else-if="Object.keys(filteredGrouped).length === 0"
+      class="empty-state"
+    >
+      <Coffee
+        :size="40"
+        style="opacity: 0.2; display: block; margin: 0 auto 12px"
+      />
       <p>No menu items found.</p>
     </div>
 
     <!-- Menu Grid grouped by Category -->
-    <div v-else v-for="(items, category) in filteredGrouped" :key="category" class="menu-section">
+    <div
+      v-else
+      v-for="(items, category) in filteredGrouped"
+      :key="category"
+      class="menu-section"
+    >
       <h3 class="section-title">
         {{ category }}
         <span class="count-chip">{{ items.length }}</span>
       </h3>
       <div class="menu-grid">
-        <div class="menu-card" v-for="item in items" :key="item.ProductId"
-          :class="{ 'item-disabled': item._disabled }">
+        <div
+          class="menu-card"
+          v-for="item in items"
+          :key="item.ProductId"
+          :class="{ 'item-disabled': item._disabled }"
+        >
           <div class="card-top">
-            <span class="cat-label">{{ item.Category ?? 'Uncategorized' }}</span>
+            <span class="cat-label">{{
+              item.Category ?? "Uncategorized"
+            }}</span>
             <span class="branch-label">{{ getBranchName(item.BranchId) }}</span>
           </div>
           <div class="card-body">
@@ -70,22 +92,40 @@
 
           <div class="recipe-status-area">
             <!-- FIX: check _recipeCount directly on this specific item -->
-            <button v-if="item._recipeCount > 0" class="recipe-btn view"
-              @click="openRecipeModal(item)">
-              <ChefHat :size="13" /> Recipe ({{ item._recipeCount }} ingredients)
+            <button
+              v-if="item._recipeCount > 0"
+              class="recipe-btn view"
+              @click="openRecipeModal(item)"
+            >
+              <ChefHat :size="13" /> Recipe ({{ item._recipeCount }}
+              ingredients)
             </button>
-            <button v-else class="recipe-btn add" @click="openRecipeModal(item)">
+            <button
+              v-else
+              class="recipe-btn add"
+              @click="openRecipeModal(item)"
+            >
               <Plus :size="13" /> Add Recipe
             </button>
           </div>
 
           <div class="price-action-row">
-            <span class="price">{{ item.Price != null ? '₱' + item.Price.toFixed(2) : '—' }}</span>
+            <span class="price">{{
+              item.Price != null ? "₱" + item.Price.toFixed(2) : "—"
+            }}</span>
             <div class="card-actions">
-              <button class="icon-btn edit" @click="openEditModal(item)" title="Edit">
+              <button
+                class="icon-btn edit"
+                @click="openEditModal(item)"
+                title="Edit"
+              >
                 <Edit2 :size="15" />
               </button>
-              <button class="icon-btn delete" @click="deleteItem(item.ProductId)" title="Delete">
+              <button
+                class="icon-btn delete"
+                @click="deleteItem(item.ProductId)"
+                title="Delete"
+              >
                 <Trash2 :size="15" />
               </button>
             </div>
@@ -99,16 +139,28 @@
       <div class="modal-content">
         <header class="modal-hdr">
           <div>
-            <h3>{{ isEditing ? 'Edit Menu Item' : 'Add Menu Item' }}</h3>
-            <p>{{ isEditing ? 'Update product details' : 'Add a new product to the menu' }}</p>
+            <h3>{{ isEditing ? "Edit Menu Item" : "Add Menu Item" }}</h3>
+            <p>
+              {{
+                isEditing
+                  ? "Update product details"
+                  : "Add a new product to the menu"
+              }}
+            </p>
           </div>
-          <button class="close-x-btn" @click="closeModal"><X :size="18" /></button>
+          <button class="close-x-btn" @click="closeModal">
+            <X :size="18" />
+          </button>
         </header>
 
         <div class="form-stack">
           <div class="field">
             <label>Product Name *</label>
-            <input v-model="form.ProductName" required placeholder="e.g. Iced Latte" />
+            <input
+              v-model="form.ProductName"
+              required
+              placeholder="e.g. Iced Latte"
+            />
           </div>
           <div class="field">
             <label>Category *</label>
@@ -125,15 +177,24 @@
           <div class="field-row">
             <div class="field">
               <label>Price (₱)</label>
-              <input type="number" v-model.number="form.Price" step="0.01" min="0"
-                placeholder="0.00" />
+              <input
+                type="number"
+                v-model.number="form.Price"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+              />
             </div>
             <div class="field">
               <label>Branch *</label>
               <div class="select-wrap full">
                 <select v-model="form.BranchId" required>
                   <option :value="null">Select branch</option>
-                  <option v-for="b in branches" :key="b.BranchId" :value="b.BranchId">
+                  <option
+                    v-for="b in branches"
+                    :key="b.BranchId"
+                    :value="b.BranchId"
+                  >
                     {{ b.BranchName }}
                   </option>
                 </select>
@@ -144,24 +205,31 @@
         </div>
 
         <button class="submit-full" :disabled="saving" @click="saveItem">
-          {{ saving ? 'Saving...' : (isEditing ? 'Update Item' : 'Add Item') }}
+          {{ saving ? "Saving..." : isEditing ? "Update Item" : "Add Item" }}
         </button>
       </div>
     </div>
 
     <!-- RECIPE MODAL -->
-    <div v-if="showRecipeModal" class="modal-overlay" @click.self="closeRecipeModal">
+    <div
+      v-if="showRecipeModal"
+      class="modal-overlay"
+      @click.self="closeRecipeModal"
+    >
       <div class="modal-content recipe-modal">
         <header class="modal-hdr">
           <div>
             <h3>Recipe: {{ activeItem?.ProductName }}</h3>
             <p>Raw materials and quantities needed to make this product</p>
           </div>
-          <button class="close-x-btn" @click="closeRecipeModal"><X :size="18" /></button>
+          <button class="close-x-btn" @click="closeRecipeModal">
+            <X :size="18" />
+          </button>
         </header>
 
-        <div v-if="loadingRecipe" class="loading-state" style="padding: 30px;">
-          <div class="spinner"></div> Loading recipe...
+        <div v-if="loadingRecipe" class="loading-state" style="padding: 30px">
+          <div class="spinner"></div>
+          Loading recipe...
         </div>
 
         <div v-else class="recipe-body">
@@ -178,7 +246,11 @@
                 <div class="select-wrap full">
                   <select v-model="ing.rawproductid">
                     <option :value="null">Select raw material</option>
-                    <option v-for="rp in rawProducts" :key="rp.rawproductid" :value="rp.rawproductid">
+                    <option
+                      v-for="rp in rawProducts"
+                      :key="rp.rawproductid"
+                      :value="rp.rawproductid"
+                    >
                       {{ rp.name }}
                     </option>
                   </select>
@@ -186,19 +258,40 @@
                 </div>
               </div>
               <div class="field-item">
-                <input v-model.number="ing.quantityneeded" type="number" min="0" placeholder="0" />
+                <input
+                  v-model.number="ing.quantityneeded"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                />
               </div>
               <div class="field-item">
                 <div class="select-wrap full">
                   <select v-model="ing.unit">
-                    <option v-for="u in ['g', 'kg', 'ml', 'l', 'pcs', 'oz', 'tbsp', 'tsp']" :key="u">
+                    <option
+                      v-for="u in [
+                        'g',
+                        'kg',
+                        'ml',
+                        'l',
+                        'pcs',
+                        'oz',
+                        'tbsp',
+                        'tsp',
+                      ]"
+                      :key="u"
+                    >
                       {{ u }}
                     </option>
                   </select>
                   <ChevronDown :size="12" class="sel-icon" />
                 </div>
               </div>
-              <button class="remove-ing" @click="recipeRows.splice(i, 1)" title="Remove">
+              <button
+                class="remove-ing"
+                @click="recipeRows.splice(i, 1)"
+                title="Remove"
+              >
                 <Trash2 :size="14" />
               </button>
             </div>
@@ -208,36 +301,64 @@
             No ingredients yet. Add one below.
           </div>
 
-          <button class="add-ing-btn" @click="recipeRows.push({ rawproductid: null, quantityneeded: 0, unit: 'g' })">
+          <button
+            class="add-ing-btn"
+            @click="
+              recipeRows.push({
+                rawproductid: null,
+                quantityneeded: 0,
+                unit: 'g',
+              })
+            "
+          >
             <Plus :size="14" /> Add Ingredient
           </button>
         </div>
 
         <div class="form-actions">
           <button class="cancel-btn" @click="closeRecipeModal">Cancel</button>
-          <button class="submit-full-sm" :disabled="savingRecipe" @click="saveRecipe">
-            {{ savingRecipe ? 'Saving...' : 'Save Recipe' }}
+          <button
+            class="submit-full-sm"
+            :disabled="savingRecipe"
+            @click="saveRecipe"
+          >
+            {{ savingRecipe ? "Saving..." : "Save Recipe" }}
           </button>
         </div>
       </div>
     </div>
 
     <!-- ALL RECIPES MODAL — redesigned with category tabs -->
-    <div v-if="showAllRecipesModal" class="modal-overlay" @click.self="showAllRecipesModal = false">
+    <div
+      v-if="showAllRecipesModal"
+      class="modal-overlay"
+      @click.self="showAllRecipesModal = false"
+    >
       <div class="modal-content all-recipes-modal">
         <header class="modal-hdr">
           <div>
             <h3>Master Recipe List</h3>
             <p>All products with their raw material requirements</p>
           </div>
-          <button class="close-x-btn" @click="showAllRecipesModal = false"><X :size="18" /></button>
+          <button class="close-x-btn" @click="showAllRecipesModal = false">
+            <X :size="18" />
+          </button>
         </header>
 
-        <div v-if="loadingAllRecipes" class="loading-state" style="padding: 40px;">
-          <div class="spinner"></div> Loading...
+        <div
+          v-if="loadingAllRecipes"
+          class="loading-state"
+          style="padding: 40px"
+        >
+          <div class="spinner"></div>
+          Loading...
         </div>
 
-        <div v-else-if="allRecipesSummary.length === 0" class="empty-state" style="padding: 40px;">
+        <div
+          v-else-if="allRecipesSummary.length === 0"
+          class="empty-state"
+          style="padding: 40px"
+        >
           <p>No recipes have been added yet.</p>
         </div>
 
@@ -252,7 +373,9 @@
               @click="activeRecipeCategory = cat"
             >
               <span class="cat-tab-name">{{ cat }}</span>
-              <span class="cat-tab-count">{{ allRecipesByCategory[cat]?.length ?? 0 }}</span>
+              <span class="cat-tab-count">{{
+                allRecipesByCategory[cat]?.length ?? 0
+              }}</span>
             </button>
           </div>
 
@@ -268,29 +391,53 @@
                 :key="row.ProductId"
                 class="recipe-card"
                 :class="{ expanded: expandedRecipe === row.ProductId }"
-                @click="expandedRecipe = expandedRecipe === row.ProductId ? null : row.ProductId"
+                @click="
+                  expandedRecipe =
+                    expandedRecipe === row.ProductId ? null : row.ProductId
+                "
               >
                 <div class="recipe-card-header">
                   <div class="recipe-card-left">
                     <Coffee :size="14" class="item-icon" />
                     <span class="recipe-card-name">{{ row.ProductName }}</span>
-                    <span class="recipe-ing-pill">{{ row.recipes.length }} ingredients</span>
+                    <span class="recipe-ing-pill"
+                      >{{ row.recipes.length }} ingredients</span
+                    >
                   </div>
                   <div class="recipe-card-right">
-                    <span class="recipe-card-price">₱{{ row.Price?.toFixed(2) ?? '—' }}</span>
-                    <ChevronDown :size="14" class="expand-icon" :class="{ rotated: expandedRecipe === row.ProductId }" />
+                    <span class="recipe-card-price"
+                      >₱{{ row.Price?.toFixed(2) ?? "—" }}</span
+                    >
+                    <ChevronDown
+                      :size="14"
+                      class="expand-icon"
+                      :class="{ rotated: expandedRecipe === row.ProductId }"
+                    />
                   </div>
                 </div>
-                <div v-if="expandedRecipe === row.ProductId" class="recipe-card-body">
-                  <div v-for="r in row.recipes" :key="r.recipeid" class="ing-row">
+                <div
+                  v-if="expandedRecipe === row.ProductId"
+                  class="recipe-card-body"
+                >
+                  <div
+                    v-for="r in row.recipes"
+                    :key="r.recipeid"
+                    class="ing-row"
+                  >
                     <span class="ing-dot"></span>
                     <span class="ing-name">{{ r.rawName }}</span>
-                    <span class="ing-qty">{{ r.quantityneeded }} {{ r.unit }}</span>
+                    <span class="ing-qty"
+                      >{{ r.quantityneeded }} {{ r.unit }}</span
+                    >
                   </div>
                 </div>
               </div>
 
-              <div v-if="filteredRecipePanel.length === 0" class="empty-recipe" style="padding: 32px;">
+              <div
+                v-if="filteredRecipePanel.length === 0"
+                class="empty-recipe"
+                style="padding: 32px"
+              >
                 No recipes found.
               </div>
             </div>
@@ -298,56 +445,67 @@
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed, onMounted } from "vue";
+import { useRoute } from "vue-router";
 import {
-  Plus, Search as SearchIcon, ChevronDown, Edit2, Trash2,
-  X, Coffee, ChefHat, BookOpen
-} from 'lucide-vue-next';
-import { supabase } from '@/supabase';
+  Plus,
+  Search as SearchIcon,
+  ChevronDown,
+  Edit2,
+  Trash2,
+  X,
+  Coffee,
+  ChefHat,
+  BookOpen,
+} from "lucide-vue-next";
+import { supabase } from "@/supabase";
 
 const route = useRoute();
 
-// State 
-const menuItems   = ref([]);
+// State
+const menuItems = ref([]);
 const rawProducts = ref([]);
-const branches    = ref([]);
-const loading     = ref(false);
+const branches = ref([]);
+const loading = ref(false);
 
-const searchQuery    = ref('');
-const filterCategory = ref('');
-const filterBranch   = ref(null);
+const searchQuery = ref("");
+const filterCategory = ref("");
+const filterBranch = ref(null);
 
 // Product modal
-const showModal  = ref(false);
-const isEditing  = ref(false);
-const editingId  = ref(null);
-const saving     = ref(false);
-const form       = ref({ ProductName: '', Category: '', Price: null, BranchId: null });
+const showModal = ref(false);
+const isEditing = ref(false);
+const editingId = ref(null);
+const saving = ref(false);
+const form = ref({
+  ProductName: "",
+  Category: "",
+  Price: null,
+  BranchId: null,
+});
 
 // Recipe modal
-const showRecipeModal   = ref(false);
-const loadingRecipe     = ref(false);
-const activeItem        = ref(null);
-const recipeRows        = ref([]);
-const savingRecipe      = ref(false);
+const showRecipeModal = ref(false);
+const loadingRecipe = ref(false);
+const activeItem = ref(null);
+const recipeRows = ref([]);
+const savingRecipe = ref(false);
 
 // All recipes modal
-const showAllRecipesModal  = ref(false);
-const allRecipesSummary    = ref([]);
-const loadingAllRecipes    = ref(false);
-const activeRecipeCategory = ref('');
-const recipeSearch         = ref('');
-const expandedRecipe       = ref(null);
+const showAllRecipesModal = ref(false);
+const allRecipesSummary = ref([]);
+const loadingAllRecipes = ref(false);
+const activeRecipeCategory = ref("");
+const recipeSearch = ref("");
+const expandedRecipe = ref(null);
 
-// Computed 
+// Computed
 const categories = computed(() => {
-  const cats = menuItems.value.map(i => i.Category).filter(Boolean);
+  const cats = menuItems.value.map((i) => i.Category).filter(Boolean);
   return [...new Set(cats)].sort();
 });
 
@@ -355,13 +513,15 @@ const filteredGrouped = computed(() => {
   let list = [...menuItems.value];
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase();
-    list = list.filter(i => i.ProductName?.toLowerCase().includes(q));
+    list = list.filter((i) => i.ProductName?.toLowerCase().includes(q));
   }
-  if (filterCategory.value) list = list.filter(i => i.Category === filterCategory.value);
-  if (filterBranch.value)   list = list.filter(i => i.BranchId === filterBranch.value);
+  if (filterCategory.value)
+    list = list.filter((i) => i.Category === filterCategory.value);
+  if (filterBranch.value)
+    list = list.filter((i) => i.BranchId === filterBranch.value);
 
   return list.reduce((acc, i) => {
-    const cat = i.Category || 'Uncategorized';
+    const cat = i.Category || "Uncategorized";
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(i);
     return acc;
@@ -370,13 +530,13 @@ const filteredGrouped = computed(() => {
 
 // All recipes — deduplicated by ProductName (same product across branches shares one recipe)
 const allRecipeCategories = computed(() => {
-  const cats = allRecipesSummary.value.map(r => r.Category).filter(Boolean);
+  const cats = allRecipesSummary.value.map((r) => r.Category).filter(Boolean);
   return [...new Set(cats)].sort();
 });
 
 const allRecipesByCategory = computed(() => {
   return allRecipesSummary.value.reduce((acc, row) => {
-    const cat = row.Category || 'Uncategorized';
+    const cat = row.Category || "Uncategorized";
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(row);
     return acc;
@@ -387,21 +547,26 @@ const filteredRecipePanel = computed(() => {
   const catItems = allRecipesByCategory.value[activeRecipeCategory.value] ?? [];
   if (!recipeSearch.value) return catItems;
   const q = recipeSearch.value.toLowerCase();
-  return catItems.filter(r => r.ProductName?.toLowerCase().includes(q));
+  return catItems.filter((r) => r.ProductName?.toLowerCase().includes(q));
 });
 
-// Fetch 
+// Fetch
 const fetchBranches = async () => {
-  const { data } = await supabase.from('branch').select('BranchId, BranchName').order('BranchName');
+  const { data } = await supabase
+    .from("branch")
+    .select("BranchId, BranchName")
+    .order("BranchName");
   if (data) branches.value = data;
 };
 
 const fetchRawProducts = async () => {
   const { data, error } = await supabase
-    .from('rawproduct')
-    .select('rawproductid, name, category, unit, reorderlevel, stockquantity, expirationdate')
-    .order('name');
-  if (error) console.error('fetchRawProducts error:', error.message);
+    .from("rawproduct")
+    .select(
+      "rawproductid, name, category, unit, reorderlevel, stockquantity, expirationdate",
+    )
+    .order("name");
+  if (error) console.error("fetchRawProducts error:", error.message);
   if (data) rawProducts.value = data;
 };
 
@@ -409,25 +574,33 @@ const fetchMenuItems = async () => {
   loading.value = true;
 
   const { data: products, error } = await supabase
-    .from('product')
-    .select('ProductId, ProductName, ProductType, Category, Price, BranchId, CreatedAt')
-    .order('Category')
-    .order('ProductName');
+    .from("product")
+    .select(
+      "ProductId, ProductName, ProductType, Category, Price, BranchId, CreatedAt, Status",
+    )
+    .neq("Status", "Archived")
+    .order("Category")
+    .order("ProductName");
 
-  if (error) { console.error(error.message); loading.value = false; return; }
+  if (error) {
+    console.error(error.message);
+    loading.value = false;
+    return;
+  }
 
   // Fetch ALL recipe rows once
   const { data: recipes } = await supabase
-    .from('recipe')
-    .select('recipeid, finishedproductid');
+    .from("recipe")
+    .select("recipeid, finishedproductid");
 
   // Count per ProductId
   const recipeCounts = {};
-  (recipes ?? []).forEach(r => {
-    recipeCounts[r.finishedproductid] = (recipeCounts[r.finishedproductid] || 0) + 1;
+  (recipes ?? []).forEach((r) => {
+    recipeCounts[r.finishedproductid] =
+      (recipeCounts[r.finishedproductid] || 0) + 1;
   });
 
-  menuItems.value = (products ?? []).map(p => ({
+  menuItems.value = (products ?? []).map((p) => ({
     ...p,
     _recipeCount: recipeCounts[p.ProductId] || 0,
     _disabled: false,
@@ -440,7 +613,12 @@ const fetchMenuItems = async () => {
 const openAddModal = () => {
   isEditing.value = false;
   editingId.value = null;
-  form.value = { ProductName: '', Category: '', Price: null, BranchId: filterBranch.value };
+  form.value = {
+    ProductName: "",
+    Category: "",
+    Price: null,
+    BranchId: filterBranch.value,
+  };
   showModal.value = true;
 };
 
@@ -449,18 +627,20 @@ const openEditModal = (item) => {
   editingId.value = item.ProductId;
   form.value = {
     ProductName: item.ProductName,
-    Category: item.Category ?? '',
+    Category: item.Category ?? "",
     Price: item.Price,
     BranchId: item.BranchId,
   };
   showModal.value = true;
 };
 
-const closeModal = () => { showModal.value = false; };
+const closeModal = () => {
+  showModal.value = false;
+};
 
 const saveItem = async () => {
   if (!form.value.ProductName || !form.value.BranchId) {
-    alert('Product name and branch are required.');
+    alert("Product name and branch are required.");
     return;
   }
   saving.value = true;
@@ -472,24 +652,44 @@ const saveItem = async () => {
   };
   let error;
   if (isEditing.value) {
-    ({ error } = await supabase.from('product').update(payload).eq('ProductId', editingId.value));
+    ({ error } = await supabase
+      .from("product")
+      .update(payload)
+      .eq("ProductId", editingId.value));
   } else {
-    ({ error } = await supabase.from('product').insert(payload));
+    ({ error } = await supabase.from("product").insert(payload));
   }
-  if (error) alert('Failed to save: ' + error.message);
-  else { await fetchMenuItems(); closeModal(); }
+  if (error) alert("Failed to save: " + error.message);
+  else {
+    await fetchMenuItems();
+    closeModal();
+  }
   saving.value = false;
 };
 
 const deleteItem = async (id) => {
-  if (!confirm('Delete this product? This will also delete its recipes.')) return;
-  await supabase.from('recipe').delete().eq('finishedproductid', id);
-  const { error } = await supabase.from('product').delete().eq('ProductId', id);
-  if (error) alert('Failed to delete: ' + error.message);
+  if (
+    !confirm("Archive this product? It can be restored from Backup & Restore.")
+  )
+    return;
+
+  const currentUser = localStorage.getItem("username") || "Unknown";
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from("product")
+    .update({
+      Status: "Archived",
+      ArchivedAt: now,
+      ArchivedBy: currentUser,
+    })
+    .eq("ProductId", id);
+
+  if (error) alert("Failed to archive: " + error.message);
   else await fetchMenuItems();
 };
 
-// Recipe CRUD 
+// Recipe CRUD
 const openRecipeModal = async (item) => {
   activeItem.value = item;
   recipeRows.value = [];
@@ -498,85 +698,93 @@ const openRecipeModal = async (item) => {
 
   // find ALL ProductIds that share this ProductName (across all branches)
   const { data: sameNameProducts } = await supabase
-    .from('product')
-    .select('ProductId')
-    .eq('ProductName', item.ProductName);
+    .from("product")
+    .select("ProductId")
+    .eq("ProductName", item.ProductName);
 
-  const allIds = (sameNameProducts ?? []).map(p => p.ProductId);
+  const allIds = (sameNameProducts ?? []).map((p) => p.ProductId);
 
   // Step 2: find any recipe row among those IDs (they should all be identical)
   const { data, error } = await supabase
-    .from('recipe')
-    .select('recipeid, finishedproductid, rawproductid, quantityneeded, unit')
-    .in('finishedproductid', allIds.length > 0 ? allIds : [item.ProductId])
+    .from("recipe")
+    .select("recipeid, finishedproductid, rawproductid, quantityneeded, unit")
+    .in("finishedproductid", allIds.length > 0 ? allIds : [item.ProductId])
     // deduplicate by rawproductid — take the first match per ingredient
-    .order('rawproductid');
+    .order("rawproductid");
 
   loadingRecipe.value = false;
 
   if (!error && data && data.length > 0) {
     // Deduplicate by rawproductid in JS
     const seen = new Set();
-    const deduped = data.filter(r => {
+    const deduped = data.filter((r) => {
       if (seen.has(r.rawproductid)) return false;
       seen.add(r.rawproductid);
       return true;
     });
-    recipeRows.value = deduped.map(r => ({
+    recipeRows.value = deduped.map((r) => ({
       rawproductid: r.rawproductid,
       quantityneeded: r.quantityneeded,
-      unit: r.unit ?? 'g',
+      unit: r.unit ?? "g",
     }));
   } else {
-    recipeRows.value = [{ rawproductid: null, quantityneeded: 0, unit: 'g' }];
+    recipeRows.value = [{ rawproductid: null, quantityneeded: 0, unit: "g" }];
   }
 };
 
-const closeRecipeModal = () => { showRecipeModal.value = false; activeItem.value = null; };
+const closeRecipeModal = () => {
+  showRecipeModal.value = false;
+  activeItem.value = null;
+};
 
 const saveRecipe = async () => {
   if (!activeItem.value) return;
-  const validRows = recipeRows.value.filter(r => r.rawproductid && r.quantityneeded > 0);
+  const validRows = recipeRows.value.filter(
+    (r) => r.rawproductid && r.quantityneeded > 0,
+  );
   if (validRows.length === 0) {
-    alert('Please add at least one ingredient with a valid quantity.');
+    alert("Please add at least one ingredient with a valid quantity.");
     return;
   }
   savingRecipe.value = true;
 
   // Find ALL ProductIds sharing this ProductName (all branches)
   const { data: sameNameProducts } = await supabase
-    .from('product')
-    .select('ProductId')
-    .eq('ProductName', activeItem.value.ProductName);
+    .from("product")
+    .select("ProductId")
+    .eq("ProductName", activeItem.value.ProductName);
 
-  const allIds = (sameNameProducts ?? []).map(p => p.ProductId);
+  const allIds = (sameNameProducts ?? []).map((p) => p.ProductId);
   const targetIds = allIds.length > 0 ? allIds : [activeItem.value.ProductId];
 
   // Delete existing recipes for ALL matching ProductIds
   const { error: delError } = await supabase
-    .from('recipe')
+    .from("recipe")
     .delete()
-    .in('finishedproductid', targetIds);
+    .in("finishedproductid", targetIds);
 
   if (delError) {
-    alert('Failed to update recipe: ' + delError.message);
+    alert("Failed to update recipe: " + delError.message);
     savingRecipe.value = false;
     return;
   }
 
   // Insert recipe rows for ALL branch ProductIds so every branch card reflects it
-  const inserts = targetIds.flatMap(pid =>
-    validRows.map(r => ({
+  const inserts = targetIds.flatMap((pid) =>
+    validRows.map((r) => ({
       finishedproductid: pid,
       rawproductid: r.rawproductid,
       quantityneeded: r.quantityneeded,
       unit: r.unit,
-    }))
+    })),
   );
 
-  const { error: insError } = await supabase.from('recipe').insert(inserts);
-  if (insError) alert('Failed to save recipe: ' + insError.message);
-  else { await fetchMenuItems(); closeRecipeModal(); }
+  const { error: insError } = await supabase.from("recipe").insert(inserts);
+  if (insError) alert("Failed to save recipe: " + insError.message);
+  else {
+    await fetchMenuItems();
+    closeRecipeModal();
+  }
   savingRecipe.value = false;
 };
 
@@ -584,23 +792,33 @@ const saveRecipe = async () => {
 const openAllRecipes = async () => {
   showAllRecipesModal.value = true;
   loadingAllRecipes.value = true;
-  recipeSearch.value = '';
+  recipeSearch.value = "";
   expandedRecipe.value = null;
 
   // Fetch all recipes
   const { data: recipes, error: recipeErr } = await supabase
-    .from('recipe')
-    .select('recipeid, finishedproductid, rawproductid, quantityneeded, unit');
+    .from("recipe")
+    .select("recipeid, finishedproductid, rawproductid, quantityneeded, unit");
 
-  if (recipeErr) { console.error(recipeErr.message); loadingAllRecipes.value = false; return; }
+  if (recipeErr) {
+    console.error(recipeErr.message);
+    loadingAllRecipes.value = false;
+    return;
+  }
 
   // Raw product name map
-  const { data: raws } = await supabase.from('rawproduct').select('rawproductid, name, unit');
+  const { data: raws } = await supabase
+    .from("rawproduct")
+    .select("rawproductid, name, unit");
   const rawMap = {};
-  (raws ?? []).forEach(r => { rawMap[r.rawproductid] = r; });
+  (raws ?? []).forEach((r) => {
+    rawMap[r.rawproductid] = r;
+  });
 
   // Get unique product IDs that have recipes
-  const productIds = [...new Set((recipes ?? []).map(r => r.finishedproductid))];
+  const productIds = [
+    ...new Set((recipes ?? []).map((r) => r.finishedproductid)),
+  ];
   if (productIds.length === 0) {
     allRecipesSummary.value = [];
     loadingAllRecipes.value = false;
@@ -610,16 +828,16 @@ const openAllRecipes = async () => {
   // FIX: fetch products and deduplicate by ProductName — pick the lowest ProductId per name
   // so we only show one entry per unique menu item regardless of branch duplication
   const { data: products } = await supabase
-    .from('product')
-    .select('ProductId, ProductName, Category, Price')
-    .in('ProductId', productIds)
-    .order('Category')
-    .order('ProductName')
-    .order('ProductId'); // lowest ID first for dedup
+    .from("product")
+    .select("ProductId, ProductName, Category, Price")
+    .in("ProductId", productIds)
+    .order("Category")
+    .order("ProductName")
+    .order("ProductId"); // lowest ID first for dedup
 
   // Deduplicate by ProductName — keep first occurrence
   const seen = new Set();
-  const dedupedProducts = (products ?? []).filter(p => {
+  const dedupedProducts = (products ?? []).filter((p) => {
     if (seen.has(p.ProductName)) return false;
     seen.add(p.ProductName);
     return true;
@@ -628,22 +846,27 @@ const openAllRecipes = async () => {
   // For each unique product name, gather ALL recipe rows from any of its ProductIds
   // (they should be the same, but this ensures we find them)
   const nameToProductIds = {};
-  (products ?? []).forEach(p => {
+  (products ?? []).forEach((p) => {
     if (!nameToProductIds[p.ProductName]) nameToProductIds[p.ProductName] = [];
     nameToProductIds[p.ProductName].push(p.ProductId);
   });
 
-  allRecipesSummary.value = dedupedProducts.map(p => ({
+  allRecipesSummary.value = dedupedProducts.map((p) => ({
     ...p,
     recipes: (recipes ?? [])
-      .filter(r => (nameToProductIds[p.ProductName] ?? []).includes(r.finishedproductid))
+      .filter((r) =>
+        (nameToProductIds[p.ProductName] ?? []).includes(r.finishedproductid),
+      )
       // deduplicate ingredient rows by rawproductid
-      .filter((r, i, arr) => arr.findIndex(x => x.rawproductid === r.rawproductid) === i)
-      .map(r => ({
+      .filter(
+        (r, i, arr) =>
+          arr.findIndex((x) => x.rawproductid === r.rawproductid) === i,
+      )
+      .map((r) => ({
         ...r,
-        rawName: rawMap[r.rawproductid]?.name ?? '—',
-        rawUnit: rawMap[r.rawproductid]?.unit ?? '',
-      }))
+        rawName: rawMap[r.rawproductid]?.name ?? "—",
+        rawUnit: rawMap[r.rawproductid]?.unit ?? "",
+      })),
   }));
 
   // Set default active category
@@ -654,18 +877,18 @@ const openAllRecipes = async () => {
   loadingAllRecipes.value = false;
 };
 
-//  Helpers 
+//  Helpers
 const getBranchName = (id) =>
-  branches.value.find(b => b.BranchId === id)?.BranchName ?? '—';
+  branches.value.find((b) => b.BranchId === id)?.BranchName ?? "—";
 
 //Init
 onMounted(async () => {
   await Promise.all([fetchBranches(), fetchRawProducts(), fetchMenuItems()]);
 
-  const branchSlug = localStorage.getItem('branch');
-  if (branchSlug && branchSlug !== 'all') {
-    const match = branches.value.find(b =>
-      b.BranchName?.toLowerCase().includes(branchSlug.toLowerCase())
+  const branchSlug = localStorage.getItem("branch");
+  if (branchSlug && branchSlug !== "all") {
+    const match = branches.value.find((b) =>
+      b.BranchName?.toLowerCase().includes(branchSlug.toLowerCase()),
     );
     if (match) filterBranch.value = match.BranchId;
   }
@@ -673,119 +896,581 @@ onMounted(async () => {
   // Auto-open edit modal from search result click
   const editId = route.query.edit;
   if (editId) {
-    const item = menuItems.value.find(p => String(p.ProductId) === editId);
+    const item = menuItems.value.find((p) => String(p.ProductId) === editId);
     if (item) openEditModal(item);
   }
 });
 </script>
 
 <style scoped>
-.menu-module { padding: 24px 32px; background: #FAFAFA; min-height: 100vh; font-family: 'Inter', sans-serif; }
+.menu-module {
+  padding: 24px 32px;
+  background: #fafafa;
+  min-height: 100vh;
+  font-family: "Inter", sans-serif;
+}
 
 /* HEADER */
-.module-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.header-main h1 { font-size: 26px; font-weight: 800; color: #31201D; margin: 0; }
-.header-main p { font-size: 14px; color: #888; margin: 4px 0 0; }
-.header-actions { display: flex; gap: 10px; }
-.recipe-all-btn { display: flex; align-items: center; gap: 7px; background: white; border: 1px solid #ddd; padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; color: #31201D; transition: 0.2s; }
-.recipe-all-btn:hover { border-color: #31201D; }
-.add-btn { display: flex; align-items: center; gap: 7px; background: #31201D; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.2s; }
-.add-btn:hover { background: #4a3330; }
+.module-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.header-main h1 {
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0;
+}
+.header-main p {
+  font-size: 14px;
+  color: #888;
+  margin: 4px 0 0;
+}
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+.recipe-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: white;
+  border: 1px solid #ddd;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  color: #31201d;
+  transition: 0.2s;
+}
+.recipe-all-btn:hover {
+  border-color: #31201d;
+}
+.add-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #31201d;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.add-btn:hover {
+  background: #4a3330;
+}
 
 /* FILTERS */
-.filters-bar { display: flex; gap: 12px; margin-bottom: 28px; background: white; padding: 12px 16px; border-radius: 12px; border: 1px solid #eee; flex-wrap: wrap; align-items: center; }
-.search-input { flex: 1; min-width: 180px; position: relative; display: flex; align-items: center; }
-.search-input input { width: 100%; padding: 9px 12px 9px 36px; border: 1px solid #eee; background: #fafafa; border-radius: 8px; outline: none; font-size: 14px; }
-.search-input svg { position: absolute; left: 10px; color: #999; }
-.select-wrap { position: relative; }
-.select-wrap.full { max-width: 100%; }
-.filter-sel { appearance: none; padding: 9px 32px 9px 12px; border: 1px solid #eee; border-radius: 8px; font-size: 14px; background: white; outline: none; cursor: pointer; min-width: 150px; transition: border-color 0.2s; }
-.filter-sel:focus { border-color: #31201D; }
-.sel-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #999; pointer-events: none; }
+.filters-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+  background: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #eee;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.search-input {
+  flex: 1;
+  min-width: 180px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-input input {
+  width: 100%;
+  padding: 9px 12px 9px 36px;
+  border: 1px solid #eee;
+  background: #fafafa;
+  border-radius: 8px;
+  outline: none;
+  font-size: 14px;
+}
+.search-input svg {
+  position: absolute;
+  left: 10px;
+  color: #999;
+}
+.select-wrap {
+  position: relative;
+}
+.select-wrap.full {
+  max-width: 100%;
+}
+.filter-sel {
+  appearance: none;
+  padding: 9px 32px 9px 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  outline: none;
+  cursor: pointer;
+  min-width: 150px;
+  transition: border-color 0.2s;
+}
+.filter-sel:focus {
+  border-color: #31201d;
+}
+.sel-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+  pointer-events: none;
+}
 
 /* LOADING / EMPTY */
-.loading-state { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 60px; color: #999; font-size: 14px; }
-.spinner { width: 18px; height: 18px; border: 2px solid #eee; border-top-color: #31201D; border-radius: 50%; animation: spin 0.7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.empty-state { text-align: center; padding: 60px; color: #bbb; font-size: 15px; }
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding: 60px;
+  color: #999;
+  font-size: 14px;
+}
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #eee;
+  border-top-color: #31201d;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.empty-state {
+  text-align: center;
+  padding: 60px;
+  color: #bbb;
+  font-size: 15px;
+}
 
 /* MENU SECTION */
-.menu-section { margin-bottom: 32px; }
-.section-title { font-size: 13px; font-weight: 700; color: #888; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px; }
-.count-chip { background: #f0f0f0; color: #666; font-size: 12px; padding: 1px 8px; border-radius: 20px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.menu-section {
+  margin-bottom: 32px;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #888;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.count-chip {
+  background: #f0f0f0;
+  color: #666;
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
 
 /* GRID */
-.menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
 
 /* CARD */
-.menu-card { background: white; border: 1px solid #eee; border-radius: 14px; padding: 18px 20px; transition: box-shadow 0.2s; display: flex; flex-direction: column; gap: 10px; }
-.menu-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
-.item-disabled { opacity: 0.45; filter: grayscale(0.6); }
-.card-top { display: flex; align-items: center; gap: 7px; }
-.cat-label { font-size: 11px; font-weight: 700; color: #C49A6C; background: #FFF9F0; padding: 2px 8px; border-radius: 4px; }
-.branch-label { margin-left: auto; font-size: 11px; color: #bbb; font-weight: 500; }
-.card-body { }
-.name-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
-.item-icon { color: #C49A6C; flex-shrink: 0; }
-.name-row h4 { margin: 0; font-size: 15px; font-weight: 700; color: #31201D; }
+.menu-card {
+  background: white;
+  border: 1px solid #eee;
+  border-radius: 14px;
+  padding: 18px 20px;
+  transition: box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.menu-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+.item-disabled {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+.card-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.cat-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #c49a6c;
+  background: #fff9f0;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.branch-label {
+  margin-left: auto;
+  font-size: 11px;
+  color: #bbb;
+  font-weight: 500;
+}
+.card-body {
+}
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.item-icon {
+  color: #c49a6c;
+  flex-shrink: 0;
+}
+.name-row h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #31201d;
+}
 
 /* RECIPE BUTTON */
-.recipe-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; }
-.recipe-btn.view { border: 1px solid #C49A6C; background: #FFF9F0; color: #C49A6C; }
-.recipe-btn.view:hover { background: #fff0dc; }
-.recipe-btn.add { border: 1px dashed #ddd; background: #fafafa; color: #bbb; }
-.recipe-btn.add:hover { border-color: #C49A6C; color: #C49A6C; background: #fff9f0; }
+.recipe-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.recipe-btn.view {
+  border: 1px solid #c49a6c;
+  background: #fff9f0;
+  color: #c49a6c;
+}
+.recipe-btn.view:hover {
+  background: #fff0dc;
+}
+.recipe-btn.add {
+  border: 1px dashed #ddd;
+  background: #fafafa;
+  color: #bbb;
+}
+.recipe-btn.add:hover {
+  border-color: #c49a6c;
+  color: #c49a6c;
+  background: #fff9f0;
+}
 
 /* PRICE ROW */
-.price-action-row { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f5f5f5; padding-top: 12px; margin-top: 2px; }
-.price { font-size: 18px; font-weight: 800; color: #31201D; }
-.card-actions { display: flex; align-items: center; gap: 6px; }
-.icon-btn { border: 1px solid #eee; background: white; padding: 6px; border-radius: 6px; color: #666; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-.icon-btn.edit:hover { border-color: #31201D; color: #31201D; }
-.icon-btn.delete:hover { border-color: #dc2626; color: #dc2626; background: #fee2e2; }
+.price-action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #f5f5f5;
+  padding-top: 12px;
+  margin-top: 2px;
+}
+.price {
+  font-size: 18px;
+  font-weight: 800;
+  color: #31201d;
+}
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.icon-btn {
+  border: 1px solid #eee;
+  background: white;
+  padding: 6px;
+  border-radius: 6px;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s;
+}
+.icon-btn.edit:hover {
+  border-color: #31201d;
+  color: #31201d;
+}
+.icon-btn.delete:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+  background: #fee2e2;
+}
 
 /* MODAL BASE */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
-.modal-content { background: white; width: 500px; max-width: 95vw; border-radius: 16px; padding: 28px 32px; box-shadow: 0 20px 50px rgba(0,0,0,0.15); max-height: 92vh; overflow-y: auto; }
-.modal-content.recipe-modal { width: 580px; }
-.modal-hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-.modal-hdr h3 { font-size: 18px; font-weight: 700; color: #31201D; margin: 0 0 3px; }
-.modal-hdr p { font-size: 13px; color: #888; margin: 0; }
-.close-x-btn { background: none; border: none; color: #ccc; cursor: pointer; padding: 4px; border-radius: 50%; transition: 0.2s; flex-shrink: 0; }
-.close-x-btn:hover { background: #f5f5f5; color: #31201D; }
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+.modal-content {
+  background: white;
+  width: 500px;
+  max-width: 95vw;
+  border-radius: 16px;
+  padding: 28px 32px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+  max-height: 92vh;
+  overflow-y: auto;
+}
+.modal-content.recipe-modal {
+  width: 580px;
+}
+.modal-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+.modal-hdr h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #31201d;
+  margin: 0 0 3px;
+}
+.modal-hdr p {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+.close-x-btn {
+  background: none;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: 0.2s;
+  flex-shrink: 0;
+}
+.close-x-btn:hover {
+  background: #f5f5f5;
+  color: #31201d;
+}
 
 /* FORM */
-.form-stack { display: flex; flex-direction: column; gap: 16px; }
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.field label { font-size: 12px; font-weight: 700; color: #31201D; text-transform: uppercase; letter-spacing: 0.04em; }
-.field input { padding: 10px 13px; border: 1px solid #eee; border-radius: 8px; background: #fafafa; outline: none; font-size: 14px; transition: 0.2s; }
-.field input:focus { border-color: #C49A6C; background: white; }
-.select-wrap.full select { width: 100%; appearance: none; padding: 10px 32px 10px 12px; border: 1px solid #eee; border-radius: 8px; font-size: 14px; background: #fafafa; outline: none; cursor: pointer; }
-.select-wrap.full select:focus { border-color: #C49A6C; }
-.submit-full { width: 100%; background: #31201D; color: white; border: none; padding: 13px; border-radius: 8px; font-weight: 700; font-size: 15px; margin-top: 20px; cursor: pointer; transition: 0.2s; }
-.submit-full:hover:not(:disabled) { background: #4a3330; }
-.submit-full:disabled { opacity: 0.5; cursor: not-allowed; }
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.field label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #31201d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.field input {
+  padding: 10px 13px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  background: #fafafa;
+  outline: none;
+  font-size: 14px;
+  transition: 0.2s;
+}
+.field input:focus {
+  border-color: #c49a6c;
+  background: white;
+}
+.select-wrap.full select {
+  width: 100%;
+  appearance: none;
+  padding: 10px 32px 10px 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fafafa;
+  outline: none;
+  cursor: pointer;
+}
+.select-wrap.full select:focus {
+  border-color: #c49a6c;
+}
+.submit-full {
+  width: 100%;
+  background: #31201d;
+  color: white;
+  border: none;
+  padding: 13px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  margin-top: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.submit-full:hover:not(:disabled) {
+  background: #4a3330;
+}
+.submit-full:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* RECIPE BODY */
-.recipe-body { margin-bottom: 16px; }
-.ingredient-header { display: grid; grid-template-columns: 2fr 1fr 1fr 36px; gap: 10px; margin-bottom: 8px; padding: 0 2px; }
-.ingredient-header label { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.04em; }
-.ingredient-list { max-height: 280px; overflow-y: auto; padding: 2px; }
-.ingredient-row { display: grid; grid-template-columns: 2fr 1fr 1fr 36px; gap: 10px; margin-bottom: 10px; align-items: center; }
-.ingredient-row input { width: 100%; height: 40px; padding: 0 12px; border: 1px solid #eee; border-radius: 8px; background: #fafafa; font-size: 14px; outline: none; transition: 0.2s; box-sizing: border-box; }
-.ingredient-row input:focus { border-color: #C49A6C; background: white; }
-.ingredient-row .select-wrap.full select { height: 40px; padding: 0 28px 0 10px; }
-.remove-ing { background: none; border: none; color: #dc2626; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 6px; border-radius: 6px; transition: 0.2s; }
-.remove-ing:hover { background: #fee2e2; }
-.add-ing-btn { margin-top: 10px; background: none; border: 1px dashed #C49A6C; color: #C49A6C; width: 100%; padding: 11px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; }
-.add-ing-btn:hover { background: #fff9f0; }
-.empty-recipe { text-align: center; color: #bbb; padding: 20px; font-size: 14px; }
-.form-actions { display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid #f0f0f0; padding-top: 18px; }
-.cancel-btn { background: #f5f5f5; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; }
-.submit-full-sm { background: #31201D; color: white; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; }
-.submit-full-sm:hover:not(:disabled) { background: #4a3330; }
-.submit-full-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.recipe-body {
+  margin-bottom: 16px;
+}
+.ingredient-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 36px;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+.ingredient-header label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ingredient-list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.ingredient-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 36px;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+.ingredient-row input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  background: #fafafa;
+  font-size: 14px;
+  outline: none;
+  transition: 0.2s;
+  box-sizing: border-box;
+}
+.ingredient-row input:focus {
+  border-color: #c49a6c;
+  background: white;
+}
+.ingredient-row .select-wrap.full select {
+  height: 40px;
+  padding: 0 28px 0 10px;
+}
+.remove-ing {
+  background: none;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: 0.2s;
+}
+.remove-ing:hover {
+  background: #fee2e2;
+}
+.add-ing-btn {
+  margin-top: 10px;
+  background: none;
+  border: 1px dashed #c49a6c;
+  color: #c49a6c;
+  width: 100%;
+  padding: 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: 0.2s;
+}
+.add-ing-btn:hover {
+  background: #fff9f0;
+}
+.empty-recipe {
+  text-align: center;
+  color: #bbb;
+  padding: 20px;
+  font-size: 14px;
+}
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 18px;
+}
+.cancel-btn {
+  background: #f5f5f5;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.submit-full-sm {
+  background: #31201d;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.submit-full-sm:hover:not(:disabled) {
+  background: #4a3330;
+}
+.submit-full-sm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ── ALL RECIPES MODAL — redesigned ── */
 .modal-content.all-recipes-modal {
@@ -837,9 +1522,18 @@ onMounted(async () => {
   transition: 0.15s;
   gap: 8px;
 }
-.cat-tab:hover { background: #f5f5f5; color: #31201D; }
-.cat-tab.active { background: #FFF9F0; color: #31201D; font-weight: 700; }
-.cat-tab-name { flex: 1; }
+.cat-tab:hover {
+  background: #f5f5f5;
+  color: #31201d;
+}
+.cat-tab.active {
+  background: #fff9f0;
+  color: #31201d;
+  font-weight: 700;
+}
+.cat-tab-name {
+  flex: 1;
+}
 .cat-tab-count {
   font-size: 11px;
   font-weight: 700;
@@ -850,7 +1544,10 @@ onMounted(async () => {
   min-width: 20px;
   text-align: center;
 }
-.cat-tab.active .cat-tab-count { background: #C49A6C22; color: #C49A6C; }
+.cat-tab.active .cat-tab-count {
+  background: #c49a6c22;
+  color: #c49a6c;
+}
 
 /* Panel */
 .recipe-panel {
@@ -867,16 +1564,21 @@ onMounted(async () => {
   gap: 8px;
   flex-shrink: 0;
 }
-.recipe-search svg { color: #bbb; flex-shrink: 0; }
+.recipe-search svg {
+  color: #bbb;
+  flex-shrink: 0;
+}
 .recipe-search input {
   flex: 1;
   border: none;
   outline: none;
   font-size: 13px;
   background: none;
-  color: #31201D;
+  color: #31201d;
 }
-.recipe-search input::placeholder { color: #ccc; }
+.recipe-search input::placeholder {
+  color: #ccc;
+}
 
 .recipe-panel-scroll {
   flex: 1;
@@ -893,10 +1595,17 @@ onMounted(async () => {
   border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
-.recipe-card:hover { border-color: #C49A6C44; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-.recipe-card.expanded { border-color: #C49A6C; }
+.recipe-card:hover {
+  border-color: #c49a6c44;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.recipe-card.expanded {
+  border-color: #c49a6c;
+}
 
 .recipe-card-header {
   display: flex;
@@ -906,21 +1615,57 @@ onMounted(async () => {
   background: white;
   gap: 10px;
 }
-.recipe-card-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-.recipe-card-name { font-size: 13px; font-weight: 600; color: #31201D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.recipe-ing-pill {
-  font-size: 11px; font-weight: 600; background: #f0f0f0; color: #888;
-  padding: 2px 7px; border-radius: 10px; flex-shrink: 0;
+.recipe-card-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
-.recipe-card.expanded .recipe-ing-pill { background: #C49A6C22; color: #C49A6C; }
-.recipe-card-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.recipe-card-price { font-size: 13px; font-weight: 700; color: #31201D; }
-.expand-icon { color: #bbb; transition: transform 0.2s; }
-.expand-icon.rotated { transform: rotate(180deg); color: #C49A6C; }
+.recipe-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #31201d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recipe-ing-pill {
+  font-size: 11px;
+  font-weight: 600;
+  background: #f0f0f0;
+  color: #888;
+  padding: 2px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.recipe-card.expanded .recipe-ing-pill {
+  background: #c49a6c22;
+  color: #c49a6c;
+}
+.recipe-card-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.recipe-card-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: #31201d;
+}
+.expand-icon {
+  color: #bbb;
+  transition: transform 0.2s;
+}
+.expand-icon.rotated {
+  transform: rotate(180deg);
+  color: #c49a6c;
+}
 
 .recipe-card-body {
   padding: 0 14px 12px;
-  background: #FDFAF7;
+  background: #fdfaf7;
   border-top: 1px solid #f5ede0;
   display: flex;
   flex-direction: column;
@@ -934,11 +1679,52 @@ onMounted(async () => {
   border-bottom: 1px solid #f0ebe0;
   font-size: 12px;
 }
-.ing-row:last-child { border-bottom: none; }
-.ing-dot { width: 5px; height: 5px; border-radius: 50%; background: #C49A6C; flex-shrink: 0; }
-.ing-name { flex: 1; color: #444; font-weight: 500; }
-.ing-qty { color: #C49A6C; font-weight: 600; font-size: 11px; background: #fff; padding: 2px 7px; border-radius: 4px; border: 1px solid #f0e0c8; }
+.ing-row:last-child {
+  border-bottom: none;
+}
+.ing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #c49a6c;
+  flex-shrink: 0;
+}
+.ing-name {
+  flex: 1;
+  color: #444;
+  font-weight: 500;
+}
+.ing-qty {
+  color: #c49a6c;
+  font-weight: 600;
+  font-size: 11px;
+  background: #fff;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid #f0e0c8;
+}
 
-@media (max-width: 1024px) { .menu-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 640px) { .menu-grid { grid-template-columns: 1fr; } .field-row { grid-template-columns: 1fr; } .all-recipes-layout { flex-direction: column; } .recipe-sidebar { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid #f0f0f0; } }
+@media (max-width: 1024px) {
+  .menu-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .menu-grid {
+    grid-template-columns: 1fr;
+  }
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+  .all-recipes-layout {
+    flex-direction: column;
+  }
+  .recipe-sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid #f0f0f0;
+  }
+}
 </style>

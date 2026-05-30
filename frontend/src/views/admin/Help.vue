@@ -257,8 +257,9 @@ const quickTopics = [
 <style scoped>
 .help-page {
   padding: 24px 32px;
-  background: #f4f1ef;
+  background: #fafafa;
   min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
 
 /* ── Hero ─────────────────────────────────────────────────── */

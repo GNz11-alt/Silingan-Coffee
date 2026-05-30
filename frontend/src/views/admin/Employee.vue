@@ -722,18 +722,21 @@ onMounted(async () => {
 }
 
 .employee-page {
-  padding: 1.5rem;
-  background: #f4f1ef;
+  padding: 24px 32px;
+  background: #fafafa;
   min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
 .page-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--text-main);
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0 0 4px;
 }
 .page-sub {
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  font-size: 14px;
+  color: #888;
+  margin: 0;
 }
 
 .btn-brown {

@@ -108,6 +108,7 @@
                 <option value="Employee">Employee</option>
                 <option value="Sale">Sale</option>
                 <option value="Schedule">Schedule</option>
+                <option value="Menu">Menu</option>
               </select>
               <i class="bi bi-chevron-down select-chevron"></i>
             </div>
@@ -363,6 +364,18 @@ const allItems = computed(() => {
     });
   });
 
+  archivedMenuItems.value.forEach((m) => {
+    items.push({
+      type: "Menu",
+      name: m.name,
+      details: m.details,
+      archivedDate: m.archivedDate,
+      archivedBy: m.archivedBy,
+      _raw: { id: m.id },
+      _table: "menu",
+    });
+  });
+
   archivedSchedules.value.forEach((s) => {
     items.push({
       type: "Schedule",
@@ -452,13 +465,18 @@ const fetchArchivedEmployees = async () => {
 };
 
 const fetchArchivedSchedules = async () => {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("schedule")
     .select(
-      "ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, ArchivedAt, ArchivedBy, employee(FirstName, LastName)",
+      `ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status,
+       BranchId, ArchivedAt, ArchivedBy,
+       employee(FirstName, LastName)`,
     )
     .eq("Status", "Archived")
     .order("ShiftDate", { ascending: false });
+
+  console.log("archived schedules:", data, error); // ← add this temporarily
+
   if (data) {
     archivedSchedules.value = data.map((s) => ({
       id: s.ScheduleId,
@@ -479,38 +497,40 @@ const fetchArchivedSchedules = async () => {
 
 const fetchArchivedInventory = async () => {
   const { data } = await supabase
-    .from("inventory")
+    .from("rawproduct")
     .select(
-      "InventoryId, Status, UpdatedAt, ArchivedBy, product(ProductName, Category, Price, BranchId, branch(BranchName))",
+      "rawproductid, name, category, unit, status, archivedDate, archivedBy",
     )
-    .eq("Status", "Archived")
-    .order("InventoryId", { ascending: true });
+    .eq("status", "Archived")
+    .order("rawproductid", { ascending: true });
+
   if (data) {
     archivedInventory.value = data.map((i) => ({
-      id: i.InventoryId,
-      name: i.product?.ProductName ?? "—",
-      details: `${i.product?.Category ?? "—"} · ₱${i.product?.Price ?? 0} · ${i.product?.branch?.BranchName ?? "—"}`,
-      archivedDate: i.UpdatedAt,
-      archivedBy: i.ArchivedBy || currentUser,
+      id: i.rawproductid,
+      name: i.name ?? "—",
+      details: `${i.category ?? "—"} · ${i.unit ?? "—"}`,
+      archivedDate: i.archivedDate,
+      archivedBy: i.archivedBy || currentUser,
     }));
   }
 };
 
 const fetchArchivedSales = async () => {
+  // Cancelled orders — matches your sales module Status values
   const { data } = await supabase
     .from("orders")
     .select(
-      "OrderId, FinalAmount, Status, ArchivedAt, ArchivedBy, CreatedAt, branch(BranchName)",
+      "OrderId, FinalAmount, Status, CreatedAt, BranchId, branch(BranchName)",
     )
-    .eq("Status", "void")
+    .eq("Status", "cancelled")
     .order("OrderId", { ascending: true });
   if (data) {
     archivedSales.value = data.map((s) => ({
       id: s.OrderId,
       name: `Order #${s.OrderId}`,
-      details: `₱${s.FinalAmount} · ${s.branch?.BranchName ?? "—"}`,
-      archivedDate: s.ArchivedAt || s.CreatedAt,
-      archivedBy: s.ArchivedBy || currentUser,
+      details: `₱${s.FinalAmount ?? 0} · ${s.branch?.BranchName ?? "—"}`,
+      archivedDate: s.CreatedAt,
+      archivedBy: currentUser,
     }));
   }
 };
@@ -522,6 +542,7 @@ const loadAll = async () => {
     fetchArchivedSchedules(),
     fetchArchivedInventory(),
     fetchArchivedSales(),
+    fetchArchivedMenuItems(),
   ]);
   isLoading.value = false;
 };
@@ -638,6 +659,28 @@ const doBackup = async () => {
   }
 };
 
+const archivedMenuItems = ref([]);
+
+const fetchArchivedMenuItems = async () => {
+  const { data } = await supabase
+    .from("product")
+    .select(
+      "ProductId, ProductName, Category, Price, Status, ArchivedAt, ArchivedBy, branch(BranchName)",
+    )
+    .eq("Status", "Archived")
+    .order("ProductId", { ascending: true });
+
+  if (data) {
+    archivedMenuItems.value = data.map((p) => ({
+      id: p.ProductId,
+      name: p.ProductName ?? "—",
+      details: `${p.Category ?? "—"} · ₱${p.Price ?? 0} · ${p.branch?.BranchName ?? "—"}`,
+      archivedDate: p.ArchivedAt,
+      archivedBy: p.ArchivedBy || currentUser,
+    }));
+  }
+};
+
 // ── Restore ────────────────────────────────────────────────
 const confirmRestore = (item) => {
   restoreTarget.value = item;
@@ -671,10 +714,10 @@ const doRestore = async () => {
     }
   } else if (item._table === "inventory") {
     const { error } = await supabase
-      .from("inventory")
-      .update({ Status: "Active", ArchivedBy: null })
-      .eq("InventoryId", item._raw.id);
-    if (error) showToast("Failed to restore inventory item.", "error");
+      .from("rawproduct")
+      .update({ status: null, archivedDate: null, archivedBy: null })
+      .eq("rawproductid", item._raw.id);
+    if (error) showToast("Failed to restore product.", "error");
     else {
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedInventory();
@@ -688,6 +731,16 @@ const doRestore = async () => {
     else {
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedSales();
+    }
+  } else if (item._table === "menu") {
+    const { error } = await supabase
+      .from("product")
+      .update({ Status: "Active", ArchivedAt: null, ArchivedBy: null })
+      .eq("ProductId", item._raw.id);
+    if (error) showToast("Failed to restore menu item.", "error");
+    else {
+      showToast(`${item.name} restored successfully.`, "success");
+      await fetchArchivedMenuItems();
     }
   }
 
@@ -710,6 +763,7 @@ const typeBadgeClass = (type) => ({
   "badge-employee": type === "Employee",
   "badge-sale": type === "Sale",
   "badge-schedule": type === "Schedule",
+  "badge-menu": type === "Menu",
 });
 
 const typeIcon = (type) =>
@@ -718,6 +772,7 @@ const typeIcon = (type) =>
     Employee: "bi bi-person",
     Sale: "bi bi-file-earmark-text",
     Schedule: "bi bi-calendar3",
+    Menu: "bi bi-cup-straw",
   })[type] || "bi bi-archive";
 
 const showToast = (message, type = "success") => {
@@ -733,26 +788,27 @@ onMounted(loadAll);
 <style scoped>
 .backup-content {
   padding: 24px 32px;
+  background: #fafafa;
+  min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
 
 /* ── Header ─────────────────────────────────── */
 .backup-header {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 28px;
-  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 24px;
 }
 .backup-header-left h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0 0 4px;
 }
 .backup-message {
   font-size: 14px;
-  color: #6c757d;
+  color: #888;
   margin: 0;
 }
 
@@ -999,6 +1055,10 @@ onMounted(loadAll);
 .badge-schedule {
   background: #fff8e1;
   color: #e65100;
+}
+.badge-menu {
+  background: #f3e8ff;
+  color: #7e22ce;
 }
 
 .btn-restore {
