@@ -745,18 +745,21 @@ onMounted(() => {
 <style scoped>
 .maintenance-page {
   padding: 24px 32px;
-  background: #f4f1ef;
+  background: #fafafa;
   min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
 
 .page-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: #1a1a1a;
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0 0 4px;
 }
 .page-sub {
-  font-size: 0.82rem;
-  color: #6b6b6b;
+  font-size: 14px;
+  color: #888;
+  margin: 0;
 }
 
 /* ── Stat Cards ───────────────────────────────────────────── */
