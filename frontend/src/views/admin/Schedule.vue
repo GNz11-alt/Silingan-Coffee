@@ -1272,7 +1272,7 @@ onMounted(async () => {
 }
 
 .btn-primary-brand {
-  background: var(--brand-primary);
+  background: #8B4513;
   color: #fff;
   border: none;
   padding: 0.45rem 0.9rem;
@@ -1281,7 +1281,7 @@ onMounted(async () => {
   font-weight: 600;
 }
 .btn-primary-brand:hover:not(:disabled) {
-  background: var(--brand-hover);
+  background: #A0522D;
 }
 .btn-primary-brand:disabled {
   opacity: 0.65;
