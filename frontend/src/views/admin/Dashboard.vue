@@ -247,7 +247,9 @@ import {
 } from "lucide-vue-next";
 
 const router = useRouter();
-const username = ref(localStorage.getItem("username") || "User");
+const raw = localStorage.getItem("username") || "User";
+const name = raw.split(/[^a-zA-Z]/)[0];
+const username = ref(name.charAt(0).toUpperCase() + name.slice(1).toLowerCase());
 const isLoading = ref(true);
 
 // Stats

@@ -2,7 +2,9 @@
   <div class="dashboard-content">
     <div class="welcome-header">
       <h1>Dashboard</h1>
-      <p class="welcome-message">Welcome back, {{ username }}!</p>
+      <p class="welcome-message">
+        Welcome back, <strong>{{ username }}!</strong>
+      </p>
       <p class="branch-label">{{ branchLabel }}</p>
     </div>
 
@@ -16,7 +18,30 @@
           <p class="stat-value">
             {{ isLoading ? "..." : formatCurrency(totalRevenue) }}
           </p>
-          <span class="stat-trend positive">Today</span>
+          <span
+            :class="[
+              'stat-trend',
+              totalRevenue === 0
+                ? 'danger'
+                : yesterdayRevenue > 0 && totalRevenue < yesterdayRevenue * 0.5
+                  ? 'danger'
+                  : yesterdayRevenue > 0 &&
+                      totalRevenue < yesterdayRevenue * 0.8
+                    ? 'warning'
+                    : 'positive',
+            ]"
+          >
+            {{
+              totalRevenue === 0
+                ? "No revenue today"
+                : yesterdayRevenue > 0 && totalRevenue < yesterdayRevenue * 0.5
+                  ? "Well below yesterday"
+                  : yesterdayRevenue > 0 &&
+                      totalRevenue < yesterdayRevenue * 0.8
+                    ? "Slightly below yesterday"
+                    : "Today"
+            }}
+          </span>
         </div>
       </div>
 
@@ -27,7 +52,28 @@
         <div class="stat-info">
           <h3>Total Orders</h3>
           <p class="stat-value">{{ isLoading ? "..." : totalOrders }}</p>
-          <span class="stat-trend positive">Today</span>
+          <span
+            :class="[
+              'stat-trend',
+              totalOrders === 0
+                ? 'danger'
+                : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.5
+                  ? 'danger'
+                  : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.8
+                    ? 'warning'
+                    : 'positive',
+            ]"
+          >
+            {{
+              totalOrders === 0
+                ? "No orders today"
+                : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.5
+                  ? "Well below yesterday"
+                  : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.8
+                    ? "Slightly below yesterday"
+                    : "Today"
+            }}
+          </span>
         </div>
       </div>
 
@@ -38,7 +84,24 @@
         <div class="stat-info">
           <h3>Staff on Duty</h3>
           <p class="stat-value">{{ isLoading ? "..." : staffOnDuty }}</p>
-          <span class="stat-trend">scheduled today</span>
+          <span
+            :class="[
+              'stat-trend',
+              staffOnDuty === 0
+                ? 'danger'
+                : staffOnDuty < 3
+                  ? 'warning'
+                  : 'positive',
+            ]"
+          >
+            {{
+              staffOnDuty === 0
+                ? "No staff scheduled"
+                : staffOnDuty < 3
+                  ? "Low coverage today"
+                  : "Scheduled today"
+            }}
+          </span>
         </div>
       </div>
 
@@ -49,18 +112,52 @@
         <div class="stat-info">
           <h3>Low Stock Items</h3>
           <p class="stat-value">{{ isLoading ? "..." : lowStockCount }}</p>
-          <span class="stat-trend warning">needs restocking</span>
+          <span
+            :class="[
+              'stat-trend',
+              lowStockCount > 10
+                ? 'danger'
+                : lowStockCount > 0
+                  ? 'warning'
+                  : 'positive',
+            ]"
+          >
+            {{
+              lowStockCount > 10
+                ? "Critical — needs attention"
+                : lowStockCount > 0
+                  ? "Needs restocking"
+                  : "All items stocked"
+            }}
+          </span>
         </div>
       </div>
 
-      <div class="stat-card growth-card">
+      <div class="stat-card">
         <div class="stat-icon">
           <component :is="TrendingUp" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">
           <h3>Total Employees</h3>
           <p class="stat-value">{{ isLoading ? "..." : totalEmployees }}</p>
-          <span class="stat-trend">in your branch</span>
+          <span
+            :class="[
+              'stat-trend',
+              totalEmployees < 3
+                ? 'danger'
+                : totalEmployees < 6
+                  ? 'warning'
+                  : 'positive',
+            ]"
+          >
+            {{
+              totalEmployees < 3
+                ? "Critically understaffed"
+                : totalEmployees < 6
+                  ? "Below ideal headcount"
+                  : "In your branch"
+            }}
+          </span>
         </div>
       </div>
     </div>
@@ -68,11 +165,14 @@
     <div class="bottom-section">
       <div class="recent-orders">
         <h2>Recent Orders</h2>
-        <p class="section-subtitle">Latest transactions in {{userBranch}}</p>
-
+        <p class="section-subtitle">Latest transactions in {{ branchLabel }}</p>
         <div class="orders-list">
           <div v-if="recentOrders.length === 0" class="empty-state">
-            No orders yet today.
+            <ShoppingBag :size="32" class="empty-icon" />
+            <p>No recent orders today.</p>
+            <span
+              >Orders will appear here once customers start purchasing.</span
+            >
           </div>
           <div
             class="order-item"
@@ -82,7 +182,7 @@
             <div class="order-info">
               <span class="order-id">#{{ order.OrderId }}</span>
               <span class="order-time">{{ formatTime(order.CreatedAt) }}</span>
-              <span class="order-items">{{ order.items }}</span>
+              <span class="order-branch">{{ order.branch }}</span>
             </div>
             <div class="order-amount">
               {{ formatCurrency(order.FinalAmount) }}
@@ -94,7 +194,6 @@
       <div class="quick-actions">
         <h2>Quick Actions</h2>
         <p class="section-subtitle">Common tasks</p>
-
         <div class="actions-list">
           <button
             class="action-item"
@@ -128,7 +227,11 @@ import {
 } from "lucide-vue-next";
 
 const router = useRouter();
-const username = ref(localStorage.getItem("username") || "User");
+const raw = localStorage.getItem("username") || "User";
+const name = raw.split(/[^a-zA-Z]/)[0];
+const username = ref(
+  name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
+);
 const userBranch = ref(localStorage.getItem("branch") || "");
 const isLoading = ref(true);
 
@@ -138,19 +241,12 @@ const totalOrders = ref(0);
 const lowStockCount = ref(0);
 const staffOnDuty = ref(0);
 const totalEmployees = ref(0);
+const yesterdayRevenue = ref(0);
+const yesterdayOrders = ref(0);
 
 // Data
 const recentOrders = ref([]);
-
-// Branch label display
-const branchLabels = {
-  dlsu: "De La Salle University",
-  ateneo: "Ateneo de Manila University",
-  batangas: "Batangas City",
-  lipa: "Lipa City",
-  cubao: "Cubao Expo",
-};
-const branchLabel = ref(branchLabels[userBranch.value] || userBranch.value);
+const branchLabel = ref("");
 
 const formatCurrency = (value) => {
   return (
@@ -170,16 +266,20 @@ const fetchDashboardData = async () => {
   isLoading.value = true;
 
   const today = new Date().toISOString().split("T")[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
 
+  // Fetch branch by Location (text value like 'dlsu')
   const { data: branchData } = await supabase
     .from("branch")
-    .select("BranchId")
+    .select("BranchId, BranchName")
     .eq("Location", userBranch.value)
     .maybeSingle();
 
   const branchId = branchData?.BranchId;
+  branchLabel.value = branchData?.BranchName || userBranch.value;
 
   if (branchId) {
+    // Today's orders
     const { data: ordersData } = await supabase
       .from("orders")
       .select("OrderId, FinalAmount, CreatedAt")
@@ -191,10 +291,27 @@ const fetchDashboardData = async () => {
     if (ordersData) {
       totalOrders.value = ordersData.length;
       totalRevenue.value = ordersData.reduce(
-        (sum, o) => sum + Number(o.FinalAmount), 0
+        (sum, o) => sum + Number(o.FinalAmount),
+        0,
       );
     }
 
+    // Yesterday's orders for comparison
+    const { data: yesterdayData } = await supabase
+      .from("orders")
+      .select("FinalAmount")
+      .eq("BranchId", branchId)
+      .gte("CreatedAt", `${yesterday}T00:00:00`)
+      .lte("CreatedAt", `${yesterday}T23:59:59`)
+      .eq("Status", "completed");
+
+    yesterdayRevenue.value = (yesterdayData ?? []).reduce(
+      (sum, o) => sum + Number(o.FinalAmount),
+      0,
+    );
+    yesterdayOrders.value = yesterdayData?.length ?? 0;
+
+    // Inventory
     const { data: inventoryData } = await supabase
       .from("inventory")
       .select("Quantity, LowStockThreshold")
@@ -202,17 +319,20 @@ const fetchDashboardData = async () => {
 
     if (inventoryData) {
       lowStockCount.value = inventoryData.filter(
-        (item) => item.Quantity <= item.LowStockThreshold
+        (item) => item.Quantity <= item.LowStockThreshold,
       ).length;
     }
 
+    // Employees
     const { count: empCount } = await supabase
       .from("employee")
       .select("*", { count: "exact", head: true })
-      .eq("BranchAssigned", branchId);
+      .eq("BranchAssigned", branchId)
+      .neq("Status", "Archived");
 
     totalEmployees.value = empCount || 0;
 
+    // Staff on duty
     const { count: dutyCount } = await supabase
       .from("schedule")
       .select("*", { count: "exact", head: true })
@@ -221,21 +341,21 @@ const fetchDashboardData = async () => {
 
     staffOnDuty.value = dutyCount || 0;
 
+    // Recent orders
     const { data: recentData } = await supabase
       .from("orders")
-      .select(
-        "OrderId, FinalAmount, CreatedAt, orderitem(Quantity, ProductId, product(ProductName))",
-      )
+      .select("OrderId, FinalAmount, BranchId, CreatedAt, branch(BranchName)")
       .eq("BranchId", branchId)
+      .gte("CreatedAt", `${today}T00:00:00`)
+      .lte("CreatedAt", `${today}T23:59:59`)
+      .eq("Status", "completed")
       .order("CreatedAt", { ascending: false })
       .limit(5);
 
     if (recentData) {
       recentOrders.value = recentData.map((o) => ({
         ...o,
-        items:
-          o.orderitem?.map((i) => i.product?.ProductName).join(", ") ||
-          "No items",
+        branch: o.branch?.BranchName || "Unknown",
       }));
     }
   }
@@ -274,6 +394,9 @@ onMounted(() => {
 <style scoped>
 .dashboard-content {
   padding: 24px 32px;
+  background: #fafafa;
+  min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
 
 .welcome-header {
@@ -281,22 +404,27 @@ onMounted(() => {
 }
 
 .welcome-header h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0;
+}
+
+.welcome-header strong {
+  color: #31201d;
 }
 
 .welcome-message {
   font-size: 14px;
-  color: #6c757d;
+  color: #888;
+  margin: 4px 0 0;
 }
 
 .branch-label {
   font-size: 13px;
   color: #8b4513;
   font-weight: 500;
-  margin-top: 2px;
+  margin-top: 20px;
 }
 
 .stats-grid {
@@ -343,23 +471,14 @@ onMounted(() => {
   font-size: 11px;
   color: #adb5bd;
 }
-.stat-trend.positive {
-  color: #28a745;
+.stat-trend.danger {
+  color: #dc2626;
 }
 .stat-trend.warning {
-  color: #ffc107;
+  color: #f59e0b;
 }
-
-.growth-card {
-  background: linear-gradient(135deg, #8b4513, #a0522d);
-  border: none;
-}
-
-.growth-card .stat-icon,
-.growth-card .stat-value,
-.growth-card .stat-info h3,
-.growth-card .stat-trend {
-  color: #ffffff;
+.stat-trend.positive {
+  color: #28a745;
 }
 
 .bottom-section {
@@ -392,9 +511,25 @@ onMounted(() => {
 
 .empty-state {
   text-align: center;
+  padding: 28px 0;
   color: #adb5bd;
-  font-size: 13px;
-  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.empty-state p {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6c757d;
+  margin: 0;
+}
+.empty-state span {
+  font-size: 12px;
+  color: #adb5bd;
+}
+.empty-icon {
+  opacity: 0.3;
 }
 
 .orders-list {
@@ -408,7 +543,6 @@ onMounted(() => {
   padding: 12px 0;
   border-bottom: 1px solid #f1f3f5;
 }
-
 .order-item:last-child {
   border-bottom: none;
 }
@@ -428,6 +562,9 @@ onMounted(() => {
 .order-time {
   color: #adb5bd;
   min-width: 70px;
+}
+.order-branch {
+  color: #495057;
 }
 .order-amount {
   font-weight: 500;
@@ -456,20 +593,6 @@ onMounted(() => {
   text-align: left;
   width: 100%;
 }
-
-.order-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f1f3f5;
-}
-
-.order-items {
-  color: #495057;
-  font-size: 12px;
-}
-
 .action-item:hover {
   background: #fff4e6;
   border-color: #8b4513;
