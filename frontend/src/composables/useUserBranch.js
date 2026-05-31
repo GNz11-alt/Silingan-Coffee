@@ -17,8 +17,8 @@ export function useUserBranch() {
 
     const parsed = parseInt(rawBranch, 10)
     if (!isNaN(parsed)) {
-      // Stored as numeric BranchId
-      userBranchId.value = parsed
+      // Stored as numeric BranchId — keep as string for consistency
+      userBranchId.value = String(parsed)
       const { data } = await supabase
         .from('branch')
         .select('BranchName')

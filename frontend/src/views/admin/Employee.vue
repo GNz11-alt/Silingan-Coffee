@@ -111,6 +111,13 @@
               {{ emp.position }}
             </div>
             <div class="detail-row">
+              <i class="bi bi-person-badge"></i> Role:
+              <span
+                class="role-pill"
+                :class="employeeRole(emp.position) === 'Manager' ? 'role-manager' : 'role-staff'"
+              >{{ employeeRole(emp.position) }}</span>
+            </div>
+            <div class="detail-row">
               <i class="bi bi-calendar3"></i> Hired:
               {{ formatDate(emp.dateHired) }}
             </div>
@@ -405,7 +412,7 @@ const form = ref(emptyForm());
 const fetchBranches = async () => {
   const { data } = await supabase.from("branch").select("BranchId, BranchName");
   if (data) {
-    branches.value = data.map((b) => ({ id: b.BranchId, name: b.BranchName }));
+    branches.value = data.map((b) => ({ id: String(b.BranchId), name: b.BranchName }));
   }
 };
 
@@ -432,7 +439,7 @@ const fetchEmployees = async () => {
       hourlyRate: e.HourlyRate,
       address: e.Address,
       dateHired: e.DateHired,
-      branchId: e.BranchAssigned,
+      branchId: String(e.BranchAssigned),
       status: e.Status,
     }));
   }
@@ -655,6 +662,11 @@ const clearFilters = () => {
 };
 
 const branchName = (id) => branches.value.find((b) => b.id === id)?.name || "—";
+
+const employeeRole = (position) => {
+  const managerRoles = ["Store Manager", "Supervisor"];
+  return managerRoles.includes(position) ? "Manager" : "Staff";
+};
 
 const initials = (emp) => {
   const f = emp.firstName?.[0] || "";
@@ -963,6 +975,21 @@ onMounted(async () => {
   font-weight: 600;
   padding: 0.2rem 0.6rem;
   border-radius: 4px;
+}
+
+.role-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+}
+.role-manager {
+  background: #e8d5f5;
+  color: #6b2d7b;
+}
+.role-staff {
+  background: #d5e8f5;
+  color: #2d5a7b;
 }
 
 .modal-overlay {

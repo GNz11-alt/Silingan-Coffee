@@ -3,12 +3,9 @@
     <div class="page-header-row">
       <div>
         <h4 class="page-title mb-1">Reports &amp; Analytics</h4>
-        <p class="page-sub mb-0">
-          Business insights, visualizations, and report generation
-          <span class="branch-pill" v-if="managerBranchName">
-            <i class="bi bi-geo-alt-fill"></i> {{ managerBranchName }}
-          </span>
-        </p>
+        <span class="branch-pill" v-if="managerBranchName">
+          <i class="bi bi-geo-alt-fill"></i> {{ managerBranchName }}
+        </span>
       </div>
       <div class="d-flex gap-2 align-items-center flex-wrap">
         <select v-model="period" class="form-select fc-brand" style="width:150px" @change="onPeriodChange">
@@ -90,7 +87,6 @@
             <div class="chart-card">
               <div class="chart-card-header">
                 <div class="chart-title">Sales Trend</div>
-                <div class="chart-sub">Daily revenue · {{ periodLabel }}</div>
               </div>
               <div class="chart-loading" v-if="chartsLoading.salesTrend">
                 <div class="spinner-border spinner-border-sm text-muted"></div>
@@ -104,7 +100,6 @@
             <div class="chart-card">
               <div class="chart-card-header">
                 <div class="chart-title">Order Volume</div>
-                <div class="chart-sub">Orders per day</div>
               </div>
               <div class="chart-loading" v-if="chartsLoading.orderVolume">
                 <div class="spinner-border spinner-border-sm text-muted"></div>
@@ -120,7 +115,6 @@
             <div class="chart-card">
               <div class="chart-card-header">
                 <div class="chart-title">Peak Hours</div>
-                <div class="chart-sub">Avg orders per hour — use this to plan staffing</div>
               </div>
               <div class="chart-loading" v-if="chartsLoading.peakHours">
                 <div class="spinner-border spinner-border-sm text-muted"></div>
@@ -134,7 +128,6 @@
             <div class="chart-card">
               <div class="chart-card-header">
                 <div class="chart-title">Revenue by Category</div>
-                <div class="chart-sub">% of total revenue per product category</div>
               </div>
               <div class="chart-loading" v-if="chartsLoading.revCategory">
                 <div class="spinner-border spinner-border-sm text-muted"></div>
@@ -154,7 +147,6 @@
             <div class="chart-card">
               <div class="chart-card-header">
                 <div class="chart-title">Top Selling Products</div>
-                <div class="chart-sub">By revenue this {{ period }}</div>
               </div>
               <div class="chart-loading" v-if="chartsLoading.topProducts">
                 <div class="spinner-border spinner-border-sm text-muted"></div>
@@ -168,7 +160,6 @@
             <div class="chart-card">
               <div class="chart-card-header">
                 <div class="chart-title">Sales by Category</div>
-                <div class="chart-sub">Revenue share per category</div>
               </div>
               <div class="chart-loading" v-if="chartsLoading.categoryPie">
                 <div class="spinner-border spinner-border-sm text-muted"></div>
@@ -208,14 +199,13 @@
       </div>
 
       <!-- INVENTORY (replaces Branches tab for managers) -->
-      <div v-show="subTab === 'inventory'">
+      <div ref="invSect" v-show="subTab === 'inventory'">
         <div class="row g-3 mb-3">
           <div class="col-12">
             <div class="chart-card">
               <div class="d-flex align-items-center justify-content-between mb-3">
                 <div>
                   <div class="chart-title">Low Stock Alerts</div>
-                  <div class="chart-sub">Items at or below reorder level — action required</div>
                 </div>
                 <span v-if="!chartsLoading.lowStock" class="alert-count-badge">
                   {{ lowStockData.length }} items
@@ -254,47 +244,30 @@
             </div>
           </div>
         </div>
-        <div class="row g-3">
-          <div class="col-12 col-md-6">
+        <div class="row g-3 mb-3">
+          <div class="col-12 col-md-7">
             <div class="chart-card">
               <div class="chart-card-header">
-                <div class="chart-title">Days of Stock Remaining</div>
-                <div class="chart-sub">Red = under 3 days, Amber = under 7 days</div>
+                <div class="chart-title">Top Selling Products</div>
               </div>
-              <div class="chart-loading" v-if="chartsLoading.stockTurnover">
+              <div class="chart-loading" v-if="chartsLoading.topProducts">
                 <div class="spinner-border spinner-border-sm text-muted"></div>
               </div>
-              <div class="chart-wrap" v-show="!chartsLoading.stockTurnover">
-                <canvas ref="stockTurnoverChart"></canvas>
+              <div class="chart-wrap" v-show="!chartsLoading.topProducts">
+                <canvas ref="invTopProductsChart"></canvas>
               </div>
             </div>
           </div>
-          <div class="col-12 col-md-6">
+          <div class="col-12 col-md-5">
             <div class="chart-card">
               <div class="chart-card-header">
-                <div class="chart-title">Daily Consumption Rates</div>
-                <div class="chart-sub">How fast each raw material is used per day</div>
+                <div class="chart-title">Sales by Category</div>
               </div>
-              <div class="chart-loading" v-if="chartsLoading.stockTurnover">
+              <div class="chart-loading" v-if="chartsLoading.categoryPie">
                 <div class="spinner-border spinner-border-sm text-muted"></div>
               </div>
-              <div v-else class="table-wrap">
-                <table class="data-table">
-                  <thead><tr><th>Item</th><th>Rate / Day</th><th>Days Left</th></tr></thead>
-                  <tbody>
-                    <tr v-for="item in stockTurnoverData.slice(0, 8)" :key="item.name">
-                      <td class="fw-600">{{ item.name }}</td>
-                      <td>{{ formatRate(item.daily_consumption_rate) }} {{ item.unit }}/day</td>
-                      <td :class="item.days_of_stock_remaining != null && item.days_of_stock_remaining <= 3
-                        ? 'text-danger fw-600' : ''">
-                        {{ formatTimeRemaining(item.days_of_stock_remaining) }}
-                      </td>
-                    </tr>
-                    <tr v-if="!stockTurnoverData.length">
-                      <td colspan="3" class="text-center text-muted py-3">No turnover data.</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div class="chart-wrap chart-wrap--sm" v-show="!chartsLoading.categoryPie">
+                <canvas ref="invCategoryPieChart"></canvas>
               </div>
             </div>
           </div>
@@ -529,16 +502,25 @@
           </div>
           <div class="modal-panel-body">
             <span class="preview-type-badge">{{ previewData?.reporttype }}</span>
-            <div class="preview-placeholder mt-3">
-              <i class="bi bi-file-earmark-bar-graph fs-1 text-muted"></i>
-              <p class="text-muted mt-2 mb-0">
-                To re-export this report, use the Generate tab with the same parameters.<br />
-                <span v-if="previewData?.filepath">File saved at: <code>{{ previewData.filepath }}</code></span>
-              </p>
-              <a v-if="previewData?.filepath" :href="previewData.filepath" target="_blank"
-                class="btn btn-primary-brand mt-3" style="display:inline-block">
-                <i class="bi bi-download me-1"></i> Download File
-              </a>
+            <div v-if="previewData?.filepath" class="preview-viewer mt-3">
+              <iframe
+                v-if="isPdfFile(previewData.filepath)"
+                :src="previewData.filepath"
+                class="pdf-viewer"
+                frameborder="0"
+              ></iframe>
+              <div v-else class="preview-excel-placeholder">
+                <i class="bi bi-file-earmark-spreadsheet fs-1 text-muted"></i>
+                <p class="text-muted mt-2 mb-0">Excel files cannot be previewed inline.</p>
+                <a :href="previewData.filepath" target="_blank"
+                  class="btn btn-primary-brand mt-3" style="display:inline-block">
+                  <i class="bi bi-download me-1"></i> Download File
+                </a>
+              </div>
+            </div>
+            <div v-else class="preview-placeholder mt-3">
+              <i class="bi bi-cloud-slash fs-1 text-muted"></i>
+              <p class="text-muted mt-2 mb-0">File was not saved to cloud storage.</p>
             </div>
           </div>
           <div class="modal-panel-footer">
@@ -577,7 +559,6 @@ import {
 } from '../../services/reportService.js'
 import { exportPDF }   from '../../services/pdfExporter.js'
 import { exportExcel } from '../../services/excelExporter.js'
-import { generateInsights } from '../../services/aiService.js'
 import { supabase } from '../../supabase.js'
 
 Chart.register(...registerables)
@@ -672,9 +653,6 @@ export default {
       genErrors: {},
 
       toast: { show: false, message: '', type: 'success' },
-      insightsLoading: false,
-      insightsData: null,
-      insightsLastRun: null,
 
       // Static config — no "branches" sub-tab (manager sees only their own branch)
       subTabs: [
@@ -743,7 +721,6 @@ export default {
     await this.resolveManagerBranch()
     await this.loadAnalyticsData()
     this.$nextTick(() => this.renderActiveCharts())
-    this.loadInsights() // generate notifications silently
   },
 
   beforeUnmount() {
@@ -801,7 +778,6 @@ export default {
     async onPeriodChange() {
       await this.loadAnalyticsData()
       this.$nextTick(() => this.renderActiveCharts())
-      this.loadInsights() // generate notifications silently
     },
 
     async loadAnalyticsData() {
@@ -931,60 +907,6 @@ export default {
       this.savedReports = rows
     },
 
-    async loadInsights() {
-      if (this.insightsLoading) return
-      this.insightsLoading = true
-      try {
-        const { from, to } = getDateRange(this.period)
-        const branch = this.managerBranchId
-
-        const [kpiRes, agingRes, schedRes] = await Promise.all([
-          getKpiSummary(from, to, branch),
-          supabase.rpc('get_inventory_aging',      { p_date_from: from, p_date_to: to, p_branch_id: branch }),
-          supabase.rpc('report_employee_schedule', { p_date_from: from, p_date_to: to, p_branch_id: branch }),
-        ])
-
-        this.insightsData = generateInsights({
-          kpiSummary:        kpiRes.data || [],
-          salesTrend:        this.salesTrendData,
-          peakHours:         this.peakHoursData,
-          revenueByCategory: this.revCategoryData,
-          topProducts:       this.topProductsData,
-          branchComparison:  [],
-          lowStock:          this.lowStockData,
-          stockTurnover:     this.stockTurnoverData,
-          inventoryAging:    agingRes.data || [],
-          scheduleData:      schedRes.data || [],
-        })
-        this.insightsLastRun = new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
-        // Bridge high/medium findings to notifications
-        const role = localStorage.getItem('role') || 'manager'
-        const notifBranchId = branch || null
-        for (const f of (this.insightsData?.findings || [])) {
-          if (f.severity !== 'high' && f.severity !== 'medium') continue
-          const linkPath = f.link?.module
-            ? `/${role}/${f.link.module}`
-            : null
-          await supabase.from('notifications').insert({
-            role,
-            branch_id: notifBranchId,
-            category: f.category,
-            title: f.title,
-            message: f.description,
-            severity: f.severity,
-            link: linkPath,
-            is_read: false,
-            created_at: new Date().toISOString(),
-          }).maybeSingle()
-        }
-      } catch (err) {
-        console.error('[Insights] Failed:', err)
-        this.insightsData = { findings: [], priorities: [], summary: 'Failed to analyze data.' }
-      } finally {
-        this.insightsLoading = false
-      }
-    },
-
     // ── CHARTS ───────────────────────────────────────────────────
 
     renderActiveCharts() {
@@ -1060,15 +982,22 @@ export default {
     },
 
     renderInventoryCharts() {
-      const top8  = this.stockTurnoverData.slice(0, 8)
-      const names = top8.map(r => r.name.length > 18 ? r.name.slice(0, 18) + '…' : r.name)
-      const days  = top8.map(r => Number(r.days_of_stock_remaining) || 0)
+      const names = this.topProductsData.map(p => p.product_name.length > 16 ? p.product_name.slice(0,16) + '…' : p.product_name)
+      const revs  = this.topProductsData.map(p => Number(p.revenue))
 
-      const fmt = this.formatTimeRemaining
-      this.makeChart('stockTurnover', 'stockTurnoverChart', {
+      this.makeChart('invTopProducts', 'invTopProductsChart', {
         type: 'bar',
-        data: { labels: names, datasets: [{ label: 'Days Remaining', data: days, backgroundColor: days.map(d => d <= 3 ? '#E67E3A' : d <= 7 ? '#E8A838' : '#8D8D8D'), borderRadius: 4 }] },
-        options: { ...baseOpts(), indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } } } },
+        data: { labels: names, datasets: [{ label: 'Revenue (₱)', data: revs, backgroundColor: PALETTE, borderRadius: 5 }] },
+        options: { ...baseOpts(), indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '₱' + Number(c.raw).toLocaleString() } } } },
+      })
+
+      const catLabels = this.revCategoryData.map(r => r.category)
+      const catRevs   = this.revCategoryData.map(r => Number(r.revenue))
+
+      this.makeChart('invCategoryPie', 'invCategoryPieChart', {
+        type: 'pie',
+        data: { labels: catLabels, datasets: [{ data: catRevs, backgroundColor: PALETTE, borderWidth: 2, borderColor: '#fff' }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#374151', font: LBL, padding: 8 } }, tooltip: { callbacks: { label: c => c.label + ': ₱' + Number(c.raw).toLocaleString() } } } },
       })
     },
 
@@ -1110,11 +1039,94 @@ export default {
           generatedBy: localStorage.getItem('username') || localStorage.getItem('role') || 'Manager',
         }
 
-        const insightsData = this.insightsData || undefined
+        // Capture chart canvases for PDF
+        let chartImages = []
+        if (this.genForm.format === 'pdf') {
+          const isInventory = this.genForm.type.startsWith('inventory-')
+
+          if (isInventory) {
+            const CHART_W = 480
+            const BAR_H = 24
+            const BAR_GAP = 6
+            const LABEL_W = 110
+
+            // Top Products Horizontal Bar
+            const top = this.topProductsData || []
+            const maxRev = Math.max(...top.map(p => Number(p.revenue)), 1)
+            const barSvg = top.length
+              ? `<svg xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${top.length * (BAR_H + BAR_GAP) + 30}" viewBox="0 0 ${CHART_W} ${top.length * (BAR_H + BAR_GAP) + 30}">
+                  <style>.t{fill:#374151;font:11px sans-serif}.l{fill:#6b7280;font:10px sans-serif}</style>
+                  ${top.map((p, i) => {
+                    const y = i * (BAR_H + BAR_GAP)
+                    const w = Math.max((Number(p.revenue) / maxRev) * (CHART_W - LABEL_W - 60), 2)
+                    const color = PALETTE[i % PALETTE.length]
+                    return `<text x="0" y="${y + BAR_H / 2 + 4}" class="t" text-anchor="end">${(p.product_name || '').length > 14 ? (p.product_name || '').slice(0,14)+'…' : (p.product_name || '')}</text>` +
+                           `<rect x="${LABEL_W + 4}" y="${y + 2}" width="${w}" height="${BAR_H - 4}" rx="3" fill="${color}"/>` +
+                           `<text x="${LABEL_W + 8 + w}" y="${y + BAR_H / 2 + 4}" class="l">₱${Number(p.revenue).toLocaleString()}</text>`
+                  }).join('')}
+                  <text x="0" y="${top.length * (BAR_H + BAR_GAP) + 20}" class="l">Revenue (₱)</text>
+                </svg>`
+              : ''
+            if (barSvg) chartImages.push({ svg: barSvg, width: CHART_W, title: 'Top Selling Products', desc: 'Highest-grossing products by revenue.' })
+
+            // Sales by Category Pie
+            const cats = this.revCategoryData || []
+            const total = cats.reduce((s, c) => s + Number(c.revenue), 0) || 1
+            const PIE_W = 320, PIE_H = 200, CX = 140, CY = 100, R = 80
+            let angle = -Math.PI / 2
+            const slices = cats.map((c, i) => {
+              const val = Number(c.revenue) / total * 2 * Math.PI
+              const a1 = angle, a2 = angle + val
+              const x1 = CX + R * Math.cos(a1), y1 = CY + R * Math.sin(a1)
+              const x2 = CX + R * Math.cos(a2), y2 = CY + R * Math.sin(a2)
+              const large = val > Math.PI ? 1 : 0
+              const color = PALETTE[i % PALETTE.length]
+              const path = `M${CX},${CY} L${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} Z`
+              angle = a2
+              return { path, color, label: c.category || '—', pct: (Number(c.revenue) / total * 100).toFixed(1) }
+            })
+            const pieSvg = cats.length
+              ? `<svg xmlns="http://www.w3.org/2000/svg" width="${PIE_W + 160}" height="${PIE_H + 20}" viewBox="0 0 ${PIE_W + 160} ${PIE_H + 20}">
+                  <style>.t{fill:#374151;font:11px sans-serif}.p{fill:#6b7280;font:10px sans-serif}</style>
+                  ${slices.map(s => `<path d="${s.path}" fill="${s.color}" stroke="#fff" stroke-width="2"/>`).join('')}
+                  ${slices.map((s, i) => {
+                    const ly = 20 + i * 22
+                    return `<rect x="${PIE_W + 10}" y="${ly}" width="12" height="12" rx="2" fill="${s.color}"/>` +
+                           `<text x="${PIE_W + 28}" y="${ly + 10}" class="t">${s.label}</text>` +
+                           `<text x="${PIE_W + 28}" y="${ly + 21}" class="p">${s.pct}%</text>`
+                  }).join('')}
+                </svg>`
+              : ''
+            if (pieSvg) chartImages.push({ svg: pieSvg, width: PIE_W + 160, title: 'Sales by Category', desc: 'Proportion of sales by product category.' })
+          } else {
+            const chartDefs = [
+              { ref: 'salesTrendChart',    key: 'salesTrend',    title: 'Sales Trend',           desc: 'Daily sales trend over the selected period.' },
+              { ref: 'orderVolumeChart',   key: 'orderVolume',   title: 'Order Volume',          desc: 'Number of orders placed per day.' },
+              { ref: 'peakHoursChart',     key: 'peakHours',     title: 'Peak Hours',            desc: 'Busiest hours of operation.' },
+              { ref: 'revCategoryChart',   key: 'revCategory',   title: 'Revenue by Category',   desc: 'Distribution of revenue across product categories.' },
+              { ref: 'topProductsChart',   key: 'topProducts',   title: 'Top Selling Products',  desc: 'Highest-grossing products by revenue.' },
+              { ref: 'categoryPieChart',   key: 'categoryPie',   title: 'Sales by Category',     desc: 'Proportion of sales by product category.' },
+              { ref: 'branchRevenueChart', key: 'branchRevenue', title: 'Branch Revenue',        desc: 'Total revenue comparison across branches.' },
+              { ref: 'branchShareChart',   key: 'branchShare',   title: 'Branch Share',          desc: "Each branch's contribution to total revenue." },
+              { ref: 'invTopProductsChart', key: 'invTopProducts', title: 'Top Selling Products',  desc: 'Highest-grossing products by revenue.' },
+              { ref: 'invCategoryPieChart', key: 'invCategoryPie', title: 'Sales by Category',     desc: 'Proportion of sales by product category.' },
+            ]
+            for (const def of chartDefs) {
+              if (!this._charts[def.key]) continue
+              const canvas = this.$refs[def.ref]
+              if (canvas && typeof canvas.toDataURL === 'function') {
+                try {
+                  chartImages.push({ data: canvas.toDataURL('image/png'), width: 500, title: def.title, desc: def.desc })
+                } catch (_) {}
+              }
+            }
+          }
+        }
+
         let fileBuffer = null
         let contentType = ''
         if (this.genForm.format === 'pdf') {
-          fileBuffer = await exportPDF(this.genForm.type, rawRows || rows, meta, insightsData)
+          fileBuffer = await exportPDF(this.genForm.type, rawRows || rows, meta, chartImages, this.topProductsData)
           contentType = 'application/pdf'
         }
         if (this.genForm.format === 'excel') {
@@ -1209,7 +1221,8 @@ export default {
     },
 
     formatTimeRemaining(days) {
-      if (days == null || isNaN(days)) return '—'
+      if (days == null || days === 'N/A') return days || '—'
+      if (isNaN(days)) return '—'
       const totalMin = Math.round(Number(days) * 24 * 60)
       const d = Math.floor(totalMin / 1440)
       const h = Math.floor((totalMin % 1440) / 60)
@@ -1237,6 +1250,10 @@ export default {
         return new Date(report.reportdate).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
       }
       return '—'
+    },
+
+    isPdfFile(path) {
+      return path && path.match(/\.pdf($|\?)/i);
     },
 
     reDownloadReport(r) {
@@ -1306,7 +1323,7 @@ export default {
 .chart-card { background:#fff; border-radius:12px; padding:1.25rem; box-shadow:var(--shadow); border:1px solid var(--border); height:100%; }
 .chart-card-header { margin-bottom:.75rem; }
 .chart-title  { font-size:.92rem; font-weight:700; color:#1a1a1a; }
-.chart-sub    { font-size:.74rem; color:#6b7280; }
+
 .chart-wrap   { position:relative; height:220px; }
 .chart-wrap--sm { height:200px; }
 .chart-loading { display:flex; align-items:center; justify-content:center; height:160px; gap:.5rem; }
@@ -1426,39 +1443,12 @@ export default {
 .preview-type-badge { display:inline-block; background:rgba(123,29,29,.10); color:#7B1D1D; font-size:.75rem; font-weight:700; padding:.2rem .6rem; border-radius:4px; }
 .preview-placeholder { text-align:center; padding:2rem; background:#f9f5f3; border-radius:10px; margin-top:1rem; }
 .preview-placeholder code { font-size:.75rem; background:#f0e8e6; color:#7B1D1D; padding:.15rem .4rem; border-radius:4px; }
+.pdf-viewer { width:100%; height:70vh; border:1px solid var(--border); border-radius:6px; background:#f9f9f9; }
+.preview-excel-placeholder { text-align:center; padding:3rem 1rem; border:2px dashed var(--border); border-radius:8px; }
 
 /* Toast */
 .toast-wrap { position:fixed; bottom:1.5rem; right:1.5rem; z-index:2000; background:#1a1a1a; color:#fff; padding:.75rem 1.2rem; border-radius:8px; font-size:.84rem; display:flex; align-items:center; gap:.5rem; box-shadow:0 4px 16px rgba(0,0,0,.25); animation:fadeIn .2s ease; }
 .toast-wrap.success { border-left:4px solid #28a745; } .toast-wrap.error { border-left:4px solid #7B1D1D; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 
-/* Insights */
-.severity-badge { font-size:.64rem; font-weight:700; padding:.15rem .5rem; border-radius:4px; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
-.sev-high { background:#F5EDE8; color:#7B1D1D; }
-.sev-medium { background:#F0EBE3; color:#8D6E63; }
-.sev-low { background:#f3f4f6; color:#6b7280; }
-.narrative-list { display:flex; flex-direction:column; gap:.75rem; }
-.narrative-card { padding:.9rem 1rem; border-radius:8px; border:1px solid var(--border); background:#fff; transition:box-shadow .15s; }
-.narrative-card:hover { box-shadow:0 1px 6px rgba(0,0,0,.08); }
-.narrative-card.narrative--high   { border-left:3px solid #7B1D1D; }
-.narrative-card.narrative--medium { border-left:3px solid #d97706; }
-.narrative-card.narrative--low    { border-left:3px solid #6b7280; }
-.narrative-header { display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; margin-bottom:.4rem; }
-.narrative-title { font-size:.88rem; font-weight:700; color:#1a1a1a; line-height:1.3; }
-.narrative-body  { font-size:.82rem; color:#374151; line-height:1.55; }
-.narrative-footer { display:flex; justify-content:space-between; align-items:center; margin-top:.5rem; padding-top:.4rem; border-top:1px solid var(--border); }
-.narrative-category { font-size:.7rem; color:#6b7280; text-transform:capitalize; }
-.narrative-link { font-size:.72rem; color:#7B1D1D; display:inline-flex; align-items:center; gap:3px; font-weight:600; }
-.priority-list { display:flex; flex-direction:column; gap:.5rem; }
-.priority-item { padding:.8rem 1rem; border-radius:8px; border:1px solid var(--border); background:#fff; transition:box-shadow .15s; }
-.priority-item:hover { box-shadow:0 1px 6px rgba(0,0,0,.08); }
-.priority-item.priority--high   { border-left:3px solid #7B1D1D; }
-.priority-item.priority--medium { border-left:3px solid #d97706; }
-.priority-item.priority--low    { border-left:3px solid #6b7280; }
-.priority-body  { flex:1; }
-.priority-action { font-size:.84rem; font-weight:700; color:#1a1a1a; }
-.priority-desc   { font-size:.78rem; color:#4b5563; line-height:1.45; margin-top:.2rem; }
-.priority-meta   { display:flex; gap:.75rem; align-items:center; margin-top:.35rem; }
-.priority-due    { font-size:.72rem; color:#6b7280; }
-.insights-footer { text-align:center; padding:.5rem; }
 </style>

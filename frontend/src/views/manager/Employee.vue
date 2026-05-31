@@ -6,7 +6,7 @@
         <h4 class="page-title mb-1">Employee Management</h4>
         <p class="page-sub mb-0">
           Manage hourly employees and availability ·
-          {{ employees.length }} total employees{{ branchName ? ' at ' + branchName : '' }}
+           {{ employees.length }} total employees{{ currentBranchName ? ' at ' + currentBranchName : '' }}
         </p>
       </div>
     </div>
@@ -100,6 +100,13 @@
             <div class="detail-row">
               <i class="bi bi-currency-dollar"></i> ₱{{ emp.hourlyRate }}/hour ·
               {{ emp.position }}
+            </div>
+            <div class="detail-row">
+              <i class="bi bi-person-badge"></i> Role:
+              <span
+                class="role-pill"
+                :class="employeeRole(emp.position) === 'Manager' ? 'role-manager' : 'role-staff'"
+              >{{ employeeRole(emp.position) }}</span>
             </div>
             <div class="detail-row">
               <i class="bi bi-calendar3"></i> Hired:
@@ -355,7 +362,7 @@ const employees = ref([]);
 const branches = ref([]);
 const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
 const managerBranchId = ref(null);
-const branchName = ref("");
+const currentBranchName = ref("");
 const departments = ["Kitchen", "Service", "Management", "Maintenance"];
 const positions = [
   "Store Manager",
@@ -389,7 +396,7 @@ const form = ref(emptyForm());
 const fetchBranches = async () => {
   const { data } = await supabase.from("branch").select("BranchId, BranchName");
   if (data) {
-    branches.value = data.map((b) => ({ id: b.BranchId, name: b.BranchName }));
+    branches.value = data.map((b) => ({ id: String(b.BranchId), name: b.BranchName }));
   }
 };
 
@@ -421,7 +428,7 @@ const fetchEmployees = async () => {
       hourlyRate: e.HourlyRate,
       address: e.Address,
       dateHired: e.DateHired,
-      branchId: e.BranchAssigned,
+      branchId: String(e.BranchAssigned),
       status: e.Status,
     }));
   }
@@ -597,6 +604,11 @@ const clearFilters = () => {
 
 const branchName = (id) => branches.value.find((b) => b.id === id)?.name || "—";
 
+const employeeRole = (position) => {
+  const managerRoles = ["Store Manager", "Supervisor"];
+  return managerRoles.includes(position) ? "Manager" : "Staff";
+};
+
 const initials = (emp) => {
   const f = emp.firstName?.[0] || "";
   const l = emp.lastName?.[0] || "";
@@ -642,7 +654,7 @@ const showToast = (message, type = "success") => {
 onMounted(async () => {
   await resolveBranch();
   managerBranchId.value = userBranchId.value;
-  branchName.value = userBranchName.value;
+  currentBranchName.value = userBranchName.value;
   await fetchBranches();
   await fetchEmployees();
 });
@@ -899,6 +911,21 @@ onMounted(async () => {
   font-weight: 600;
   padding: 0.2rem 0.6rem;
   border-radius: 4px;
+}
+
+.role-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+}
+.role-manager {
+  background: #e8d5f5;
+  color: #6b2d7b;
+}
+.role-staff {
+  background: #d5e8f5;
+  color: #2d5a7b;
 }
 
 .modal-overlay {
