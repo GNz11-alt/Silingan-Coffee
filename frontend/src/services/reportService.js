@@ -112,6 +112,8 @@ export async function getSavedReports({ types, branchId, dateFrom, dateTo } = {}
       reporttype,
       reporttitle,
       reportdate,
+      date_from,
+      date_to,
       filepath,
       createdat,
       branch:branchid(BranchName),
@@ -129,7 +131,7 @@ export async function getSavedReports({ types, branchId, dateFrom, dateTo } = {}
 }
 
 //save repost metadata record after report
-export async function saveReportRecord({ type, title, branchId, generatedBy, filePath }) {
+export async function saveReportRecord({ type, title, branchId, generatedBy, filePath, dateFrom, dateTo }) {
   const today = new Date().toISOString().split('T')[0]
 
   let recordBranchId = branchId
@@ -150,6 +152,8 @@ export async function saveReportRecord({ type, title, branchId, generatedBy, fil
     branchid:    recordBranchId,
     generatedby: generatedBy,
     createdat:   new Date().toISOString(),
+    date_from:   dateFrom || today,
+    date_to:     dateTo   || today,
   }
   if (filePath)    record.filepath    = filePath
   return supabase.from('report').insert(record).select().single()
