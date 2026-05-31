@@ -1153,6 +1153,8 @@ export default {
           branchId:    this.managerBranchId,
           generatedBy: Number(localStorage.getItem('userId')) || null,
           filePath:    filePath,
+          dateFrom:    this.genForm.dateFrom,
+          dateTo:      this.genForm.dateTo,
         })
         if (saveErr) console.error('[Reports] Failed to save report record:', saveErr)
 

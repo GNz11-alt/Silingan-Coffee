@@ -2001,6 +2001,8 @@ export default {
           branchId: this.genForm.branchId,
           generatedBy: Number(localStorage.getItem("userId")) || null,
           filePath: filePath,
+          dateFrom: this.genForm.dateFrom,
+          dateTo: this.genForm.dateTo,
         });
         if (saveErr)
           console.error("[Reports] Failed to save report record:", saveErr);
@@ -2125,17 +2127,26 @@ export default {
       if (!report) return "—";
       const from = report.date_from || report.dateFrom;
       const to = report.date_to || report.dateTo;
-      if (!from || !to) return "—";
-      const fromDate = new Date(from).toLocaleDateString("en-PH", {
-        month: "short",
-        day: "numeric",
-      });
-      const toDate = new Date(to).toLocaleDateString("en-PH", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-      return `${fromDate} – ${toDate}`;
+      if (from && to) {
+        const fromDate = new Date(from).toLocaleDateString("en-PH", {
+          month: "short",
+          day: "numeric",
+        });
+        const toDate = new Date(to).toLocaleDateString("en-PH", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+        return `${fromDate} – ${toDate}`;
+      }
+      if (report.reportdate) {
+        return new Date(report.reportdate).toLocaleDateString("en-PH", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+      return "—";
     },
 
     isPdfFile(path) {
