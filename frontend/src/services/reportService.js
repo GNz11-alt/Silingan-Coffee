@@ -179,70 +179,302 @@ const REPORT_FUNCTION_MAP = {
 export async function fetchReportData(reportType, { dateFrom, dateTo, branchId } = {}) {
   const fnName = REPORT_FUNCTION_MAP[reportType]
 
-//custom RPC handlers
+// Inventory reports: source from rawproduct + rawproducttransaction
   if (reportType === 'inventory-on-hand') {
-    const { data, error } = await supabase.rpc('get_inventory_on_hand', {
-      p_date_from: dateFrom,
-      p_date_to:   dateTo,
-      p_branch_id: branchId,
-    })
-    return { data: data?.map(r => ({
-      'Product Name':     r.productname,
-      'Category':         r.category,
-      'Unit':             r.unit || '—',
-      'Current Stock':   r.stockquantity,
-      'Reorder Level':    r.reorderlevel,
-      'Expiration Date':  r.expirationdate || 'N/A',
-      'Status': r.stockquantity === 0 ? 'Out of Stock'
-              : r.stockquantity <= r.reorderlevel ? 'Low Stock' : 'In Stock',
-    })), raw: data || [], error }
-  }
-  
-  if (reportType === 'inventory-aging') {
-    const { data, error } = await supabase.rpc('get_inventory_aging', {
-      p_date_from: dateFrom,
-      p_date_to:   dateTo,
-      p_branch_id: branchId,
-    })
-    const today = new Date()
-    return { data: data?.map(r => {
-      const expDate = new Date(r.expirationdate)
-      const daysLeft = Math.ceil((expDate - today) / 86400000)
-      const rawRecord = { ...r, days_until_expiry: isNaN(daysLeft) ? 9999 : daysLeft }
+    const [prodRes, txRes] = await Promise.all([
+      supabase.from('rawproduct').select('rawproductid, name, category, unit, reorderlevel, hasexpiry').neq('status', 'Archived'),
+      supabase.from('rawproducttransaction').select('rawproductid, branchid, transactiontype, quantity'),
+    ])
+    if (prodRes.error) return { data: [], raw: [], error: prodRes.error }
+    const filteredTx = branchId ? (txRes.data || []).filter(t => t.branchid === branchId) : (txRes.data || [])
+    const stockByProduct = {}
+    for (const tx of filteredTx) {
+      const qty = tx.transactiontype === 'in' ? tx.quantity : -tx.quantity
+      stockByProduct[tx.rawproductid] = (stockByProduct[tx.rawproductid] || 0) + qty
+    }
+    const raw = (prodRes.data || []).map(p => {
+      const stock = stockByProduct[p.rawproductid] || 0
       return {
-        'Product Name':     r.productname,
-        'Category':         r.category,
-        'Unit':             r.unit || '—',
-        'Current Stock':    r.stockquantity,
-        'Expiration Date':  r.expirationdate,
-        'Days Until Expiry': daysLeft,
-        'Urgency': daysLeft <= 0 ? 'EXPIRED' : daysLeft <= 3 ? 'Critical' : daysLeft <= 7 ? 'Warning' : 'OK',
+        name: p.name,
+        category: p.category,
+        unit: p.unit || '—',
+        stockquantity: stock,
+        reorderlevel: p.reorderlevel,
+        shortage: p.reorderlevel ? Math.max(0, p.reorderlevel - stock) : 0,
+        status: stock === 0 ? 'Out of Stock'
+              : (p.reorderlevel && stock <= p.reorderlevel) ? 'Low Stock' : 'In Stock',
       }
-    }), raw: data?.map(r => {
-      const expDate = new Date(r.expirationdate)
-      const daysLeft = Math.ceil((expDate - today) / 86400000)
-      return { ...r, days_until_expiry: isNaN(daysLeft) ? 9999 : daysLeft }
-    }) || [], error }
+    })
+    return { data: transformRowData(reportType, raw), raw, error: null }
   }
+
+  if (reportType === 'inventory-aging') {
+    const [prodRes, txRes] = await Promise.all([
+      supabase.from('rawproduct').select('rawproductid, name, category, unit, hasexpiry').neq('status', 'Archived'),
+      supabase.from('rawproducttransaction').select('rawproductid, branchid, transactiontype, quantity, expirationdate').not('expirationdate', 'is', null),
+    ])
+    if (prodRes.error) return { data: [], raw: [], error: prodRes.error }
+    const filteredTx = branchId ? (txRes.data || []).filter(t => t.branchid === branchId) : (txRes.data || [])
+    const today = new Date()
+    const batchesByProduct = {}
+    for (const tx of filteredTx) {
+      if (!batchesByProduct[tx.rawproductid]) batchesByProduct[tx.rawproductid] = []
+      batchesByProduct[tx.rawproductid].push(tx)
+    }
+    const raw = (prodRes.data || []).map(p => {
+      const batches = batchesByProduct[p.rawproductid] || []
+      let stock = 0
+      let nearestExpiry = null
+      for (const b of batches) {
+        const qty = b.transactiontype === 'in' ? b.quantity : -b.quantity
+        stock += qty
+        if (b.expirationdate && (!nearestExpiry || new Date(b.expirationdate) < new Date(nearestExpiry))) {
+          nearestExpiry = b.expirationdate
+        }
+      }
+      const expDate = nearestExpiry ? new Date(nearestExpiry) : null
+      const daysLeft = expDate ? Math.ceil((expDate - today) / 86400000) : null
+      return {
+        name: p.name,
+        category: p.category,
+        unit: p.unit || '—',
+        stockquantity: stock,
+        expirationdate: nearestExpiry || 'N/A',
+        days_until_expiry: daysLeft != null ? daysLeft : 'N/A',
+        urgency: daysLeft == null ? 'N/A'
+                : daysLeft <= 0 ? 'EXPIRED'
+                : daysLeft <= 3 ? 'Critical'
+                : daysLeft <= 7 ? 'Warning' : 'OK',
+      }
+    })
+    return { data: transformRowData(reportType, raw), raw, error: null }
+  }
+
   if (reportType === 'low-inventory') {
-    const invParams = {}
-    if (branchId) invParams.p_branch_id = branchId
-    const { data, error } = await supabase.rpc('get_low_stock_items', Object.keys(invParams).length ? invParams : undefined)
-    return { data: data?.map(r => ({
-      'Product Name':     r.name,
-      'Category':         r.category,
-      'Unit':             r.unit || '—',
-      'Current Stock':    r.stockquantity,
-      'Reorder Level':    r.reorderlevel,
-      'Shortage':         Math.max(0, r.reorderlevel - r.stockquantity),
-      'Expiration Date':  r.expirationdate || 'N/A',
-      'Days of Stock Remaining': r.days_until_expiry != null ? r.days_until_expiry : '—',
-      'Branch':           r.branch_name || '—',
-    })), raw: data?.map(r => ({
-      ...r,
-      branch_name:         r.branch_name || null,
-      days_of_stock_remaining: r.days_until_expiry,
-    })) || [], error }
+    const [prodRes, txRes, branchRes] = await Promise.all([
+      supabase.from('rawproduct').select('rawproductid, name, category, unit, reorderlevel').neq('status', 'Archived'),
+      supabase.from('rawproducttransaction').select('rawproductid, branchid, transactiontype, quantity, expirationdate'),
+      supabase.from('branch').select('BranchId, BranchName'),
+    ])
+    if (prodRes.error) return { data: [], raw: [], error: prodRes.error }
+    const filteredTx = branchId ? (txRes.data || []).filter(t => t.branchid === branchId) : (txRes.data || [])
+    const branchMap = {}
+    for (const b of branchRes.data || []) branchMap[b.BranchId] = b.BranchName
+    const stockByProduct = {}
+    const branchNamesByProduct = {}
+    const expiryByProduct = {}
+    for (const tx of filteredTx) {
+      const qty = tx.transactiontype === 'in' ? tx.quantity : -tx.quantity
+      const pid = tx.rawproductid
+      stockByProduct[pid] = (stockByProduct[pid] || 0) + qty
+      if (tx.branchid) {
+        if (!branchNamesByProduct[pid]) branchNamesByProduct[pid] = new Set()
+        branchNamesByProduct[pid].add(branchMap[tx.branchid] || tx.branchid)
+      }
+      if (tx.expirationdate) {
+        if (!expiryByProduct[pid] || new Date(tx.expirationdate) < new Date(expiryByProduct[pid])) {
+          expiryByProduct[pid] = tx.expirationdate
+        }
+      }
+    }
+    const raw = (prodRes.data || [])
+      .filter(p => {
+        const stock = stockByProduct[p.rawproductid] || 0
+        return p.reorderlevel && stock <= p.reorderlevel
+      })
+      .map(p => {
+        const stock = stockByProduct[p.rawproductid] || 0
+        return {
+          name: p.name,
+          category: p.category,
+          unit: p.unit || '—',
+          stockquantity: stock,
+          reorderlevel: p.reorderlevel,
+          shortage: Math.max(0, p.reorderlevel - stock),
+          days_of_stock_remaining: '—',
+          expirationdate: expiryByProduct[p.rawproductid] || 'N/A',
+          branch_name: branchNamesByProduct[p.rawproductid]
+            ? [...branchNamesByProduct[p.rawproductid]].join(', ') : '—',
+        }
+      })
+    return { data: transformRowData(reportType, raw), raw, error: null }
+  }
+
+  if (reportType === 'stock-turnover') {
+    const start = dateFrom ? new Date(dateFrom) : null
+    const end = dateTo ? new Date(dateTo) : null
+    const daysInRange = start && end ? Math.max(1, Math.floor((end - start) / 86400000) + 1) : 1
+
+    const [prodRes, recipeRes, orderRes] = await Promise.all([
+      supabase.from('rawproduct').select('rawproductid, name, category, unit').neq('status', 'Archived'),
+      supabase.from('recipe').select('rawproductid, finishedproductid, quantityneeded'),
+      (() => {
+        let q = supabase.from('orders').select('OrderId').eq('Status', 'completed')
+        if (dateFrom) q = q.gte('CreatedAt', dateFrom + 'T00:00:00')
+        if (dateTo) q = q.lte('CreatedAt', dateTo + 'T23:59:59')
+        if (branchId) q = q.eq('BranchId', branchId)
+        return q
+      })(),
+    ])
+    if (prodRes.error) return { data: [], raw: [], error: prodRes.error }
+
+    const orderIds = (orderRes.data || []).map(o => o.OrderId)
+    let oiQuery = supabase.from('orderitem').select('ProductId, Quantity')
+    if (orderIds.length) oiQuery = oiQuery.in('OrderId', orderIds)
+    const { data: orderItems } = orderIds.length ? await oiQuery : { data: [] }
+
+    const recipeMap = {}
+    for (const r of recipeRes.data || []) {
+      if (!recipeMap[r.finishedproductid]) recipeMap[r.finishedproductid] = []
+      recipeMap[r.finishedproductid].push({ rawproductid: r.rawproductid, qty: r.quantityneeded })
+    }
+
+    const consumptionMap = {}
+    for (const oi of orderItems || []) {
+      const recipes = recipeMap[oi.ProductId] || []
+      for (const r of recipes) {
+        consumptionMap[r.rawproductid] = (consumptionMap[r.rawproductid] || 0) + r.qty * oi.Quantity
+      }
+    }
+
+    let txQuery = supabase.from('rawproducttransaction').select('rawproductid, branchid, transactiontype, quantity')
+    if (branchId) txQuery = txQuery.eq('branchid', branchId)
+    const { data: transactions } = await txQuery
+
+    const stockByProduct = {}
+    for (const tx of transactions || []) {
+      const qty = tx.transactiontype === 'in' ? tx.quantity : -tx.quantity
+      stockByProduct[tx.rawproductid] = (stockByProduct[tx.rawproductid] || 0) + qty
+    }
+
+    const raw = (prodRes.data || []).map(p => {
+      const totalUsed = consumptionMap[p.rawproductid] || 0
+      const dailyRate = daysInRange > 0 ? totalUsed / daysInRange : 0
+      const stock = stockByProduct[p.rawproductid] || 0
+      const daysRemaining = dailyRate > 0 ? Math.round(stock / dailyRate * 10) / 10 : (stock > 0 ? 'N/A' : 0)
+      return {
+        name: p.name,
+        category: p.category || '—',
+        unit: p.unit || '—',
+        daily_consumption_rate: Math.round(dailyRate * 100) / 100,
+        days_of_stock_remaining: daysRemaining,
+      }
+    })
+
+    return { data: transformRowData(reportType, raw), raw, error: null }
+  }
+
+  if (reportType === 'inventory-monthly' || reportType === 'inventory-weekly') {
+    const isWeekly = reportType === 'inventory-weekly'
+    const [prodRes, recipeRes, orderRes, branchRes] = await Promise.all([
+      supabase.from('rawproduct').select('rawproductid, name, category, unit, reorderlevel').neq('status', 'Archived'),
+      supabase.from('recipe').select('rawproductid, finishedproductid, quantityneeded'),
+      (() => {
+        let q = supabase.from('orders').select('OrderId, CreatedAt, BranchId').eq('Status', 'completed')
+        if (dateFrom) q = q.gte('CreatedAt', dateFrom + 'T00:00:00')
+        if (dateTo) q = q.lte('CreatedAt', dateTo + 'T23:59:59')
+        if (branchId) q = q.eq('BranchId', branchId)
+        return q
+      })(),
+      supabase.from('branch').select('BranchId, BranchName'),
+    ])
+    if (prodRes.error) return { data: [], raw: [], error: prodRes.error }
+
+    const branchNameMap = {}
+    for (const b of branchRes.data || []) branchNameMap[b.BranchId] = b.BranchName
+
+    const orderIds = (orderRes.data || []).map(o => o.OrderId)
+    let oiQuery = supabase.from('orderitem').select('ProductId, Quantity')
+    if (orderIds.length) oiQuery = oiQuery.in('OrderId', orderIds)
+    const { data: orderItems } = orderIds.length ? await oiQuery : { data: [] }
+
+    const recipeMap = {}
+    for (const r of recipeRes.data || []) {
+      if (!recipeMap[r.finishedproductid]) recipeMap[r.finishedproductid] = []
+      recipeMap[r.finishedproductid].push({ rawproductid: r.rawproductid, qty: r.quantityneeded })
+    }
+
+    const orderLookup = {}
+    for (const o of orderRes.data || []) orderLookup[o.OrderId] = o
+
+    const consumptionByPeriod = {}
+    for (const oi of orderItems || []) {
+      const order = orderLookup[oi.OrderId]
+      if (!order) continue
+      const createdAt = new Date(order.CreatedAt)
+      let periodKey
+      if (isWeekly) {
+        const ws = new Date(createdAt)
+        ws.setDate(ws.getDate() - ws.getDay())
+        periodKey = ws.toISOString().split('T')[0]
+      } else {
+        periodKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}`
+      }
+      const oBranchId = order.BranchId
+      const recipes = recipeMap[oi.ProductId] || []
+      for (const r of recipes) {
+        const key = `${periodKey}:${oBranchId}:${r.rawproductid}`
+        consumptionByPeriod[key] = (consumptionByPeriod[key] || 0) + r.qty * oi.Quantity
+      }
+    }
+
+    let txQuery = supabase.from('rawproducttransaction').select('rawproductid, branchid, transactiontype, quantity')
+    if (branchId) txQuery = txQuery.eq('branchid', branchId)
+    const { data: transactions } = await txQuery
+
+    const stockByProductBranch = {}
+    for (const tx of transactions || []) {
+      const qty = tx.transactiontype === 'in' ? tx.quantity : -tx.quantity
+      const key = `${tx.rawproductid}:${tx.branchid}`
+      stockByProductBranch[key] = (stockByProductBranch[key] || 0) + qty
+    }
+
+    const productMap = {}
+    for (const p of prodRes.data || []) productMap[p.rawproductid] = p
+
+    const raw = []
+    for (const [key, totalQty] of Object.entries(consumptionByPeriod)) {
+      const parts = key.split(':')
+      const periodKey = parts[0]
+      const branchIdStr = parts[1]
+      const rawproductid = Number(parts[2])
+      const p = productMap[rawproductid]
+      if (!p) continue
+      const stockKey = `${rawproductid}:${branchIdStr}`
+      const stock = stockByProductBranch[stockKey] || 0
+      const branchName = branchNameMap[Number(branchIdStr)] || '—'
+      const status = stock === 0 ? 'Out of Stock'
+        : (p.reorderlevel && stock <= p.reorderlevel) ? 'Low Stock' : 'In Stock'
+      if (isWeekly) {
+        const ws = new Date(periodKey)
+        const we = new Date(ws)
+        we.setDate(we.getDate() + 6)
+        raw.push({
+          week_start: periodKey,
+          week_end: we.toISOString().split('T')[0],
+          branch_name: branchName,
+          product_name: p.name,
+          category: p.category || '—',
+          unit: p.unit || '—',
+          total_quantity_used: totalQty,
+          current_stock: stock,
+          stock_status: status,
+        })
+      } else {
+        raw.push({
+          year_month: periodKey,
+          branch_name: branchName,
+          product_name: p.name,
+          category: p.category || '—',
+          unit: p.unit || '—',
+          total_quantity_used: totalQty,
+          current_stock: stock,
+          stock_status: status,
+        })
+      }
+    }
+
+    return { data: transformRowData(reportType, raw), raw, error: null }
   }
 
 //rpc based queries
