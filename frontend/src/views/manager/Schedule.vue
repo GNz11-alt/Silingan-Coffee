@@ -279,13 +279,25 @@
                   <span v-if="day.isToday" class="today-badge">Today</span>
                 </div>
                 <div class="day-shifts">
-                  <div v-for="shift in day.shifts" :key="shift.id" class="shift-badge" :style="{ background: avatarColor(shift.employeeId) }">
+                  <div v-for="shift in day.shifts" :key="shift.id" class="shift-badge" :style="{ background: avatarColor(shift.employeeId) }" @click="showShiftDetail = shift" :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`">
                     <div class="shift-badge-time">{{ shift.startTime }}</div>
                     <div class="shift-badge-name">{{ shift.initials }}</div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+          <div v-if="schedEmployees.length" class="employee-legend">
+            <span class="legend-label">Employees:</span>
+            <span
+              v-for="emp in schedEmployees"
+              :key="emp.id"
+              class="legend-item"
+              :title="emp.name"
+            >
+              <span class="legend-swatch" :style="{ background: avatarColor(emp.id) }"></span>
+              {{ emp.name }}
+            </span>
           </div>
         </div>
       </div>
@@ -307,10 +319,16 @@
                   <span class="avail-role">{{ inq.role }}</span>
                 </div>
                 <div class="avail-meta">
-                  Requesting shift change for
+                  <strong>{{ inq.requestType || 'Shift Change' }}</strong> for
                   <strong>{{ formatDate(inq.requestDate) }}</strong>
                 </div>
+                <div v-if="inq.preferredDate" class="avail-meta">
+                  Preferred: <strong>{{ formatDate(inq.preferredDate) }}</strong>
+                </div>
                 <div class="avail-notes">{{ inq.reason }}</div>
+                <div v-if="inq.managerNote" class="avail-notes manager-note" style="margin-top: 4px;">
+                  <strong>Manager:</strong> {{ inq.managerNote }}
+                </div>
               </div>
             </div>
             <div class="avail-right">
@@ -498,6 +516,62 @@
       </div>
     </Teleport>
 
+    <!-- ── SHIFT DETAIL ───────────────────────────────────── -->
+    <Teleport to="body">
+      <div
+        v-if="showShiftDetail"
+        class="modal-overlay"
+        @click.self="showShiftDetail = null"
+      >
+        <div class="modal-panel modal-panel--sm">
+          <div class="modal-panel-header">
+            <h5 class="mb-0">Shift Details</h5>
+            <button class="btn-close-panel" @click="showShiftDetail = null">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="modal-panel-body">
+            <div class="shift-detail-content">
+              <div class="shift-detail-employee">
+                <div
+                  class="emp-avatar lg"
+                  :style="{ background: avatarColor(showShiftDetail.employeeId) }"
+                >
+                  {{ showShiftDetail.initials }}
+                </div>
+                <div>
+                  <div class="shift-detail-name">{{ showShiftDetail.employeeName }}</div>
+                  <div class="shift-detail-role">{{ showShiftDetail.role }}</div>
+                </div>
+              </div>
+              <div class="shift-detail-info">
+                <div class="shift-detail-row">
+                  <span class="label">Date:</span>
+                  <span class="value">{{ formatDate(showShiftDetail.shiftDate) }}</span>
+                </div>
+                <div class="shift-detail-row">
+                  <span class="label">Time:</span>
+                  <span class="value">{{ showShiftDetail.startTime }} – {{ showShiftDetail.endTime }}</span>
+                </div>
+                <div class="shift-detail-row">
+                  <span class="label">Branch:</span>
+                  <span class="value">{{ branchName(showShiftDetail.branchId) }}</span>
+                </div>
+                <div class="shift-detail-row">
+                  <span class="label">Status:</span>
+                  <span class="value">
+                    <span class="badge-status" :class="schedStatusClass(showShiftDetail.status)">
+                      {{ showShiftDetail.status }}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- ── TOAST ──────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="toast.show" class="toast-wrap" :class="toast.type">
@@ -539,6 +613,7 @@ const schedViewMode = ref("table"); // "table" or "calendar"
 const monthOffset = ref(0); // 0 = current month, -1 = last month, +1 = next month
 const showModal = ref(false);
 const showDeleteConfirm = ref(false);
+const showShiftDetail = ref(null);
 const isEditing = ref(false);
 const saving = ref(false);
 const deleteTarget = ref(null);
@@ -601,6 +676,15 @@ const filteredSchedules = computed(() => {
       !schedStatusFilter.value || s.status === schedStatusFilter.value;
     return matchSearch && matchDate && matchStatus;
   });
+});
+
+const schedEmployees = computed(() => {
+  const seen = new Set();
+  return schedules.value.filter((s) => {
+    if (seen.has(s.employeeId)) return false;
+    seen.add(s.employeeId);
+    return true;
+  }).map((s) => ({ id: s.employeeId, name: s.employeeName, initials: s.initials }));
 });
 
 // Calendar view computed properties
@@ -687,7 +771,7 @@ const fetchEmployees = async () => {
 const fetchAvailability = async () => {
   const { data: branchEmps } = await supabase
     .from("employee")
-    .select("EmployeeId, FirstName, LastName")
+    .select("EmployeeId, FirstName, LastName, Position")
     .eq("BranchAssigned", managerBranchId.value);
 
   const empMap = {};
@@ -698,6 +782,7 @@ const fetchAvailability = async () => {
       empMap[e.EmployeeId] = {
         name: `${e.FirstName || ''} ${e.LastName || ''}`.trim() || 'Unknown',
         initials: `${(e.FirstName?.[0] || '')}${(e.LastName?.[0] || '')}`.toUpperCase() || '?',
+        position: e.Position || '—',
       };
     });
   }
@@ -721,7 +806,7 @@ const fetchAvailability = async () => {
         employeeId: a.employeeid,
         employeeName: emp?.name || 'Unknown',
         initials: emp?.initials || '?',
-        role: "—",
+        role: emp?.position || "—",
         availableDate: a.availabledate,
         startTime: a.starttime?.slice(0, 5),
         endTime: a.endtime?.slice(0, 5),
@@ -735,7 +820,7 @@ const fetchAvailability = async () => {
 const fetchChangeInquiries = async () => {
   const { data: branchEmps } = await supabase
     .from("employee")
-    .select("EmployeeId, FirstName, LastName")
+    .select("EmployeeId, FirstName, LastName, Position")
     .eq("BranchAssigned", managerBranchId.value);
 
   const empMap = {};
@@ -746,6 +831,7 @@ const fetchChangeInquiries = async () => {
       empMap[e.EmployeeId] = {
         name: `${e.FirstName || ''} ${e.LastName || ''}`.trim() || 'Unknown',
         initials: `${(e.FirstName?.[0] || '')}${(e.LastName?.[0] || '')}`.toUpperCase() || '?',
+        position: e.Position || '—',
       };
     });
   }
@@ -769,10 +855,13 @@ const fetchChangeInquiries = async () => {
         employeeId: c.employeeid,
         employeeName: emp?.name || 'Unknown',
         initials: emp?.initials || '?',
-        role: "—",
+        role: emp?.position || "—",
         requestDate: c.requestdate,
+        requestType: c.requesttype || 'Shift Change',
+        preferredDate: c.preferreddate,
         reason: c.reason,
         status: c.status,
+        managerNote: c.managernote,
       };
     });
   }
@@ -842,9 +931,57 @@ const validate = () => {
   return Object.keys(e).length === 0;
 };
 
+const checkScheduleConflict = async () => {
+  const { data } = await supabase
+    .from("schedule")
+    .select("ScheduleId, StartTime, EndTime, Role")
+    .eq("EmployeeId", form.value.employeeId)
+    .eq("ShiftDate", form.value.shiftDate)
+    .neq("Status", "Cancelled")
+    .neq("Status", "Archived");
+
+  if (!data || data.length === 0) return null;
+
+  const newStart = form.value.startTime;
+  const newEnd = form.value.endTime;
+
+  // Check for time overlaps, excluding the current record if editing
+  for (const existing of data) {
+    if (isEditing.value && existing.ScheduleId === form.value.id) {
+      continue; // Skip the current record when editing
+    }
+
+    const existingStart = existing.StartTime;
+    const existingEnd = existing.EndTime;
+
+    // Check for overlap: newStart < existingEnd AND newEnd > existingStart
+    if (newStart < existingEnd && newEnd > existingStart) {
+      return {
+        employeeId: form.value.employeeId,
+        existingStart,
+        existingEnd,
+        existingRole: existing.Role,
+      };
+    }
+  }
+
+  return null;
+};
+
 const saveSchedule = async () => {
   if (!validate()) return;
   saving.value = true;
+
+  // Check for schedule conflicts
+  const conflict = await checkScheduleConflict();
+  if (conflict) {
+    showToast(
+      `Employee already has a shift from ${conflict.existingStart}–${conflict.existingEnd} (${conflict.existingRole}) on this date.`,
+      "error"
+    );
+    saving.value = false;
+    return;
+  }
 
   const payload = {
     EmployeeId: form.value.employeeId,
@@ -918,6 +1055,30 @@ const updateAvailStatus = async (avail, status) => {
   avail.status = status;
 
   if (status === "Confirmed") {
+    // Check for schedule conflicts before creating
+    const { data: conflicts } = await supabase
+      .from("schedule")
+      .select("StartTime, EndTime, Role")
+      .eq("EmployeeId", avail.employeeId)
+      .eq("ShiftDate", avail.availableDate)
+      .neq("Status", "Cancelled")
+      .neq("Status", "Archived");
+
+    if (conflicts && conflicts.length > 0) {
+      const newStart = avail.startTime;
+      const newEnd = avail.endTime;
+      
+      for (const existing of conflicts) {
+        if (newStart < existing.EndTime && newEnd > existing.StartTime) {
+          showToast(
+            `Employee already has a shift from ${existing.StartTime}–${existing.EndTime} (${existing.Role}) on this date.`,
+            "error"
+          );
+          return;
+        }
+      }
+    }
+
     const { error: schedErr } = await supabase
       .from("schedule")
       .insert([{
@@ -1395,6 +1556,67 @@ onMounted(async () => {
   display: block;
 }
 
+.shift-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.shift-detail-employee {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.emp-avatar.lg {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.shift-detail-name {
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 0.25rem;
+}
+
+.shift-detail-role {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.shift-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.shift-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.shift-detail-row .label {
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 0.84rem;
+}
+
+.shift-detail-row .value {
+  color: var(--text-main);
+  font-size: 0.84rem;
+}
+
 .toast-wrap {
   position: fixed;
   bottom: 1.5rem;
@@ -1573,5 +1795,38 @@ onMounted(async () => {
 
 .fade-slide-move {
   transition: transform 0.4s ease;
+}
+
+.employee-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f9f6f4;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.employee-legend .legend-label {
+  font-weight: 600;
+  color: #5d4037;
+  margin-right: 4px;
+}
+.employee-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 4px;
+  background: #fff;
+  border: 1px solid #e8ddd8;
+}
+.employee-legend .legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 </style>

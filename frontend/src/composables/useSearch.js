@@ -102,12 +102,14 @@ export function useSearch(items, options = {}) {
       })
     }
 
+    // Save scope-filtered list before fuzzy search
+    const scopeFiltered = filtered
+
     // Apply fuzzy search
     if (q && fuseInstance) {
       filtered = fuseInstance.search(q).map(r => r.item)
-      // Re-intersect with scope-filtered items
-      const scopeSet = new Set(filtered)
-      filtered = filtered.filter(item => scopeSet.has(item))
+      // Intersect with scope-filtered items
+      filtered = filtered.filter(item => scopeFiltered.includes(item))
     }
 
     results.value = filtered
