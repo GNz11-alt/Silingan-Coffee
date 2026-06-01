@@ -5,7 +5,7 @@
       <div class="ph-left">
         <h1>Inventory</h1>
         <p v-if="assignedBranchName" class="branch-label">
-          {{ assignedBranchName }}
+          Managing inventory for <strong>{{ assignedBranchName }}</strong>
         </p>
         <p v-else class="no-branch-warn">No branch assigned to your account.</p>
       </div>
