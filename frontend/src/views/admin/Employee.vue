@@ -19,9 +19,11 @@
       <div class="col-6 col-md-3" v-for="stat in stats" :key="stat.label">
         <div class="stat-card">
           <div class="stat-icon"><i :class="stat.icon"></i></div>
-          <div class="stat-value">{{ stat.value }}</div>
-          <div class="stat-label">{{ stat.label }}</div>
-          <div class="stat-sub">{{ stat.sub }}</div>
+          <div class="stat-info">
+            <h3>{{ stat.label }}</h3>
+            <p class="stat-value">{{ stat.value }}</p>
+            <span class="stat-trend">{{ stat.sub }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -114,8 +116,13 @@
               <i class="bi bi-person-badge"></i> Role:
               <span
                 class="role-pill"
-                :class="employeeRole(emp.position) === 'Manager' ? 'role-manager' : 'role-staff'"
-              >{{ employeeRole(emp.position) }}</span>
+                :class="
+                  employeeRole(emp.position) === 'Manager'
+                    ? 'role-manager'
+                    : 'role-staff'
+                "
+                >{{ employeeRole(emp.position) }}</span
+              >
             </div>
             <div class="detail-row">
               <i class="bi bi-calendar3"></i> Hired:
@@ -412,7 +419,10 @@ const form = ref(emptyForm());
 const fetchBranches = async () => {
   const { data } = await supabase.from("branch").select("BranchId, BranchName");
   if (data) {
-    branches.value = data.map((b) => ({ id: String(b.BranchId), name: b.BranchName }));
+    branches.value = data.map((b) => ({
+      id: String(b.BranchId),
+      name: b.BranchName,
+    }));
   }
 };
 
@@ -558,14 +568,24 @@ const saveEmployee = async () => {
       showToast("Failed to update employee.", "error");
     } else {
       // Update corresponding user record if branch changed
-      const originalEmployee = employees.value.find(e => e.id === form.value.id);
-      if (originalEmployee && originalEmployee.branchId !== form.value.branchId) {
+      const originalEmployee = employees.value.find(
+        (e) => e.id === form.value.id,
+      );
+      if (
+        originalEmployee &&
+        originalEmployee.branchId !== form.value.branchId
+      ) {
+        const generatedUsername =
+          `${form.value.firstName.toLowerCase()}.${form.value.lastName.toLowerCase()}`.replace(
+            /\s+/g,
+            "",
+          );
         const { data: userRecord } = await supabase
           .from("users")
           .select("id")
-          .eq("username", form.value.email)
+          .eq("username", generatedUsername)
           .maybeSingle();
-        
+
         if (userRecord) {
           await supabase
             .from("users")
@@ -577,28 +597,50 @@ const saveEmployee = async () => {
       await fetchEmployees();
     }
   } else {
-    const { error: empError } = await supabase.from("employee").insert([payload]);
+    // Step 1: Insert employee first to get the EmployeeId back
+    const { data: empData, error: empError } = await supabase
+      .from("employee")
+      .insert([payload])
+      .select("EmployeeId")
+      .single();
 
-    if (empError) {
+    if (empError || !empData) {
       showToast("Failed to add employee.", "error");
     } else {
+      const newEmployeeId = empData.EmployeeId;
+
       // Determine role based on position
       const roleMap = {
         "Store Manager": "manager",
-        "Supervisor": "manager"
+        Supervisor: "manager",
       };
       const userRole = roleMap[form.value.position] || "staff";
-      
-      // Generate a default password
-      const defaultPassword = Math.random().toString(36).slice(-8);
-      
-      // Create user account
+
+      // Fixed default passwords per role (pre-hashed SHA-256)
+      const rolePasswordMap = {
+        admin:
+          "bc78e58d55cde1346e68f8e5fe588dedf62fa457aa646a500a53347faff6ee24", // Admin@1234
+        manager:
+          "dd255c2053c4dfb3fa704699ab45ee3feb592b8988484a90a04c224b8350bf55", // Manager@1234
+        staff:
+          "6910cceb81feaf028f8cead7f8347aba32227a459811908f758ac38ae157144e", // Staff@1234
+      };
+      const hashedPassword = rolePasswordMap[userRole];
+
+      // Step 2: Create user account linked to the new employee
+      const generatedUsername =
+        `${form.value.firstName.toLowerCase()}.${form.value.lastName.toLowerCase()}`.replace(
+          /\s+/g,
+          "",
+        );
+
       const userPayload = {
-        username: form.value.email,
-        password: defaultPassword,
+        username: generatedUsername,
+        password: hashedPassword,
         role: userRole,
         branch: form.value.branchId,
-        last_active: new Date().toISOString()
+        last_active: new Date().toISOString(),
+        employee_id: newEmployeeId,
       };
 
       const { error: userError } = await supabase
@@ -608,7 +650,15 @@ const saveEmployee = async () => {
       if (userError) {
         showToast("Employee added but user account creation failed.", "error");
       } else {
-        showToast("Employee and user account created successfully.", "success");
+        const roleDefaultPlaintext = {
+          admin: "Admin@1234",
+          manager: "Manager@1234",
+          staff: "Staff@1234",
+        };
+        showToast(
+          `Employee added. Login: ${generatedUsername} / Default password: ${roleDefaultPlaintext[userRole]}`,
+          "success",
+        );
       }
       await fetchEmployees();
     }
@@ -626,6 +676,8 @@ const confirmDelete = (emp) => {
 const deleteEmployee = async () => {
   const currentUser = localStorage.getItem("username") || "Unknown";
   const now = new Date().toISOString();
+
+  // Archive employee
   const { error } = await supabase
     .from("employee")
     .update({ Status: "Archived", ArchivedAt: now, ArchivedBy: currentUser })
@@ -633,24 +685,17 @@ const deleteEmployee = async () => {
 
   if (error) {
     showToast("Failed to delete employee.", "error");
-  } else {
-    // Archive corresponding user account
-    const { data: userRecord } = await supabase
-      .from("users")
-      .select("id")
-      .eq("username", deleteTarget.value.email)
-      .maybeSingle();
-    
-    if (userRecord) {
-      await supabase
-        .from("users")
-        .update({ status: "archived" })
-        .eq("id", userRecord.id);
-    }
-    
-    showToast("Employee deleted.", "success");
-    await fetchEmployees();
+    return;
   }
+
+  // Archive linked user explicitly with correct username
+  await supabase
+    .from("users")
+    .update({ status: "archived" })
+    .eq("employee_id", deleteTarget.value.id); 
+
+  showToast("Employee deleted.", "success");
+  await fetchEmployees();
   showDeleteConfirm.value = false;
 };
 
@@ -715,7 +760,7 @@ onMounted(async () => {
   await fetchEmployees();
   const editId = route.query.edit;
   if (editId) {
-    const emp = employees.value.find(e => String(e.EmployeeId) === editId);
+    const emp = employees.value.find((e) => String(e.EmployeeId) === editId);
     if (emp) openEditModal(emp);
   }
 });
@@ -731,6 +776,10 @@ onMounted(async () => {
   --text-muted: #6b6b6b;
   --border: #e5e0dd;
   --shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+}
+
+.emp-name {
+  text-transform: capitalize;
 }
 
 .employee-page {
@@ -795,32 +844,38 @@ onMounted(async () => {
 }
 
 .stat-card {
-  background: #fff;
-  border-radius: 10px;
-  padding: 1.1rem 1.25rem;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--border);
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid #e9ecef;
+  transition: all 0.2s ease;
+}
+.stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 .stat-icon {
-  color: var(--brand-primary);
-  font-size: 1.1rem;
-  margin-bottom: 0.4rem;
+  color: #7b1d1d;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.stat-info h3 {
+  font-size: 13px;
+  color: #6c757d;
+  margin-bottom: 6px;
+  font-weight: 500;
 }
 .stat-value {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: var(--text-main);
-  line-height: 1;
-}
-.stat-label {
-  font-size: 0.78rem;
+  font-size: 24px;
   font-weight: 600;
-  color: var(--text-main);
-  margin-top: 0.2rem;
+  color: #212529;
+  margin-bottom: 4px;
 }
-.stat-sub {
-  font-size: 0.73rem;
-  color: var(--text-muted);
+.stat-trend {
+  font-size: 11px;
+  color: #adb5bd;
 }
 
 .filter-bar {

@@ -108,6 +108,7 @@
                 <option value="Employee">Employee</option>
                 <option value="Sale">Sale</option>
                 <option value="Schedule">Schedule</option>
+                <option value="Menu">Menu</option>
               </select>
               <i class="bi bi-chevron-down select-chevron"></i>
             </div>
@@ -313,7 +314,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { Database, Package, Users, File, Calendar } from "lucide-vue-next";
+import {
+  Database,
+  Package,
+  Users,
+  File,
+  Calendar,
+  ShoppingBag,
+} from "lucide-vue-next";
 import { supabase } from "@/supabase.js";
 
 // ── Current user ───────────────────────────────────────────
@@ -328,11 +336,13 @@ const isLoading = ref(false);
 const isBackingUp = ref(false);
 const search = ref("");
 const filterType = ref("");
+const managerBranchId = ref(null);
 
 const archivedEmployees = ref([]);
 const archivedSchedules = ref([]);
 const archivedInventory = ref([]);
 const archivedSales = ref([]);
+const archivedMenuItems = ref([]);
 
 const showRestoreModal = ref(false);
 const showBackupModal = ref(false);
@@ -402,6 +412,18 @@ const allItems = computed(() => {
     });
   });
 
+  archivedMenuItems.value.forEach((m) => {
+    items.push({
+      type: "Menu",
+      name: m.name,
+      details: m.details,
+      archivedDate: m.archivedDate,
+      archivedBy: m.archivedBy || currentUser,
+      _raw: { id: m.id },
+      _table: "menu",
+    });
+  });
+
   return items.map((item, idx) => ({
     ...item,
     archiveId: buildArchiveId(idx),
@@ -424,15 +446,31 @@ const filteredItems = computed(() =>
   }),
 );
 
+// ── Resolve manager branch ─────────────────────────────────
+const resolveManagerBranch = async () => {
+  const slug = localStorage.getItem("branch");
+  if (!slug || slug === "all") return;
+  const { data } = await supabase
+    .from("branch")
+    .select("BranchId")
+    .eq("Location", slug) // ← use Location not BranchName
+    .maybeSingle();
+  managerBranchId.value = data?.BranchId ?? null;
+  console.log("managerBranchId resolved:", managerBranchId.value);
+};
+
 // ── Fetch ──────────────────────────────────────────────────
 const fetchArchivedEmployees = async () => {
-  const { data } = await supabase
+  let query = supabase
     .from("employee")
     .select(
       "EmployeeId, FirstName, LastName, Email, Position, Department, HourlyRate, DateHired, BranchAssigned, Status, ArchivedAt, ArchivedBy",
     )
     .eq("Status", "Archived")
     .order("EmployeeId", { ascending: true });
+  if (managerBranchId.value)
+    query = query.eq("BranchAssigned", managerBranchId.value);
+  const { data } = await query;
   if (data) {
     archivedEmployees.value = data.map((e) => ({
       id: e.EmployeeId,
@@ -452,13 +490,16 @@ const fetchArchivedEmployees = async () => {
 };
 
 const fetchArchivedSchedules = async () => {
-  const { data } = await supabase
+  let query = supabase
     .from("schedule")
     .select(
-      "ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, ArchivedAt, ArchivedBy, employee(FirstName, LastName)",
+      `ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, ArchivedAt, ArchivedBy, employee(FirstName, LastName)`,
     )
     .eq("Status", "Archived")
     .order("ShiftDate", { ascending: false });
+  if (managerBranchId.value)
+    query = query.eq("BranchId", managerBranchId.value);
+  const { data } = await query;
   if (data) {
     archivedSchedules.value = data.map((s) => ({
       id: s.ScheduleId,
@@ -479,68 +520,93 @@ const fetchArchivedSchedules = async () => {
 
 const fetchArchivedInventory = async () => {
   const { data } = await supabase
-    .from("inventory")
+    .from("rawproduct")
     .select(
-      "InventoryId, Status, UpdatedAt, ArchivedBy, product(ProductName, Category, Price, BranchId, branch(BranchName))",
+      "rawproductid, name, category, unit, status, archivedDate, archivedBy",
     )
-    .eq("Status", "Archived")
-    .order("InventoryId", { ascending: true });
+    .eq("status", "Archived")
+    .order("rawproductid", { ascending: true });
   if (data) {
     archivedInventory.value = data.map((i) => ({
-      id: i.InventoryId,
-      name: i.product?.ProductName ?? "—",
-      details: `${i.product?.Category ?? "—"} · ₱${i.product?.Price ?? 0} · ${i.product?.branch?.BranchName ?? "—"}`,
-      archivedDate: i.UpdatedAt,
-      archivedBy: i.ArchivedBy || currentUser,
+      id: i.rawproductid,
+      name: i.name ?? "—",
+      details: `${i.category ?? "—"} · ${i.unit ?? "—"}`,
+      archivedDate: i.archivedDate,
+      archivedBy: i.archivedBy || currentUser,
     }));
   }
 };
 
 const fetchArchivedSales = async () => {
-  const { data } = await supabase
+  let query = supabase
     .from("orders")
     .select(
-      "OrderId, FinalAmount, Status, ArchivedAt, ArchivedBy, CreatedAt, branch(BranchName)",
+      "OrderId, FinalAmount, Status, CreatedAt, BranchId, branch(BranchName)",
     )
-    .eq("Status", "void")
+    .eq("Status", "cancelled")
     .order("OrderId", { ascending: true });
+  if (managerBranchId.value)
+    query = query.eq("BranchId", managerBranchId.value);
+  const { data } = await query;
   if (data) {
     archivedSales.value = data.map((s) => ({
       id: s.OrderId,
       name: `Order #${s.OrderId}`,
-      details: `₱${s.FinalAmount} · ${s.branch?.BranchName ?? "—"}`,
-      archivedDate: s.ArchivedAt || s.CreatedAt,
-      archivedBy: s.ArchivedBy || currentUser,
+      details: `₱${s.FinalAmount ?? 0} · ${s.branch?.BranchName ?? "—"}`,
+      archivedDate: s.CreatedAt,
+      archivedBy: currentUser,
+    }));
+  }
+};
+
+const fetchArchivedMenuItems = async () => {
+  let query = supabase
+    .from("product")
+    .select(
+      "ProductId, ProductName, Category, Price, Status, ArchivedAt, ArchivedBy, branch(BranchName)",
+    )
+    .eq("Status", "Archived")
+    .order("ProductId", { ascending: true });
+  if (managerBranchId.value)
+    query = query.eq("BranchId", managerBranchId.value);
+  const { data } = await query;
+  if (data) {
+    archivedMenuItems.value = data.map((p) => ({
+      id: p.ProductId,
+      name: p.ProductName ?? "—",
+      details: `${p.Category ?? "—"} · ₱${p.Price ?? 0} · ${p.branch?.BranchName ?? "—"}`,
+      archivedDate: p.ArchivedAt,
+      archivedBy: p.ArchivedBy || currentUser,
     }));
   }
 };
 
 const loadAll = async () => {
   isLoading.value = true;
+  await resolveManagerBranch();
   await Promise.all([
     fetchArchivedEmployees(),
     fetchArchivedSchedules(),
     fetchArchivedInventory(),
     fetchArchivedSales(),
+    fetchArchivedMenuItems(),
   ]);
   isLoading.value = false;
 };
 
-// ── Compute backup size from snapshot ─────────────────────
+// ── Backup ─────────────────────────────────────────────────
 const computeSnapshotSizeMb = (snapshot) => {
   const bytes = new Blob([JSON.stringify(snapshot)]).size;
   return parseFloat((bytes / (1024 * 1024)).toFixed(2));
 };
 
-// ── Backup ─────────────────────────────────────────────────
 const handleBackupNow = () => {
   showBackupModal.value = true;
 };
 
 const doBackup = async () => {
   isBackingUp.value = true;
-  const currentUser = localStorage.getItem("username") || "Unknown"; // add this line
-
+  const user = localStorage.getItem("username") || "Unknown";
   try {
     const [
       { data: liveInventory },
@@ -549,16 +615,12 @@ const doBackup = async () => {
       { data: liveSchedules },
     ] = await Promise.all([
       supabase
-        .from("inventory")
-        .select(
-          "InventoryId, Status, UpdatedAt, product(ProductName, Category, Price, BranchId, branch(BranchName))",
-        )
-        .eq("Status", "Active"),
+        .from("rawproduct")
+        .select("rawproductid, name, category, unit, status")
+        .neq("status", "Archived"),
       supabase
         .from("employee")
-        .select(
-          "EmployeeId, FirstName, LastName, Email, Position, Department, HourlyRate, DateHired, BranchAssigned, Status",
-        )
+        .select("EmployeeId, FirstName, LastName, Position, Status")
         .eq("Status", "Active"),
       supabase
         .from("orders")
@@ -567,14 +629,15 @@ const doBackup = async () => {
       supabase
         .from("schedule")
         .select(
-          "ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, employee(FirstName, LastName)",
+          "ScheduleId, EmployeeId, Role, ShiftDate, Status, employee(FirstName, LastName)",
         )
         .eq("Status", "Scheduled"),
     ]);
 
     const snapshot = {
       exportedAt: new Date().toISOString(),
-      exportedBy: currentUser,
+      exportedBy: user,
+      branch: localStorage.getItem("branch") || "all",
       totals: {
         live: {
           inventory: liveInventory?.length ?? 0,
@@ -587,6 +650,7 @@ const doBackup = async () => {
           employees: archivedEmployees.value.length,
           sales: archivedSales.value.length,
           schedules: archivedSchedules.value.length,
+          menu: archivedMenuItems.value.length,
         },
       },
       live: {
@@ -600,10 +664,10 @@ const doBackup = async () => {
         employees: archivedEmployees.value,
         sales: archivedSales.value,
         schedules: archivedSchedules.value,
+        menu: archivedMenuItems.value,
       },
     };
 
-    // ── Trigger browser download ───────────────────────────
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
       type: "application/json",
     });
@@ -614,22 +678,19 @@ const doBackup = async () => {
     a.click();
     URL.revokeObjectURL(url);
 
-    // ── Log to backup_logs so Maintenance history picks it up
     const sizeMb = computeSnapshotSizeMb(snapshot);
     await supabase.from("backup_logs").insert({
       type: "Manual",
       size_mb: sizeMb,
       status: "Success",
-      backed_up_by: currentUser,
+      backed_up_by: user,
     });
-
     showToast("Backup file downloaded successfully.", "success");
   } catch {
-    // Log the failure too so the history is accurate
     await supabase.from("backup_logs").insert({
       type: "Manual",
       status: "Failed",
-      backed_up_by: currentUser,
+      backed_up_by: localStorage.getItem("username") || "Unknown",
     });
     showToast("Backup failed. Please try again.", "error");
   } finally {
@@ -646,7 +707,6 @@ const confirmRestore = (item) => {
 
 const doRestore = async () => {
   restoring.value = true;
-  const currentUser = localStorage.getItem("username") || "Unknown";
   const item = restoreTarget.value;
 
   if (item._table === "employee") {
@@ -671,10 +731,10 @@ const doRestore = async () => {
     }
   } else if (item._table === "inventory") {
     const { error } = await supabase
-      .from("inventory")
-      .update({ Status: "Active", ArchivedBy: null })
-      .eq("InventoryId", item._raw.id);
-    if (error) showToast("Failed to restore inventory item.", "error");
+      .from("rawproduct")
+      .update({ status: null, archivedDate: null, archivedBy: null })
+      .eq("rawproductid", item._raw.id);
+    if (error) showToast("Failed to restore product.", "error");
     else {
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedInventory();
@@ -688,6 +748,16 @@ const doRestore = async () => {
     else {
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedSales();
+    }
+  } else if (item._table === "menu") {
+    const { error } = await supabase
+      .from("product")
+      .update({ Status: "Active", ArchivedAt: null, ArchivedBy: null })
+      .eq("ProductId", item._raw.id);
+    if (error) showToast("Failed to restore menu item.", "error");
+    else {
+      showToast(`${item.name} restored successfully.`, "success");
+      await fetchArchivedMenuItems();
     }
   }
 
@@ -710,6 +780,7 @@ const typeBadgeClass = (type) => ({
   "badge-employee": type === "Employee",
   "badge-sale": type === "Sale",
   "badge-schedule": type === "Schedule",
+  "badge-menu": type === "Menu",
 });
 
 const typeIcon = (type) =>
@@ -718,6 +789,7 @@ const typeIcon = (type) =>
     Employee: "bi bi-person",
     Sale: "bi bi-file-earmark-text",
     Schedule: "bi bi-calendar3",
+    Menu: "bi bi-cup-straw",
   })[type] || "bi bi-archive";
 
 const showToast = (message, type = "success") => {
@@ -738,21 +810,19 @@ onMounted(loadAll);
 /* ── Header ─────────────────────────────────── */
 .backup-header {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 28px;
-  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 24px;
 }
 .backup-header-left h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0 0 4px;
 }
 .backup-message {
   font-size: 14px;
-  color: #6c757d;
+  color: #888;
   margin: 0;
 }
 
@@ -821,7 +891,10 @@ onMounted(loadAll);
   font-size: 12px;
   color: #6c757d;
 }
-
+.badge-menu {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
 /* ── Archived Items ─────────────────────────── */
 .archived-items {
   background: #ffffff;

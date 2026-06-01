@@ -9,39 +9,47 @@
     <!-- ── STAT CARDS ──────────────────────────────────────── -->
     <div class="stats-grid mb-4">
       <div class="stat-card">
-        <div class="stat-top">
-          <span class="stat-label">System Health</span>
-          <component :is="CheckCircle" :size="22" class="stat-icon green" />
+        <div class="stat-icon-wrap green">
+          <component :is="CheckCircle" :size="28" stroke-width="1.5" />
         </div>
-        <div class="stat-value green">{{ stats.health_label }}</div>
-        <div class="stat-sub">All systems operational</div>
+        <div class="stat-info">
+          <h3>System Health</h3>
+          <p class="stat-value green">{{ stats.health_label }}</p>
+          <span class="stat-sub">All systems operational</span>
+        </div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-top">
-          <span class="stat-label">Uptime</span>
-          <component :is="Clock" :size="22" class="stat-icon" />
+        <div class="stat-icon-wrap">
+          <component :is="Clock" :size="28" stroke-width="1.5" />
         </div>
-        <div class="stat-value">{{ stats.uptime_percent }}%</div>
-        <div class="stat-sub">{{ stats.uptime_label }}</div>
+        <div class="stat-info">
+          <h3>Uptime</h3>
+          <p class="stat-value">{{ stats.uptime_percent }}%</p>
+          <span class="stat-sub">{{ stats.uptime_label }}</span>
+        </div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-top">
-          <span class="stat-label">Active Users</span>
-          <component :is="Users" :size="22" class="stat-icon" />
+        <div class="stat-icon-wrap">
+          <component :is="Users" :size="28" stroke-width="1.5" />
         </div>
-        <div class="stat-value">{{ totalUsers }}</div>
-        <div class="stat-sub">registered users</div>
+        <div class="stat-info">
+          <h3>Active Users</h3>
+          <p class="stat-value">{{ totalUsers }}</p>
+          <span class="stat-sub">registered users</span>
+        </div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-top">
-          <span class="stat-label">Last Backup</span>
-          <component :is="Database" :size="22" class="stat-icon" />
+        <div class="stat-icon-wrap">
+          <component :is="Database" :size="28" stroke-width="1.5" />
         </div>
-        <div class="stat-value">{{ lastBackupStatus }}</div>
-        <div class="stat-sub">{{ lastBackupTime }}</div>
+        <div class="stat-info">
+          <h3>Last Backup</h3>
+          <p class="stat-value">{{ lastBackupTime }}</p>
+          <span class="stat-sub">{{ lastBackupStatus }}</span>
+        </div>
       </div>
     </div>
 
@@ -85,20 +93,6 @@
                 :style="{ width: storagePercent + '%' }"
               ></div>
             </div>
-
-            <div class="resource-row mt-3">
-              <span class="resource-label">Memory Usage</span>
-              <span class="resource-value">{{ stats.memory_percent }}%</span>
-            </div>
-            <div class="progress-bar-wrap">
-              <div
-                class="progress-bar"
-                :style="{
-                  width: stats.memory_percent + '%',
-                  background: stats.memory_percent > 80 ? '#dc3545' : '#532f15',
-                }"
-              ></div>
-            </div>
           </div>
         </div>
 
@@ -115,11 +109,11 @@
             </div>
             <div class="security-row">
               <span class="security-label">SSL Certificate</span>
-              <span class="badge badge-active">Valid</span>
-            </div>
-            <div class="security-row">
-              <span class="security-label">Last Security Scan</span>
-              <span class="security-val">{{ lastScanLabel }}</span>
+              <span
+                :class="['badge', sslValid ? 'badge-active' : 'badge-inactive']"
+              >
+                {{ sslValid ? "Valid" : "Not Secure" }}
+              </span>
             </div>
             <div class="security-row">
               <span class="security-label">Failed Login Attempts</span>
@@ -135,8 +129,8 @@
         <div>
           <div class="alert-title">System Optimization Recommended</div>
           <div class="alert-sub">
-            Consider running database optimization to improve performance. Last
-            optimization was {{ lastOptimization }}.
+            Consider running query optimization to refresh database statistics.
+            Last optimization was {{ lastOptimization }}.
           </div>
         </div>
         <button
@@ -225,18 +219,23 @@
           <p class="mt-2 text-muted small">Loading users...</p>
         </div>
 
-        <table v-else class="history-table">
+        <table v-else class="history-table users-table">
           <thead>
             <tr>
-              <th>Username</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Position</th>
               <th>Role</th>
               <th>Branch</th>
               <th>Last Active</th>
             </tr>
           </thead>
+
           <tbody>
             <tr v-for="u in userList" :key="u.id">
-              <td>{{ u.username }}</td>
+              <td>{{ u.fullName }}</td>
+              <td>{{ u.email }}</td>
+              <td>{{ u.position ?? "—" }}</td>
               <td>{{ u.role }}</td>
               <td>{{ u.branch ?? "—" }}</td>
               <td>
@@ -250,7 +249,7 @@
             </tr>
             <tr v-if="!userList.length">
               <td
-                colspan="3"
+                colspan="6"
                 class="text-center text-muted py-4"
                 style="font-size: 13px"
               >
@@ -406,6 +405,9 @@ import {
   CheckSquare,
 } from "lucide-vue-next";
 
+const branches = ref([]);
+const sslValid = ref(window.location.protocol === "https:");
+
 // ── Tabs ───────────────────────────────────────────────────
 const activeTab = ref("overview");
 const tabs = [
@@ -429,7 +431,6 @@ const stats = ref({
   uptime_label: "—",
   storage_used_gb: 0,
   storage_total_gb: 0,
-  memory_percent: 0,
 });
 
 const storagePercent = computed(() => {
@@ -438,9 +439,7 @@ const storagePercent = computed(() => {
 });
 
 // ── Security ───────────────────────────────────────────────
-// Firewall and SSL are infrastructure-level; shown as static Active/Valid.
 // lastScanLabel is derived from the stats row updated_at.
-const lastScanLabel = ref("—");
 const failedLogins = ref(0);
 
 // ── Users / sessions ───────────────────────────────────────
@@ -509,11 +508,10 @@ const timeAgo = (iso) => {
   return `${days} day${days > 1 ? "s" : ""} ago`;
 };
 
-
-
 // ── Fetch: system stats ────────────────────────────────────
 const fetchStats = async () => {
   isLoadingStats.value = true;
+  await supabase.rpc("refresh_system_stats");
   const { data, error } = await supabase
     .from("system_stats")
     .select("*")
@@ -532,10 +530,7 @@ const fetchStats = async () => {
     uptime_label: data.uptime_label,
     storage_used_gb: data.storage_used_gb,
     storage_total_gb: data.storage_total_gb,
-    memory_percent: data.memory_percent,
   };
-
-  lastScanLabel.value = timeAgo(data.updated_at);
 };
 
 // ── Fetch: failed logins (last 24 h) ──────────────────────
@@ -553,13 +548,23 @@ const fetchFailedLogins = async () => {
 const fetchUsers = async () => {
   isLoadingUsers.value = true;
 
-  const [{ data, error }, { count }] = await Promise.all([
-    supabase.from("users").select("id, username, role, branch, last_active"),
-    supabase
-      .from("users")
-      .select("id", { count: "exact", head: true })
-      .gte("last_active", new Date(Date.now() - 15 * 60000).toISOString()),
-  ]);
+  const [{ data, error }, { count }, { data: empData }, { data: branchData }] =
+    await Promise.all([
+      supabase
+        .from("users")
+        .select("id, username, role, branch, last_active")
+        .neq("status", "archived")
+        .order("last_active", { ascending: false }),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .gte("last_active", new Date(Date.now() - 15 * 60000).toISOString()),
+      supabase
+        .from("employee")
+        .select("Email, FirstName, LastName, Position")
+        .neq("Status", "Archived"),
+      supabase.from("branch").select("BranchId, BranchName"),
+    ]);
 
   isLoadingUsers.value = false;
 
@@ -568,11 +573,38 @@ const fetchUsers = async () => {
     return;
   }
 
-  totalUsers.value = count ?? 0;
-  userList.value = data.map((u) => ({
-    ...u,
-    lastActivePretty: timeAgo(u.last_active),
+  branches.value = (branchData || []).map((b) => ({
+    id: String(b.BranchId),
+    name: b.BranchName,
   }));
+
+  const empMap = {};
+  for (const e of empData || []) {
+    const key =
+      `${e.FirstName.toLowerCase()}.${e.LastName.toLowerCase()}`.replace(
+        /\s+/g,
+        "",
+      );
+    empMap[key] = e;
+  }
+
+  userList.value = data.map((u) => {
+    const emp = empMap[u.username];
+    const fallbackName = u.username.includes("@")
+      ? u.username.split("@")[0]
+      : u.username.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    return {
+      ...u,
+      fullName: emp ? `${emp.FirstName} ${emp.LastName}` : fallbackName,
+      email: emp?.Email || "—",
+      position: emp?.Position || null,
+      branch:
+        branches.value.find((b) => b.id === String(u.branch))?.name || u.branch,
+      lastActivePretty: timeAgo(u.last_active),
+    };
+  });
+
+  totalUsers.value = count ?? 0;
 };
 
 // ── Fetch: backup history ──────────────────────────────────
@@ -659,25 +691,34 @@ const fetchTasks = async () => {
 };
 
 // ── Action: run optimization ───────────────────────────────
+// ── Action: run optimization ───────────────────────────────
 const runOptimization = async () => {
   optimizing.value = true;
   const now = new Date().toISOString();
 
-  const { error } = await supabase
+  const { error: fnError } = await supabase.rpc("run_vacuum");
+
+  if (fnError) {
+    optimizing.value = false;
+    showToast("Optimization failed: " + fnError.message, "error");
+    return;
+  }
+
+  const { error: dbError } = await supabase
     .from("maintenance_tasks")
     .update({ last_run_at: now })
     .eq("name", "Optimize Database");
 
   optimizing.value = false;
 
-  if (error) {
-    showToast("Optimization failed.", "error");
+  if (dbError) {
+    showToast("Optimization ran but failed to log.", "error");
     return;
   }
 
   lastOptimization.value = "Just now";
   showOptimizationAlert.value = false;
-  showToast("Database optimization completed successfully.");
+  showToast("Query statistics updated successfully.");
   await fetchTasks();
 };
 
@@ -707,6 +748,15 @@ const saveSettings = async () => {
 const runTask = async (task) => {
   task.running = true;
   const now = new Date().toISOString();
+
+  if (task.name === "Optimize Database") {
+    const { error: fnError } = await supabase.rpc("run_vacuum");
+    if (fnError) {
+      task.running = false;
+      showToast("Optimization failed: " + fnError.message, "error");
+      return;
+    }
+  }
 
   const { error } = await supabase
     .from("maintenance_tasks")
@@ -743,6 +793,42 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.users-table td:nth-child(1),
+.users-table td:nth-child(4),
+.users-table td:nth-child(5) {
+  text-transform: capitalize;
+}
+
+.history-table th:nth-child(1),
+.history-table td:nth-child(1) {
+  width: 15%;
+}
+
+.history-table th:nth-child(2),
+.history-table td:nth-child(2) {
+  width: 22%;
+}
+
+.history-table th:nth-child(3),
+.history-table td:nth-child(3) {
+  width: 15%;
+}
+
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) {
+  width: 10%;
+}
+
+.history-table th:nth-child(5),
+.history-table td:nth-child(5) {
+  width: 12%;
+}
+
+.history-table th:nth-child(6),
+.history-table td:nth-child(6) {
+  width: 14%;
+}
+
 .maintenance-page {
   padding: 24px 32px;
   background: #fafafa;
@@ -769,44 +855,43 @@ onMounted(() => {
   gap: 16px;
 }
 .stat-card {
-  background: #fff;
+  background: #ffffff;
   border-radius: 12px;
   padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
   border: 1px solid #e9ecef;
-  transition: box-shadow 0.2s;
+  transition: all 0.2s ease;
 }
 .stat-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
-.stat-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.stat-label {
-  font-size: 13px;
-  color: #6b6b6b;
-  font-weight: 500;
-}
-.stat-icon {
+.stat-icon-wrap {
   color: #8b4513;
+  flex-shrink: 0;
 }
-.stat-icon.green {
+.stat-icon-wrap.green {
   color: #28a745;
 }
+.stat-info h3 {
+  font-size: 13px;
+  color: #6c757d;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
 .stat-value {
-  font-size: 26px;
-  font-weight: 700;
-  color: #8b4513;
+  font-size: 24px;
+  font-weight: 600;
+  color: #212529;
   margin-bottom: 4px;
 }
 .stat-value.green {
   color: #28a745;
 }
 .stat-sub {
-  font-size: 12px;
-  color: #8b4513;
+  font-size: 11px;
+  color: #adb5bd;
 }
 
 /* ── Tabs ─────────────────────────────────────────────────── */
@@ -1043,6 +1128,7 @@ onMounted(() => {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
 }
 .history-table th {
   background: #f8f9fa;

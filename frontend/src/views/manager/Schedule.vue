@@ -39,7 +39,12 @@
         <div class="section-title mb-3">Employee Availability</div>
         <div v-if="pendingOrFading.length" class="avail-list">
           <TransitionGroup name="fade-slide">
-            <div v-for="avail in pendingOrFading" :key="avail.id" class="avail-row" :class="{ 'is-fading': fadingIds.has(avail.id) }">
+            <div
+              v-for="avail in pendingOrFading"
+              :key="avail.id"
+              class="avail-row"
+              :class="{ 'is-fading': fadingIds.has(avail.id) }"
+            >
               <div class="avail-left">
                 <div
                   class="emp-avatar"
@@ -248,14 +253,25 @@
 
         <!-- CALENDAR VIEW -->
         <div v-if="schedViewMode === 'calendar'">
-          <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
+          <div
+            class="d-flex justify-content-center align-items-center gap-3 mb-4"
+          >
             <button class="btn btn-ghost btn-sm" @click="monthOffset -= 1">
               <i class="bi bi-chevron-left"></i> Previous
             </button>
-            <span style="min-width: 200px; text-align: center; font-weight: 600; font-size: 1.1rem">
+            <span
+              style="
+                min-width: 200px;
+                text-align: center;
+                font-weight: 600;
+                font-size: 1.1rem;
+              "
+            >
               {{ monthYearLabel }}
             </span>
-            <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">Today</button>
+            <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">
+              Today
+            </button>
             <button class="btn btn-ghost btn-sm" @click="monthOffset += 1">
               Next <i class="bi bi-chevron-right"></i>
             </button>
@@ -263,7 +279,11 @@
 
           <div class="calendar-container">
             <div class="calendar-header">
-              <div class="calendar-day-header" v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="day">
+              <div
+                class="calendar-day-header"
+                v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
+                :key="day"
+              >
                 {{ day }}
               </div>
             </div>
@@ -272,32 +292,28 @@
                 v-for="day in monthDays"
                 :key="day.dateStr"
                 class="calendar-day"
-                :class="{ 'is-today': day.isToday, 'is-other-month': day.isOtherMonth }"
+                :class="{
+                  'is-today': day.isToday,
+                  'is-other-month': day.isOtherMonth,
+                }"
               >
                 <div class="day-number">
                   {{ day.dayOfMonth }}
                   <span v-if="day.isToday" class="today-badge">Today</span>
                 </div>
                 <div class="day-shifts">
-                  <div v-for="shift in day.shifts" :key="shift.id" class="shift-badge" :style="{ background: avatarColor(shift.employeeId) }" @click="showShiftDetail = shift" :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`">
+                  <div
+                    v-for="shift in day.shifts"
+                    :key="shift.id"
+                    class="shift-badge"
+                    :style="{ background: avatarColor(shift.employeeId) }"
+                  >
                     <div class="shift-badge-time">{{ shift.startTime }}</div>
                     <div class="shift-badge-name">{{ shift.initials }}</div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div v-if="schedEmployees.length" class="employee-legend">
-            <span class="legend-label">Employees:</span>
-            <span
-              v-for="emp in schedEmployees"
-              :key="emp.id"
-              class="legend-item"
-              :title="emp.name"
-            >
-              <span class="legend-swatch" :style="{ background: avatarColor(emp.id) }"></span>
-              {{ emp.name }}
-            </span>
           </div>
         </div>
       </div>
@@ -319,16 +335,10 @@
                   <span class="avail-role">{{ inq.role }}</span>
                 </div>
                 <div class="avail-meta">
-                  <strong>{{ inq.requestType || 'Shift Change' }}</strong> for
+                  Requesting shift change for
                   <strong>{{ formatDate(inq.requestDate) }}</strong>
                 </div>
-                <div v-if="inq.preferredDate" class="avail-meta">
-                  Preferred: <strong>{{ formatDate(inq.preferredDate) }}</strong>
-                </div>
                 <div class="avail-notes">{{ inq.reason }}</div>
-                <div v-if="inq.managerNote" class="avail-notes manager-note" style="margin-top: 4px;">
-                  <strong>Manager:</strong> {{ inq.managerNote }}
-                </div>
               </div>
             </div>
             <div class="avail-right">
@@ -445,8 +455,17 @@
               </div>
               <div class="col-12">
                 <label class="form-label-sm">Branch</label>
-                <select v-model="form.branchId" class="form-select fc-brand" disabled>
-                  <option v-for="b in branches" :key="b.id" :value="b.id" :selected="b.id === managerBranchId">
+                <select
+                  v-model="form.branchId"
+                  class="form-select fc-brand"
+                  disabled
+                >
+                  <option
+                    v-for="b in branches"
+                    :key="b.id"
+                    :value="b.id"
+                    :selected="b.id === managerBranchId"
+                  >
                     {{ b.name }}
                   </option>
                 </select>
@@ -516,62 +535,6 @@
       </div>
     </Teleport>
 
-    <!-- ── SHIFT DETAIL ───────────────────────────────────── -->
-    <Teleport to="body">
-      <div
-        v-if="showShiftDetail"
-        class="modal-overlay"
-        @click.self="showShiftDetail = null"
-      >
-        <div class="modal-panel modal-panel--sm">
-          <div class="modal-panel-header">
-            <h5 class="mb-0">Shift Details</h5>
-            <button class="btn-close-panel" @click="showShiftDetail = null">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-          <div class="modal-panel-body">
-            <div class="shift-detail-content">
-              <div class="shift-detail-employee">
-                <div
-                  class="emp-avatar lg"
-                  :style="{ background: avatarColor(showShiftDetail.employeeId) }"
-                >
-                  {{ showShiftDetail.initials }}
-                </div>
-                <div>
-                  <div class="shift-detail-name">{{ showShiftDetail.employeeName }}</div>
-                  <div class="shift-detail-role">{{ showShiftDetail.role }}</div>
-                </div>
-              </div>
-              <div class="shift-detail-info">
-                <div class="shift-detail-row">
-                  <span class="label">Date:</span>
-                  <span class="value">{{ formatDate(showShiftDetail.shiftDate) }}</span>
-                </div>
-                <div class="shift-detail-row">
-                  <span class="label">Time:</span>
-                  <span class="value">{{ showShiftDetail.startTime }} – {{ showShiftDetail.endTime }}</span>
-                </div>
-                <div class="shift-detail-row">
-                  <span class="label">Branch:</span>
-                  <span class="value">{{ branchName(showShiftDetail.branchId) }}</span>
-                </div>
-                <div class="shift-detail-row">
-                  <span class="label">Status:</span>
-                  <span class="value">
-                    <span class="badge-status" :class="schedStatusClass(showShiftDetail.status)">
-                      {{ showShiftDetail.status }}
-                    </span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
     <!-- ── TOAST ──────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="toast.show" class="toast-wrap" :class="toast.type">
@@ -603,7 +566,8 @@ const tabs = [
   { key: "change", label: "Change Inquiries" },
 ];
 
-const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
+const { isAdmin, userBranchId, userBranchName, resolveBranch } =
+  useUserBranch();
 const managerBranchId = ref(null);
 
 const schedSearch = ref("");
@@ -613,7 +577,6 @@ const schedViewMode = ref("table"); // "table" or "calendar"
 const monthOffset = ref(0); // 0 = current month, -1 = last month, +1 = next month
 const showModal = ref(false);
 const showDeleteConfirm = ref(false);
-const showShiftDetail = ref(null);
 const isEditing = ref(false);
 const saving = ref(false);
 const deleteTarget = ref(null);
@@ -652,7 +615,9 @@ const pendingCount = computed(
 );
 
 const resolvedAvail = computed(() =>
-  availability.value.filter((a) => a.status === "Confirmed" || a.status === "Cancelled"),
+  availability.value.filter(
+    (a) => a.status === "Confirmed" || a.status === "Cancelled",
+  ),
 );
 
 const fadingIds = ref(new Set());
@@ -676,15 +641,6 @@ const filteredSchedules = computed(() => {
       !schedStatusFilter.value || s.status === schedStatusFilter.value;
     return matchSearch && matchDate && matchStatus;
   });
-});
-
-const schedEmployees = computed(() => {
-  const seen = new Set();
-  return schedules.value.filter((s) => {
-    if (seen.has(s.employeeId)) return false;
-    seen.add(s.employeeId);
-    return true;
-  }).map((s) => ({ id: s.employeeId, name: s.employeeName, initials: s.initials }));
 });
 
 // Calendar view computed properties
@@ -711,7 +667,9 @@ const monthDays = computed(() => {
   // Start from Monday of the week containing the 1st
   const startDate = new Date(start);
   const dayOfWeek = startDate.getDay();
-  startDate.setDate(startDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  startDate.setDate(
+    startDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1),
+  );
 
   for (let i = 0; i < 42; i++) {
     const d = new Date(startDate);
@@ -721,7 +679,9 @@ const monthDays = computed(() => {
     const isOtherMonth = d.getMonth() !== start.getMonth();
 
     // Find shifts for this day
-    const shiftsForDay = filteredSchedules.value.filter((s) => s.shiftDate === dateStr);
+    const shiftsForDay = filteredSchedules.value.filter(
+      (s) => s.shiftDate === dateStr,
+    );
 
     days.push({
       dateStr,
@@ -740,20 +700,21 @@ const fetchBranches = async () => {
     branches.value = data.map((b) => ({ id: b.BranchId, name: b.BranchName }));
 };
 
-
-
 const updateInquiryStatus = async (inq, status) => {
   const { error } = await supabase
-    .from('changeinquiry')
+    .from("changeinquiry")
     .update({ status: status })
-    .eq('inquiryid', inq.id)
+    .eq("inquiryid", inq.id);
 
-  if (error) showToast('Failed to update inquiry.', 'error')
+  if (error) showToast("Failed to update inquiry.", "error");
   else {
-    inq.status = status
-    showToast(`Inquiry ${status === 'Approved' ? 'approved' : 'denied'}.`, 'success')
+    inq.status = status;
+    showToast(
+      `Inquiry ${status === "Approved" ? "approved" : "denied"}.`,
+      "success",
+    );
   }
-}
+};
 
 const fetchEmployees = async () => {
   const { data } = await supabase
@@ -771,18 +732,19 @@ const fetchEmployees = async () => {
 const fetchAvailability = async () => {
   const { data: branchEmps } = await supabase
     .from("employee")
-    .select("EmployeeId, FirstName, LastName, Position")
+    .select("EmployeeId, FirstName, LastName")
     .eq("BranchAssigned", managerBranchId.value);
 
   const empMap = {};
   const empIds = [];
   if (branchEmps) {
-    branchEmps.forEach(e => {
+    branchEmps.forEach((e) => {
       empIds.push(e.EmployeeId);
       empMap[e.EmployeeId] = {
-        name: `${e.FirstName || ''} ${e.LastName || ''}`.trim() || 'Unknown',
-        initials: `${(e.FirstName?.[0] || '')}${(e.LastName?.[0] || '')}`.toUpperCase() || '?',
-        position: e.Position || '—',
+        name: `${e.FirstName || ""} ${e.LastName || ""}`.trim() || "Unknown",
+        initials:
+          `${e.FirstName?.[0] || ""}${e.LastName?.[0] || ""}`.toUpperCase() ||
+          "?",
       };
     });
   }
@@ -804,9 +766,9 @@ const fetchAvailability = async () => {
       return {
         id: a.availabilityid,
         employeeId: a.employeeid,
-        employeeName: emp?.name || 'Unknown',
-        initials: emp?.initials || '?',
-        role: emp?.position || "—",
+        employeeName: emp?.name || "Unknown",
+        initials: emp?.initials || "?",
+        role: "—",
         availableDate: a.availabledate,
         startTime: a.starttime?.slice(0, 5),
         endTime: a.endtime?.slice(0, 5),
@@ -820,18 +782,19 @@ const fetchAvailability = async () => {
 const fetchChangeInquiries = async () => {
   const { data: branchEmps } = await supabase
     .from("employee")
-    .select("EmployeeId, FirstName, LastName, Position")
+    .select("EmployeeId, FirstName, LastName")
     .eq("BranchAssigned", managerBranchId.value);
 
   const empMap = {};
   const empIds = [];
   if (branchEmps) {
-    branchEmps.forEach(e => {
+    branchEmps.forEach((e) => {
       empIds.push(e.EmployeeId);
       empMap[e.EmployeeId] = {
-        name: `${e.FirstName || ''} ${e.LastName || ''}`.trim() || 'Unknown',
-        initials: `${(e.FirstName?.[0] || '')}${(e.LastName?.[0] || '')}`.toUpperCase() || '?',
-        position: e.Position || '—',
+        name: `${e.FirstName || ""} ${e.LastName || ""}`.trim() || "Unknown",
+        initials:
+          `${e.FirstName?.[0] || ""}${e.LastName?.[0] || ""}`.toUpperCase() ||
+          "?",
       };
     });
   }
@@ -853,15 +816,12 @@ const fetchChangeInquiries = async () => {
       return {
         id: c.inquiryid,
         employeeId: c.employeeid,
-        employeeName: emp?.name || 'Unknown',
-        initials: emp?.initials || '?',
-        role: emp?.position || "—",
+        employeeName: emp?.name || "Unknown",
+        initials: emp?.initials || "?",
+        role: "—",
         requestDate: c.requestdate,
-        requestType: c.requesttype || 'Shift Change',
-        preferredDate: c.preferreddate,
         reason: c.reason,
         status: c.status,
-        managerNote: c.managernote,
       };
     });
   }
@@ -882,8 +842,13 @@ const fetchSchedules = async () => {
     schedules.value = data.map((s) => ({
       id: s.ScheduleId,
       employeeId: s.EmployeeId,
-      employeeName: s.employee ? `${s.employee.FirstName || ''} ${s.employee.LastName || ''}`.trim() : 'Unknown',
-      initials: s.employee ? `${(s.employee.FirstName?.[0] || '')}${(s.employee.LastName?.[0] || '')}`.toUpperCase() || '?' : '?',
+      employeeName: s.employee
+        ? `${s.employee.FirstName || ""} ${s.employee.LastName || ""}`.trim()
+        : "Unknown",
+      initials: s.employee
+        ? `${s.employee.FirstName?.[0] || ""}${s.employee.LastName?.[0] || ""}`.toUpperCase() ||
+          "?"
+        : "?",
       role: s.Role,
       shiftDate: s.ShiftDate,
       startTime: s.StartTime?.slice(0, 5),
@@ -931,57 +896,9 @@ const validate = () => {
   return Object.keys(e).length === 0;
 };
 
-const checkScheduleConflict = async () => {
-  const { data } = await supabase
-    .from("schedule")
-    .select("ScheduleId, StartTime, EndTime, Role")
-    .eq("EmployeeId", form.value.employeeId)
-    .eq("ShiftDate", form.value.shiftDate)
-    .neq("Status", "Cancelled")
-    .neq("Status", "Archived");
-
-  if (!data || data.length === 0) return null;
-
-  const newStart = form.value.startTime;
-  const newEnd = form.value.endTime;
-
-  // Check for time overlaps, excluding the current record if editing
-  for (const existing of data) {
-    if (isEditing.value && existing.ScheduleId === form.value.id) {
-      continue; // Skip the current record when editing
-    }
-
-    const existingStart = existing.StartTime;
-    const existingEnd = existing.EndTime;
-
-    // Check for overlap: newStart < existingEnd AND newEnd > existingStart
-    if (newStart < existingEnd && newEnd > existingStart) {
-      return {
-        employeeId: form.value.employeeId,
-        existingStart,
-        existingEnd,
-        existingRole: existing.Role,
-      };
-    }
-  }
-
-  return null;
-};
-
 const saveSchedule = async () => {
   if (!validate()) return;
   saving.value = true;
-
-  // Check for schedule conflicts
-  const conflict = await checkScheduleConflict();
-  if (conflict) {
-    showToast(
-      `Employee already has a shift from ${conflict.existingStart}–${conflict.existingEnd} (${conflict.existingRole}) on this date.`,
-      "error"
-    );
-    saving.value = false;
-    return;
-  }
 
   const payload = {
     EmployeeId: form.value.employeeId,
@@ -1043,45 +960,20 @@ const deleteSchedule = async () => {
 
 const updateAvailStatus = async (avail, status) => {
   const { error } = await supabase
-    .from('availability')
+    .from("availability")
     .update({ status })
-    .eq('availabilityid', avail.id);
+    .eq("availabilityid", avail.id);
 
   if (error) {
-    showToast('Failed to update availability.', 'error');
+    showToast("Failed to update availability.", "error");
     return;
   }
 
   avail.status = status;
 
   if (status === "Confirmed") {
-    // Check for schedule conflicts before creating
-    const { data: conflicts } = await supabase
-      .from("schedule")
-      .select("StartTime, EndTime, Role")
-      .eq("EmployeeId", avail.employeeId)
-      .eq("ShiftDate", avail.availableDate)
-      .neq("Status", "Cancelled")
-      .neq("Status", "Archived");
-
-    if (conflicts && conflicts.length > 0) {
-      const newStart = avail.startTime;
-      const newEnd = avail.endTime;
-      
-      for (const existing of conflicts) {
-        if (newStart < existing.EndTime && newEnd > existing.StartTime) {
-          showToast(
-            `Employee already has a shift from ${existing.StartTime}–${existing.EndTime} (${existing.Role}) on this date.`,
-            "error"
-          );
-          return;
-        }
-      }
-    }
-
-    const { error: schedErr } = await supabase
-      .from("schedule")
-      .insert([{
+    const { error: schedErr } = await supabase.from("schedule").insert([
+      {
         EmployeeId: avail.employeeId,
         Role: avail.role,
         ShiftDate: avail.availableDate,
@@ -1090,14 +982,18 @@ const updateAvailStatus = async (avail, status) => {
         Status: "Scheduled",
         BranchId: managerBranchId.value,
         BasedOnAvailabilityId: avail.id,
-      }]);
+      },
+    ]);
 
     if (schedErr) {
-      showToast('Availability approved but failed to create schedule.', 'error');
+      showToast(
+        "Availability approved but failed to create schedule.",
+        "error",
+      );
       return;
     }
     await fetchSchedules();
-    showToast('Availability approved and schedule created.', 'success');
+    showToast("Availability approved and schedule created.", "success");
   } else {
     showToast(`Availability rejected.`, "success");
   }
@@ -1105,7 +1001,9 @@ const updateAvailStatus = async (avail, status) => {
   // Start 20-second fade-out before removing from pending view
   fadingIds.value = new Set([...fadingIds.value, avail.id]);
   setTimeout(() => {
-    fadingIds.value = new Set([...fadingIds.value].filter(id => id !== avail.id));
+    fadingIds.value = new Set(
+      [...fadingIds.value].filter((id) => id !== avail.id),
+    );
   }, 20000);
 };
 
@@ -1183,18 +1081,21 @@ onMounted(async () => {
 }
 
 .schedule-page {
-  padding: 1.5rem;
-  background: #f4f1ef;
+  padding: 24px 32px;
+  background: #fafafa;
   min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
 .page-title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--text-main);
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0 0 4px;
 }
 .page-sub {
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  font-size: 14px;
+  color: #888;
+  margin: 0;
 }
 
 .tab-bar {
@@ -1402,7 +1303,7 @@ onMounted(async () => {
 }
 
 .btn-primary-brand {
-  background: var(--brand-primary);
+  background: #8b4513;
   color: #fff;
   border: none;
   padding: 0.45rem 0.9rem;
@@ -1411,7 +1312,7 @@ onMounted(async () => {
   font-weight: 600;
 }
 .btn-primary-brand:hover:not(:disabled) {
-  background: var(--brand-hover);
+  background: #a0522d;
 }
 .btn-primary-brand:disabled {
   opacity: 0.65;
@@ -1556,67 +1457,6 @@ onMounted(async () => {
   display: block;
 }
 
-.shift-detail-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.shift-detail-employee {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.emp-avatar.lg {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 0.9rem;
-  flex-shrink: 0;
-}
-
-.shift-detail-name {
-  font-weight: 600;
-  color: var(--text-main);
-  margin-bottom: 0.25rem;
-}
-
-.shift-detail-role {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-.shift-detail-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.shift-detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.shift-detail-row .label {
-  font-weight: 600;
-  color: var(--text-main);
-  font-size: 0.84rem;
-}
-
-.shift-detail-row .value {
-  color: var(--text-main);
-  font-size: 0.84rem;
-}
-
 .toast-wrap {
   position: fixed;
   bottom: 1.5rem;
@@ -1702,7 +1542,7 @@ onMounted(async () => {
   border-right: none;
 }
 
-.calendar-day:nth-last-child(-n+7) {
+.calendar-day:nth-last-child(-n + 7) {
   border-bottom: none;
 }
 
@@ -1733,14 +1573,14 @@ onMounted(async () => {
 
 .today-badge {
   display: inline-block;
-  background: #FFF4E5;
-  color: #8B4513;
+  background: #fff4e5;
+  color: #8b4513;
   font-size: 0.65rem;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 3px;
   margin-left: auto;
-  border: 1px solid #F1E6D2;
+  border: 1px solid #f1e6d2;
 }
 
 .day-shifts {
@@ -1795,38 +1635,5 @@ onMounted(async () => {
 
 .fade-slide-move {
   transition: transform 0.4s ease;
-}
-
-.employee-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: #f9f6f4;
-  border-radius: 8px;
-  font-size: 0.85rem;
-}
-.employee-legend .legend-label {
-  font-weight: 600;
-  color: #5d4037;
-  margin-right: 4px;
-}
-.employee-legend .legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px 2px 4px;
-  border-radius: 4px;
-  background: #fff;
-  border: 1px solid #e8ddd8;
-}
-.employee-legend .legend-swatch {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  flex-shrink: 0;
 }
 </style>

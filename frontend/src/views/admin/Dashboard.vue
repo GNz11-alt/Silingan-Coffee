@@ -32,13 +32,13 @@
           >
             {{
               totalRevenue === 0
-                ? "No revenue today"
+                ? "no revenue today"
                 : yesterdayRevenue > 0 && totalRevenue < yesterdayRevenue * 0.5
-                  ? "Well below yesterday"
+                  ? "well below yesterday"
                   : yesterdayRevenue > 0 &&
                       totalRevenue < yesterdayRevenue * 0.8
-                    ? "Slightly below yesterday"
-                    : "Today across all branches"
+                    ? "slightly below yesterday"
+                    : "today across all branches"
             }}
           </span>
         </div>
@@ -65,12 +65,12 @@
           >
             {{
               totalOrders === 0
-                ? "No orders today"
+                ? "no orders today"
                 : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.5
-                  ? "Well below yesterday"
+                  ? "well below yesterday"
                   : yesterdayOrders > 0 && totalOrders < yesterdayOrders * 0.8
-                    ? "Slightly below yesterday"
-                    : "Today across all branches"
+                    ? "slightly below yesterday"
+                    : "today across all branches"
             }}
           </span>
         </div>
@@ -97,10 +97,10 @@
           >
             {{
               activeBranches < 3
-                ? "Several branches offline"
+                ? "several branches offline"
                 : activeBranches < 5
-                  ? "Some branches inactive"
-                  : "Locations operating"
+                  ? "some branches inactive"
+                  : "locations operating"
             }}
           </span>
         </div>
@@ -116,19 +116,19 @@
           <span
             :class="[
               'stat-trend',
-              lowStockCount > 10
+              lowStockPercent >= 20
                 ? 'danger'
-                : lowStockCount > 0
+                : lowStockPercent > 0
                   ? 'warning'
                   : 'positive',
             ]"
           >
             {{
-              lowStockCount > 10
-                ? "Critical — needs attention"
-                : lowStockCount > 0
-                  ? "Across all branches"
-                  : "All items stocked"
+              lowStockPercent >= 20
+                ? "critical — needs attention"
+                : lowStockPercent > 0
+                  ? "across all branches"
+                  : "all items stocked"
             }}
           </span>
         </div>
@@ -153,10 +153,10 @@
           >
             {{
               totalEmployees < 10
-                ? "Critically understaffed"
+                ? "critically understaffed"
                 : totalEmployees < 20
-                  ? "Below ideal headcount"
-                  : "Across all branches"
+                  ? "below ideal headcount"
+                  : "across all branches"
             }}
           </span>
         </div>
@@ -247,7 +247,11 @@ import {
 } from "lucide-vue-next";
 
 const router = useRouter();
-const username = ref(localStorage.getItem("username") || "User");
+const raw = localStorage.getItem("username") || "User";
+const name = raw.split(/[^a-zA-Z]/)[0];
+const username = ref(
+  name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
+);
 const isLoading = ref(true);
 
 // Stats
@@ -258,6 +262,7 @@ const lowStockCount = ref(0);
 const totalEmployees = ref(0);
 const yesterdayRevenue = ref(0);
 const yesterdayOrders = ref(0);
+const lowStockPercent = ref(0);
 
 // Data
 const branchPerformance = ref([]);
@@ -344,9 +349,17 @@ const fetchDashboardData = async () => {
   const branchStockList = Object.values(branchItemStock);
 
   // Global low stock count
+  const { data: allProducts } = await supabase
+    .from("rawproduct")
+    .select("rawproductid")
+    .neq("status", "Archived");
+
+  const totalItems = allProducts?.length ?? 0;
   lowStockCount.value = branchStockList.filter(
     (i) => i.reorderlevel && i.quantity <= i.reorderlevel && i.quantity > 0,
   ).length;
+  lowStockPercent.value =
+    totalItems > 0 ? (lowStockCount.value / totalItems) * 100 : 0;
 
   // Build branch performance
   if (branchData) {
@@ -369,14 +382,14 @@ const fetchDashboardData = async () => {
       ).length;
 
       let status = "good";
-      let statusText = "Good";
+      let statusText = "no low stock items";
 
       if (zeroStockCount > 0) {
         status = "critical";
         statusText = `${zeroStockCount} Out of Stock`;
       } else if (branchLowStock > 0) {
         status = "warning";
-        statusText = `${branchLowStock} Low Stock Item${branchLowStock > 1 ? "s" : ""}`;
+        statusText = `${branchLowStock} low stock item${branchLowStock > 1 ? "s" : ""}`;
       }
 
       return {
