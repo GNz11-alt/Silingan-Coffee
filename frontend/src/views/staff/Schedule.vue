@@ -328,6 +328,9 @@
                   <span class="status-badge" :class="statusClass(inq.Status)">{{ inq.Status }}</span>
                 </div>
                 <p class="inquiry-reason">{{ inq.Reason }}</p>
+                <div v-if="inq.PreferredDate" class="inquiry-meta">
+                  <span class="preferred-date">Preferred: {{ formatShiftDate(inq.PreferredDate) }}</span>
+                </div>
                 <div v-if="inq.ManagerNote" class="manager-note">
                   <Briefcase :size="14" />
                   <span><strong>Manager:</strong> {{ inq.ManagerNote }}</span>
@@ -488,10 +491,16 @@ export default {
           return {
             id: s.EmployeeId + dateStr,
             employeeId: s.EmployeeId,
+            employeeName: s.Name,
             startTime: s.TimeIn,
+            endTime: s.TimeOut,
             label: isMine ? 'Me' : (s.Name?.split(' ').map(n => n[0]).join('').toUpperCase() || ''),
             isMine,
-            color: isMine ? '#5d4037' : this.avatarColors[s.EmployeeId % this.avatarColors.length]
+            color: isMine ? '#5d4037' : this.avatarColors[s.EmployeeId % this.avatarColors.length],
+            shiftDate: s.WorkDate,
+            role: s.Position,
+            branch: s.Branch,
+            status: s.Status
           }
         })
 
@@ -705,10 +714,12 @@ export default {
         if (error) throw error
         this.myInquiries = (data || []).map(c => ({
           InquiryId: c.inquiryid,
-          RequestType: 'Shift Change',
+          RequestType: c.requesttype || 'Shift Change',
           ShiftDate: c.requestdate,
+          PreferredDate: c.preferreddate,
           Reason: c.reason,
           Status: c.status,
+          ManagerNote: c.managernote,
           CreatedAt: c.createdat
         }))
       } catch (err) {
@@ -767,6 +778,8 @@ export default {
           .insert({
             employeeid: this.employeeId,
             requestdate: this.inquiryForm.ShiftDate,
+            requesttype: this.inquiryForm.RequestType,
+            preferreddate: this.inquiryForm.PreferredDate || null,
             reason: this.inquiryForm.Reason,
             status: 'Pending'
           })

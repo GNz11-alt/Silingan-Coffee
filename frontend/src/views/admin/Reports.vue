@@ -3,7 +3,7 @@
     <div>
       <h4 class="page-title mb-1">Reports &amp; Analytics</h4>
     </div>
-    <div class="d-flex gap-2 align-items-center flex-wrap mt-3 mb-4">
+    <div class="d-flex gap-2 align-items-center flex-wrap">
       <select
         v-model="period"
         class="form-select fc-brand"
@@ -46,11 +46,7 @@
 
     <!-- ── KPI CARDS ──────────────────────────────────────────── -->
     <div class="row g-3 mb-4">
-      <div
-        class="col-12 col-sm-6 col-xl-3"
-        v-for="kpi in kpis"
-        :key="kpi.label"
-      >
+      <div class="col-6 col-md-3" v-for="kpi in kpis" :key="kpi.label">
         <div class="kpi-card">
           <div
             v-if="kpiLoading"
@@ -58,17 +54,17 @@
             style="height: 70px"
           ></div>
           <template v-else>
-            <div class="kpi-icon"><i :class="kpi.icon"></i></div>
-            <div class="kpi-info">
-              <h3>{{ kpi.label }}</h3>
-              <p class="kpi-value">{{ kpi.value }}</p>
-              <div class="kpi-change" :class="kpi.up ? 'up' : 'down'">
-                <i
-                  class="bi"
-                  :class="kpi.up ? 'bi-arrow-up-right' : 'bi-arrow-down-right'"
-                ></i>
-                {{ kpi.change }} from last period
-              </div>
+            <div class="kpi-top">
+              <span class="kpi-label">{{ kpi.label }}</span>
+              <div class="kpi-icon"><i :class="kpi.icon"></i></div>
+            </div>
+            <div class="kpi-value">{{ kpi.value }}</div>
+            <div class="kpi-change" :class="kpi.up ? 'up' : 'down'">
+              <i
+                class="bi"
+                :class="kpi.up ? 'bi-arrow-up-right' : 'bi-arrow-down-right'"
+              ></i>
+              {{ kpi.change }} from last period
             </div>
           </template>
         </div>
@@ -429,10 +425,7 @@
               <div class="chart-loading" v-if="chartsLoading.categoryPie">
                 <div class="spinner-border spinner-border-sm text-muted"></div>
               </div>
-              <div
-                class="chart-wrap chart-wrap--sm"
-                v-show="!chartsLoading.categoryPie"
-              >
+              <div class="chart-wrap chart-wrap--sm" v-show="!chartsLoading.categoryPie">
                 <canvas ref="invCategoryPieChart"></canvas>
               </div>
             </div>
@@ -828,24 +821,16 @@
               ></iframe>
               <div v-else class="preview-excel-placeholder">
                 <i class="bi bi-file-earmark-spreadsheet fs-1 text-muted"></i>
-                <p class="text-muted mt-2 mb-0">
-                  Excel files cannot be previewed inline.
-                </p>
-                <a
-                  :href="previewData.filepath"
-                  target="_blank"
-                  class="btn btn-primary-brand mt-3"
-                  style="display: inline-block"
-                >
+                <p class="text-muted mt-2 mb-0">Excel files cannot be previewed inline.</p>
+                <a :href="previewData.filepath" target="_blank"
+                  class="btn btn-primary-brand mt-3" style="display:inline-block">
                   <i class="bi bi-download me-1"></i> Download File
                 </a>
               </div>
             </div>
             <div v-else class="preview-placeholder mt-3">
               <i class="bi bi-cloud-slash fs-1 text-muted"></i>
-              <p class="text-muted mt-2 mb-0">
-                File was not saved to cloud storage.
-              </p>
+              <p class="text-muted mt-2 mb-0">File was not saved to cloud storage.</p>
             </div>
           </div>
           <div class="modal-panel-footer">
@@ -1783,161 +1768,71 @@ export default {
 
             // Top Products Horizontal Bar
             const top = this.topProductsData || [];
-            const maxRev = Math.max(...top.map((p) => Number(p.revenue)), 1);
+            const maxRev = Math.max(...top.map(p => Number(p.revenue)), 1);
             const barSvg = top.length
               ? `<svg xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${top.length * (BAR_H + BAR_GAP) + 30}" viewBox="0 0 ${CHART_W} ${top.length * (BAR_H + BAR_GAP) + 30}">
                   <style>.t{fill:#374151;font:11px sans-serif}.l{fill:#6b7280;font:10px sans-serif}</style>
-                  ${top
-                    .map((p, i) => {
-                      const y = i * (BAR_H + BAR_GAP);
-                      const w = Math.max(
-                        (Number(p.revenue) / maxRev) * (CHART_W - LABEL_W - 60),
-                        2,
-                      );
-                      const color = PALETTE[i % PALETTE.length];
-                      return (
-                        `<text x="0" y="${y + BAR_H / 2 + 4}" class="t" text-anchor="end">${(p.product_name || "").length > 14 ? (p.product_name || "").slice(0, 14) + "…" : p.product_name || ""}</text>` +
-                        `<rect x="${LABEL_W + 4}" y="${y + 2}" width="${w}" height="${BAR_H - 4}" rx="3" fill="${color}"/>` +
-                        `<text x="${LABEL_W + 8 + w}" y="${y + BAR_H / 2 + 4}" class="l">₱${Number(p.revenue).toLocaleString()}</text>`
-                      );
-                    })
-                    .join("")}
+                  ${top.map((p, i) => {
+                    const y = i * (BAR_H + BAR_GAP);
+                    const w = Math.max((Number(p.revenue) / maxRev) * (CHART_W - LABEL_W - 60), 2);
+                    const color = PALETTE[i % PALETTE.length];
+                    return `<text x="0" y="${y + BAR_H / 2 + 4}" class="t" text-anchor="end">${(p.product_name || '').length > 14 ? (p.product_name || '').slice(0,14)+'…' : (p.product_name || '')}</text>` +
+                           `<rect x="${LABEL_W + 4}" y="${y + 2}" width="${w}" height="${BAR_H - 4}" rx="3" fill="${color}"/>` +
+                           `<text x="${LABEL_W + 8 + w}" y="${y + BAR_H / 2 + 4}" class="l">₱${Number(p.revenue).toLocaleString()}</text>`;
+                  }).join('')}
                   <text x="0" y="${top.length * (BAR_H + BAR_GAP) + 20}" class="l">Revenue (₱)</text>
                 </svg>`
-              : "";
-            if (barSvg)
-              chartImages.push({
-                svg: barSvg,
-                width: CHART_W,
-                title: "Top Selling Products",
-                desc: "Highest-grossing products by revenue.",
-              });
+              : '';
+            if (barSvg) chartImages.push({ svg: barSvg, width: CHART_W, title: 'Top Selling Products', desc: 'Highest-grossing products by revenue.' });
 
             // Sales by Category Pie
             const cats = this.revCategoryData || [];
             const total = cats.reduce((s, c) => s + Number(c.revenue), 0) || 1;
-            const PIE_W = 320,
-              PIE_H = 200,
-              CX = 140,
-              CY = 100,
-              R = 80;
+            const PIE_W = 320, PIE_H = 200, CX = 140, CY = 100, R = 80;
             let angle = -Math.PI / 2;
             const slices = cats.map((c, i) => {
-              const val = (Number(c.revenue) / total) * 2 * Math.PI;
-              const a1 = angle,
-                a2 = angle + val;
-              const x1 = CX + R * Math.cos(a1),
-                y1 = CY + R * Math.sin(a1);
-              const x2 = CX + R * Math.cos(a2),
-                y2 = CY + R * Math.sin(a2);
+              const val = Number(c.revenue) / total * 2 * Math.PI;
+              const a1 = angle, a2 = angle + val;
+              const x1 = CX + R * Math.cos(a1), y1 = CY + R * Math.sin(a1);
+              const x2 = CX + R * Math.cos(a2), y2 = CY + R * Math.sin(a2);
               const large = val > Math.PI ? 1 : 0;
               const color = PALETTE[i % PALETTE.length];
               const path = `M${CX},${CY} L${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} Z`;
               angle = a2;
-              return {
-                path,
-                color,
-                label: c.category || "—",
-                pct: ((Number(c.revenue) / total) * 100).toFixed(1),
-              };
+              return { path, color, label: c.category || '—', pct: (Number(c.revenue) / total * 100).toFixed(1) };
             });
             const pieSvg = cats.length
               ? `<svg xmlns="http://www.w3.org/2000/svg" width="${PIE_W + 160}" height="${PIE_H + 20}" viewBox="0 0 ${PIE_W + 160} ${PIE_H + 20}">
                   <style>.t{fill:#374151;font:11px sans-serif}.p{fill:#6b7280;font:10px sans-serif}</style>
-                  ${slices.map((s) => `<path d="${s.path}" fill="${s.color}" stroke="#fff" stroke-width="2"/>`).join("")}
-                  ${slices
-                    .map((s, i) => {
-                      const ly = 20 + i * 22;
-                      return (
-                        `<rect x="${PIE_W + 10}" y="${ly}" width="12" height="12" rx="2" fill="${s.color}"/>` +
-                        `<text x="${PIE_W + 28}" y="${ly + 10}" class="t">${s.label}</text>` +
-                        `<text x="${PIE_W + 28}" y="${ly + 21}" class="p">${s.pct}%</text>`
-                      );
-                    })
-                    .join("")}
+                  ${slices.map(s => `<path d="${s.path}" fill="${s.color}" stroke="#fff" stroke-width="2"/>`).join('')}
+                  ${slices.map((s, i) => {
+                    const ly = 20 + i * 22;
+                    return `<rect x="${PIE_W + 10}" y="${ly}" width="12" height="12" rx="2" fill="${s.color}"/>` +
+                           `<text x="${PIE_W + 28}" y="${ly + 10}" class="t">${s.label}</text>` +
+                           `<text x="${PIE_W + 28}" y="${ly + 21}" class="p">${s.pct}%</text>`;
+                  }).join('')}
                 </svg>`
-              : "";
-            if (pieSvg)
-              chartImages.push({
-                svg: pieSvg,
-                width: PIE_W + 160,
-                title: "Sales by Category",
-                desc: "Proportion of sales by product category.",
-              });
+              : '';
+            if (pieSvg) chartImages.push({ svg: pieSvg, width: PIE_W + 160, title: 'Sales by Category', desc: 'Proportion of sales by product category.' });
           } else {
             const chartDefs = [
-              {
-                ref: "salesTrendChart",
-                key: "salesTrend",
-                title: "Sales Trend",
-                desc: "Daily sales trend over the selected period.",
-              },
-              {
-                ref: "orderVolumeChart",
-                key: "orderVolume",
-                title: "Order Volume",
-                desc: "Number of orders placed per day.",
-              },
-              {
-                ref: "peakHoursChart",
-                key: "peakHours",
-                title: "Peak Hours",
-                desc: "Busiest hours of operation.",
-              },
-              {
-                ref: "revCategoryChart",
-                key: "revCategory",
-                title: "Revenue by Category",
-                desc: "Distribution of revenue across product categories.",
-              },
-              {
-                ref: "topProductsChart",
-                key: "topProducts",
-                title: "Top Selling Products",
-                desc: "Highest-grossing products by revenue.",
-              },
-              {
-                ref: "categoryPieChart",
-                key: "categoryPie",
-                title: "Sales by Category",
-                desc: "Proportion of sales by product category.",
-              },
-              {
-                ref: "branchRevenueChart",
-                key: "branchRevenue",
-                title: "Branch Revenue",
-                desc: "Total revenue comparison across branches.",
-              },
-              {
-                ref: "branchShareChart",
-                key: "branchShare",
-                title: "Branch Share",
-                desc: "Each branch's contribution to total revenue.",
-              },
-              {
-                ref: "invTopProductsChart",
-                key: "invTopProducts",
-                title: "Top Selling Products",
-                desc: "Highest-grossing products by revenue.",
-              },
-              {
-                ref: "invCategoryPieChart",
-                key: "invCategoryPie",
-                title: "Sales by Category",
-                desc: "Proportion of sales by product category.",
-              },
+              { ref: 'salesTrendChart',     key: 'salesTrend',     title: 'Sales Trend',           desc: 'Daily sales trend over the selected period.' },
+              { ref: 'orderVolumeChart',    key: 'orderVolume',    title: 'Order Volume',          desc: 'Number of orders placed per day.' },
+              { ref: 'peakHoursChart',      key: 'peakHours',      title: 'Peak Hours',            desc: 'Busiest hours of operation.' },
+              { ref: 'revCategoryChart',    key: 'revCategory',    title: 'Revenue by Category',   desc: 'Distribution of revenue across product categories.' },
+              { ref: 'topProductsChart',    key: 'topProducts',    title: 'Top Selling Products',  desc: 'Highest-grossing products by revenue.' },
+              { ref: 'categoryPieChart',    key: 'categoryPie',    title: 'Sales by Category',     desc: 'Proportion of sales by product category.' },
+              { ref: 'branchRevenueChart',  key: 'branchRevenue',  title: 'Branch Revenue',        desc: 'Total revenue comparison across branches.' },
+              { ref: 'branchShareChart',    key: 'branchShare',    title: 'Branch Share',          desc: "Each branch's contribution to total revenue." },
+              { ref: 'invTopProductsChart', key: 'invTopProducts', title: 'Top Selling Products',  desc: 'Highest-grossing products by revenue.' },
+              { ref: 'invCategoryPieChart', key: 'invCategoryPie', title: 'Sales by Category',     desc: 'Proportion of sales by product category.' },
             ];
             for (const def of chartDefs) {
               if (!this._charts[def.key]) continue;
               const canvas = this.$refs[def.ref];
-              if (canvas && typeof canvas.toDataURL === "function") {
+              if (canvas && typeof canvas.toDataURL === 'function') {
                 try {
-                  chartImages.push({
-                    data: canvas.toDataURL("image/png"),
-                    width: 500,
-                    title: def.title,
-                    desc: def.desc,
-                  });
+                  chartImages.push({ data: canvas.toDataURL('image/png'), width: 500, title: def.title, desc: def.desc });
                 } catch (_) {}
               }
             }
@@ -1948,13 +1843,7 @@ export default {
         let fileBuffer = null;
         let contentType = "";
         if (this.genForm.format === "pdf") {
-          fileBuffer = await exportPDF(
-            this.genForm.type,
-            rawRows || rows,
-            meta,
-            chartImages,
-            this.topProductsData,
-          );
+          fileBuffer = await exportPDF(this.genForm.type, rawRows || rows, meta, chartImages, this.topProductsData);
           contentType = "application/pdf";
         }
         if (this.genForm.format === "excel") {
@@ -1976,17 +1865,10 @@ export default {
           } = await uploadReportFile(fileBuffer, fileName, contentType);
           if (uploadErr) {
             console.error("[Reports] Storage upload failed:", uploadErr);
-            if (uploadErr.message?.includes("Bucket not found")) {
-              this.showToast(
-                'Storage bucket "reports" not found — create it in Supabase Storage dashboard',
-                "error",
-              );
+            if (uploadErr.message?.includes('Bucket not found')) {
+              this.showToast('Storage bucket "reports" not found — create it in Supabase Storage dashboard', 'error')
             } else {
-              this.showToast(
-                "Cloud upload failed: " +
-                  (uploadErr.message || "unknown error"),
-                "error",
-              );
+              this.showToast('Cloud upload failed: ' + (uploadErr.message || 'unknown error'), 'error')
             }
           } else {
             filePath = publicUrl || uploadedPath;
@@ -2103,8 +1985,8 @@ export default {
     },
 
     formatTimeRemaining(days) {
-      if (days == null || days === "N/A") return days || "—";
-      if (isNaN(days)) return "—";
+      if (days == null || days === 'N/A') return days || '—';
+      if (isNaN(days)) return '—';
       const totalMin = Math.round(Number(days) * 24 * 60);
       const d = Math.floor(totalMin / 1440);
       const h = Math.floor((totalMin % 1440) / 60);
@@ -2200,37 +2082,38 @@ export default {
 
 /* KPI */
 .kpi-card {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 20px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+.kpi-top {
   display: flex;
   align-items: center;
-  gap: 16px;
-  border: 1px solid #e9ecef;
-  transition: all 0.2s ease;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
 }
-.kpi-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+.kpi-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .kpi-icon {
   color: #7b1d1d;
-  font-size: 28px;
-  flex-shrink: 0;
-}
-.kpi-info h3 {
-  font-size: 13px;
-  color: #6c757d;
-  margin-bottom: 6px;
-  font-weight: 500;
+  font-size: 1rem;
 }
 .kpi-value {
-  font-size: 24px;
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #1a1a1a;
+  line-height: 1.1;
 }
 .kpi-change {
-  font-size: 11px;
+  font-size: 0.72rem;
+  margin-top: 0.3rem;
   display: flex;
   align-items: center;
   gap: 0.2rem;
@@ -3148,4 +3031,5 @@ export default {
   border: 2px dashed var(--border);
   border-radius: 8px;
 }
+
 </style>

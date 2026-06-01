@@ -12,6 +12,16 @@ export function useSearchData() {
     const items = []
 
     try {
+      // Fetch inventory stock for accurate product stock status
+      const { data: inventoryRows } = await supabase
+        .from('inventory')
+        .select('ProductId, Quantity, LowStockThreshold, BranchId')
+      const stockMap = {}
+      for (const inv of inventoryRows || []) {
+        const key = `${inv.ProductId}:${inv.BranchId}`
+        stockMap[key] = { qty: inv.Quantity, threshold: inv.LowStockThreshold }
+      }
+
       // Fetch products
       const { data: products } = await supabase
         .from('product')
@@ -19,7 +29,14 @@ export function useSearchData() {
 
       if (products) {
         products.forEach(p => {
-          const stockStatus = p.Price ? (p.Price > 100 ? 'In Stock' : 'Low Stock') : 'Out of Stock'
+          const invKey = `${p.ProductId}:${p.BranchId}`
+          const stock = stockMap[invKey]
+          let stockStatus = 'Out of Stock'
+          if (stock) {
+            if (stock.qty === 0) stockStatus = 'Out of Stock'
+            else if (stock.qty <= (stock.threshold || 0)) stockStatus = 'Low Stock'
+            else stockStatus = 'In Stock'
+          }
           items.push({
             id: `prod-${p.ProductId}`,
             type: 'product',
@@ -54,7 +71,7 @@ export function useSearchData() {
             description: r.category || 'Raw material',
             details: `${qty} ${r.unit || ''} in stock`,
             status,
-            branch: '',
+            branch: 'all',
             category: r.category || 'Uncategorized',
             date: null,
           })
