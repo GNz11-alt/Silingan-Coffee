@@ -281,7 +281,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="item in lowStockData" :key="item.rawproductid">
+                    <tr v-for="(item, idx) in lowStockData" :key="idx">
                       <td class="fw-600">{{ item.name }}</td>
                       <td>{{ item.category }}</td>
                       <td>{{ item.stockquantity }} {{ item.unit }}</td>
@@ -595,6 +595,12 @@
               </div>
             </div>
 
+            <div class="mb-2 d-flex gap-1">
+              <button class="btn btn-quick-range btn-sm" @click="setQuickRange('today')">Today</button>
+              <button class="btn btn-quick-range btn-sm" @click="setQuickRange('week')">This Week</button>
+              <button class="btn btn-quick-range btn-sm" @click="setQuickRange('month')">This Month</button>
+            </div>
+
             <div class="mb-3">
               <label class="form-label-sm">Date To</label>
               <input
@@ -793,6 +799,7 @@ import {
   getRevenueByCategory,
   getTopProducts,
   getLowStockItems,
+  getLowRawMaterials,
   getStockTurnover,
   getSavedReports,
   saveReportRecord,
@@ -955,16 +962,15 @@ export default {
           { value: "sales-pipeline", label: "Sales Pipeline Report" },
           { value: "sales-performance", label: "Sales Performance Report" },
           { value: "sales-forecast", label: "Sales Forecast Report" },
-          { value: "sales-monthly", label: "Monthly Summary Report" },
-          { value: "sales-weekly", label: "Weekly Summary Report" },
+          { value: "sales-summary", label: "Sales Summary Report" },
         ],
         inventory: [
           { value: "inventory-on-hand", label: "Inventory on Hand Report" },
           { value: "inventory-aging", label: "Inventory Aging Report" },
           { value: "stock-turnover", label: "Stock Turnover Report" },
           { value: "low-inventory", label: "Low Inventory Report" },
-          { value: "inventory-monthly", label: "Monthly Summary Report" },
-          { value: "inventory-weekly", label: "Weekly Summary Report" },
+          { value: "low-raw-materials", label: "Low Raw Materials Report" },
+          { value: "inventory-summary", label: "Inventory Summary Report" },
         ],
         schedule: [
           { value: "employee-schedule", label: "Employee Schedule Report" },
@@ -995,7 +1001,7 @@ export default {
           icon: "bi bi-graph-up-arrow",
           color: "green",
           category: "sales",
-          type: "sales-monthly",
+          type: "sales-summary",
           formats: ["PDF", "Excel"],
         },
         {
@@ -1257,13 +1263,21 @@ export default {
     async loadLowStock(from, to, branch) {
       this.chartsLoading.lowStock = true;
       delete this.chartErrors.lowStock;
-      const { data, error } = await getLowStockItems(from, to, branch);
+      const { data, error } = await getLowRawMaterials(branch);
       this.chartsLoading.lowStock = false;
       if (error) {
         console.error("[Reports] LowStock query failed:", error);
         this.chartErrors.lowStock = error.message;
       } else {
-        this.lowStockData = data || [];
+        this.lowStockData = (data || []).map(i => ({
+          name: i.name,
+          category: i.category,
+          stockquantity: i.we_have,
+          reorderlevel: i.minimum_safe,
+          unit: i.unit,
+          days_until_expiry: null,
+          expirationdate: null,
+        }));
       }
     },
 
@@ -1618,9 +1632,10 @@ export default {
         // Capture chart canvases for PDF
         let chartImages = [];
         if (this.genForm.format === "pdf") {
-          const isInventory = this.genForm.type.startsWith("inventory-");
+          const salesTypes = ['sales-pipeline', 'sales-performance', 'sales-forecast', 'sales-summary', 'consolidated-report'];
+          const isSalesType = salesTypes.includes(this.genForm.type);
 
-          if (isInventory) {
+          if (isSalesType) {
             const CHART_W = 480;
             const BAR_H = 24;
             const BAR_GAP = 6;
@@ -1709,83 +1724,6 @@ export default {
                 title: "Sales by Category",
                 desc: "Proportion of sales by product category.",
               });
-          } else {
-            const chartDefs = [
-              {
-                ref: "salesTrendChart",
-                key: "salesTrend",
-                title: "Sales Trend",
-                desc: "Daily sales trend over the selected period.",
-              },
-              {
-                ref: "orderVolumeChart",
-                key: "orderVolume",
-                title: "Order Volume",
-                desc: "Number of orders placed per day.",
-              },
-              {
-                ref: "peakHoursChart",
-                key: "peakHours",
-                title: "Peak Hours",
-                desc: "Busiest hours of operation.",
-              },
-              {
-                ref: "revCategoryChart",
-                key: "revCategory",
-                title: "Revenue by Category",
-                desc: "Distribution of revenue across product categories.",
-              },
-              {
-                ref: "topProductsChart",
-                key: "topProducts",
-                title: "Top Selling Products",
-                desc: "Highest-grossing products by revenue.",
-              },
-              {
-                ref: "categoryPieChart",
-                key: "categoryPie",
-                title: "Sales by Category",
-                desc: "Proportion of sales by product category.",
-              },
-              {
-                ref: "branchRevenueChart",
-                key: "branchRevenue",
-                title: "Branch Revenue",
-                desc: "Total revenue comparison across branches.",
-              },
-              {
-                ref: "branchShareChart",
-                key: "branchShare",
-                title: "Branch Share",
-                desc: "Each branch's contribution to total revenue.",
-              },
-              {
-                ref: "invTopProductsChart",
-                key: "invTopProducts",
-                title: "Top Selling Products",
-                desc: "Highest-grossing products by revenue.",
-              },
-              {
-                ref: "invCategoryPieChart",
-                key: "invCategoryPie",
-                title: "Sales by Category",
-                desc: "Proportion of sales by product category.",
-              },
-            ];
-            for (const def of chartDefs) {
-              if (!this._charts[def.key]) continue;
-              const canvas = this.$refs[def.ref];
-              if (canvas && typeof canvas.toDataURL === "function") {
-                try {
-                  chartImages.push({
-                    data: canvas.toDataURL("image/png"),
-                    width: 500,
-                    title: def.title,
-                    desc: def.desc,
-                  });
-                } catch (_) {}
-              }
-            }
           }
         }
 
@@ -1871,6 +1809,29 @@ export default {
       this.genForm.type = tpl.type;
       this.mainTab = "generate";
       this.showToast(`Template "${tpl.name}" applied.`, "success");
+    },
+
+    setQuickRange(range) {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      if (range === 'today') {
+        this.genForm.dateFrom = todayStr;
+        this.genForm.dateTo = todayStr;
+      } else if (range === 'week') {
+        const sunday = new Date(today);
+        sunday.setDate(today.getDate() - today.getDay());
+        const syyyy = sunday.getFullYear();
+        const smm = String(sunday.getMonth() + 1).padStart(2, '0');
+        const sdd = String(sunday.getDate()).padStart(2, '0');
+        this.genForm.dateFrom = `${syyyy}-${smm}-${sdd}`;
+        this.genForm.dateTo = todayStr;
+      } else if (range === 'month') {
+        this.genForm.dateFrom = `${yyyy}-${mm}-01`;
+        this.genForm.dateTo = todayStr;
+      }
     },
 
     resetGenForm() {
@@ -2680,6 +2641,22 @@ export default {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.btn-quick-range {
+  background: #5d4037;
+  color: #fff;
+  border: 1px solid #5d4037;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-quick-range:hover {
+  background: #e0e0e0;
+  color: #5d4037;
+}
+
 .btn-gray {
   background: #e0e0e0;
   color: #333;
