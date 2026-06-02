@@ -96,7 +96,6 @@
         <div class="eoq-title-row">
           <TrendingUp :size="16" />
           <h3>Reorder Suggestions</h3>
-          <span class="eoq-badge">Based on Sales</span>
         </div>
         <p class="eoq-sub">Items at or below reorder point.</p>
       </div>
@@ -1489,9 +1488,9 @@ onMounted(async () => {
 .batch-expiring-warn { font-size: 12px; color: #d97706; font-weight: 700; display: block; }
 
 .status-badge { display: inline-block; padding: 5px 13px; border-radius: 20px; font-size: 14px; font-weight: 600; }
-.status-badge.good { background: #e8f5e9; color: #2e7d32; }
-.status-badge.low { background: #fff3e0; color: #f57c00; }
-.status-badge.out { background: #ffebee; color: #c62828; }
+.status-badge.good {  color: #2e7d32; }
+.status-badge.low { color: #f57c00; }
+.status-badge.out {  color: #c62828; }
 
 .batch-id-tag { background: #f0ebe4; padding: 4px 10px; border-radius: 6px; font-family: monospace; font-weight: 700; font-size: 13px; color: #5c3317; }
 .expiry-val { font-size: 15px; font-weight: 700; }

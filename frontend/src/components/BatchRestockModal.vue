@@ -5,7 +5,7 @@
         <div class="brm-header">
           <div>
             <h2>Batch Restock</h2>
-            <p class="brm-sub">Add multiple items in one session — each row is a separate delivery batch</p>
+            <p class="brm-sub">Add multiple items in one session</p>
           </div>
           <button class="brm-close" @click="$emit('close')">×</button>
         </div>

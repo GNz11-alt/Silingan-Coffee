@@ -5,7 +5,7 @@
         <div class="srm-header">
           <div>
             <h2>Reduce Stock</h2>
-            <p class="srm-sub">Log a non-sale reduction — spoilage, spillage, sampling, etc.</p>
+            <p class="srm-sub"></p>
           </div>
           <button class="srm-close" @click="$emit('close')">×</button>
         </div>
@@ -303,7 +303,7 @@ const confirm = async () => {
   display: flex; justify-content: space-between; align-items: flex-start;
   padding: 20px 22px; border-bottom: 1px solid #e9ecef;
 }
-.srm-header h2 { font-size: 17px; font-weight: 700; color: #212529; margin: 0 0 2px; }
+.srm-header h2 { font-size: 19px; font-weight: 700; color: #212529; margin: 0 0 2px; }
 .srm-sub { font-size: 13px; color: #888; margin: 0; }
 .srm-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #6c757d; }
 .srm-body { padding: 20px 22px; flex: 1; overflow-y: auto; }
