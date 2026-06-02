@@ -3,7 +3,13 @@
     <div class="notif-panel">
       <div class="notif-header">
         <span class="notif-title">Notifications</span>
-        <button v-if="tab === 'new' && unreadCount" class="notif-mark-all" @click="markAll">Mark all read</button>
+        <div class="notif-header-actions">
+          <button class="notif-refresh" @click="refreshNow" :disabled="loading">Refresh</button>
+          <button v-if="tab === 'new' && unreadCount" class="notif-mark-all" @click="markAll">Mark all read</button>
+        </div>
+      </div>
+      <div class="notif-last-updated">
+        Last updated: {{ lastUpdatedLabel }}
       </div>
 
       <div class="notif-tabs">
@@ -77,12 +83,19 @@ const props = defineProps({
 const emit = defineEmits(['close', 'update-count'])
 
 const router = useRouter()
-const { fetchNotifications, fetchAllNotifications, markAsRead, markAllAsRead } = useNotifications()
+const {
+  fetchNotificationBundle,
+  markAsRead,
+  markAllAsRead,
+} = useNotifications()
 const notifications = ref([])
 const loading = ref(true)
 const tab = ref('new')
 const unreadCount = ref(0)
 const detail = ref(null)
+const unread = ref([])
+const history = ref([])
+const lastUpdated = ref(0)
 
 const linkLabel = computed(() => {
   if (!detail.value?.link) return ''
@@ -91,25 +104,12 @@ const linkLabel = computed(() => {
 })
 
 onMounted(async () => {
-  const [unread, all] = await Promise.all([
-    fetchNotifications(props.branchId),
-    fetchAllNotifications(props.branchId),
-  ])
-  unreadCount.value = unread.length
-  notifications.value = tab.value === 'new' ? unread : all
-  loading.value = false
-  emit('update-count', unreadCount.value)
+  await loadNotifications({ force: false })
 })
 
 async function switchTab(t) {
   tab.value = t
-  loading.value = true
-  if (t === 'new') {
-    notifications.value = await fetchNotifications(props.branchId)
-  } else {
-    notifications.value = await fetchAllNotifications(props.branchId)
-  }
-  loading.value = false
+  notifications.value = t === 'new' ? unread.value : history.value
 }
 
 function timeAgo(dateStr) {
@@ -153,8 +153,36 @@ function goToLink() {
 async function markAll() {
   await markAllAsRead(props.branchId)
   unreadCount.value = 0
-  notifications.value = []
+  unread.value = []
+  notifications.value = tab.value === 'new' ? [] : history.value
   emit('update-count', 0)
+}
+
+const lastUpdatedLabel = computed(() => {
+  if (!lastUpdated.value) return 'Never'
+  return new Date(lastUpdated.value).toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+})
+
+async function loadNotifications({ force }) {
+  loading.value = true
+  const bundle = await fetchNotificationBundle(props.branchId, { force })
+  unread.value = bundle.unread || []
+  history.value = bundle.all || []
+  unreadCount.value = unread.value.length
+  notifications.value = tab.value === 'new' ? unread.value : history.value
+  lastUpdated.value = bundle.lastRefresh || Date.now()
+  loading.value = false
+  emit('update-count', unreadCount.value)
+}
+
+async function refreshNow() {
+  await loadNotifications({ force: true })
 }
 </script>
 
@@ -185,6 +213,31 @@ async function markAll() {
   justify-content: space-between;
   padding: 14px 16px;
   border-bottom: 1px solid #f0ebe8;
+}
+.notif-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.notif-refresh {
+  background: none;
+  border: 1px solid #e5e0dd;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #374151;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.notif-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.notif-last-updated {
+  padding: 8px 16px;
+  border-bottom: 1px solid #f0ebe8;
+  font-size: 0.7rem;
+  color: #6b7280;
 }
 .notif-title {
   font-size: 0.92rem;

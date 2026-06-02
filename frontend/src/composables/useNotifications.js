@@ -1,9 +1,46 @@
 import { supabase } from '@/supabase.js'
 
-export function useNotifications() {
-  const role = localStorage.getItem('role') || ''
+const REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000
+const LAST_REFRESH_KEY = 'lastNotificationRefresh'
+const CACHE_KEY = 'notificationCache'
 
-  function baseQuery(branchId = null) {
+function getRole() {
+  return localStorage.getItem('role') || ''
+}
+
+function getScopeKey(role, branchId) {
+  return `${role || 'unknown'}:${branchId ?? 'all'}`
+}
+
+function getLastRefresh(role, branchId = null) {
+  const all = JSON.parse(localStorage.getItem(LAST_REFRESH_KEY) || '{}')
+  return Number(all[getScopeKey(role, branchId)] || 0)
+}
+
+function setLastRefresh(role, branchId = null, value = Date.now()) {
+  const all = JSON.parse(localStorage.getItem(LAST_REFRESH_KEY) || '{}')
+  all[getScopeKey(role, branchId)] = value
+  localStorage.setItem(LAST_REFRESH_KEY, JSON.stringify(all))
+}
+
+function getCached(role, branchId = null) {
+  const all = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+  return all[getScopeKey(role, branchId)] || null
+}
+
+function setCached(role, branchId = null, payload) {
+  const all = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+  all[getScopeKey(role, branchId)] = payload
+  localStorage.setItem(CACHE_KEY, JSON.stringify(all))
+}
+
+function shouldAutoRefresh(role, branchId = null) {
+  const last = getLastRefresh(role, branchId)
+  return !last || Date.now() - last > REFRESH_INTERVAL_MS
+}
+
+export function useNotifications() {
+  function baseQuery(role, branchId = null) {
     let query = supabase
       .from('notifications')
       .select('*')
@@ -17,23 +54,70 @@ export function useNotifications() {
     return query
   }
 
-  async function fetchNotifications(branchId = null) {
-    const query = baseQuery(branchId).eq('is_read', false).limit(50)
+  async function fetchNotifications(branchId = null, { force = false } = {}) {
+    const role = getRole()
+    if (!role) return []
+
+    if (!force && !shouldAutoRefresh(role, branchId)) {
+      const cached = getCached(role, branchId)
+      if (cached?.unread) return cached.unread
+    }
+
+    const query = baseQuery(role, branchId).eq('is_read', false).limit(50)
     const { data, error } = await query
     if (error) {
       console.error('[Notifications] fetch failed:', error)
       return []
     }
-    return data || []
+    const unread = data || []
+    const existing = getCached(role, branchId) || {}
+    setCached(role, branchId, { ...existing, unread, updatedAt: Date.now() })
+    setLastRefresh(role, branchId, Date.now())
+    return unread
   }
 
-  async function fetchAllNotifications(branchId = null) {
-    const { data, error } = await baseQuery(branchId)
+  async function fetchAllNotifications(branchId = null, { force = false } = {}) {
+    const role = getRole()
+    if (!role) return []
+
+    if (!force && !shouldAutoRefresh(role, branchId)) {
+      const cached = getCached(role, branchId)
+      if (cached?.all) return cached.all
+    }
+
+    const { data, error } = await baseQuery(role, branchId)
     if (error) {
       console.error('[Notifications] fetchAll failed:', error)
       return []
     }
-    return data || []
+    const all = data || []
+    const existing = getCached(role, branchId) || {}
+    setCached(role, branchId, { ...existing, all, updatedAt: Date.now() })
+    setLastRefresh(role, branchId, Date.now())
+    return all
+  }
+
+  async function fetchNotificationBundle(branchId = null, { force = false } = {}) {
+    const role = getRole()
+    if (!role) return { unread: [], all: [], lastRefresh: 0 }
+
+    if (!force && !shouldAutoRefresh(role, branchId)) {
+      const cached = getCached(role, branchId)
+      if (cached?.unread && cached?.all) {
+        return {
+          unread: cached.unread,
+          all: cached.all,
+          lastRefresh: getLastRefresh(role, branchId),
+          fromCache: true,
+        }
+      }
+    }
+
+    const [unread, all] = await Promise.all([
+      fetchNotifications(branchId, { force: true }),
+      fetchAllNotifications(branchId, { force: true }),
+    ])
+    return { unread, all, lastRefresh: getLastRefresh(role, branchId), fromCache: false }
   }
 
   async function markAsRead(id) {
@@ -45,6 +129,9 @@ export function useNotifications() {
   }
 
   async function markAllAsRead(branchId = null) {
+    const role = getRole()
+    if (!role) return
+
     let query = supabase
       .from('notifications')
       .update({ is_read: true })
@@ -60,6 +147,9 @@ export function useNotifications() {
   }
 
   async function addNotification({ branch_id, category, title, message, severity = 'medium', link = null }) {
+    const role = getRole()
+    if (!role) return
+
     const record = {
       role,
       branch_id,
@@ -76,5 +166,14 @@ export function useNotifications() {
     if (error) console.error('[Notifications] addNotification failed:', error)
   }
 
-  return { role, fetchNotifications, fetchAllNotifications, markAsRead, markAllAsRead, addNotification }
+  return {
+    fetchNotifications,
+    fetchAllNotifications,
+    fetchNotificationBundle,
+    markAsRead,
+    markAllAsRead,
+    addNotification,
+    shouldAutoRefresh,
+    getLastRefresh,
+  }
 }

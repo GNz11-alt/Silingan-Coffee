@@ -83,12 +83,9 @@ export async function getBranchComparison(dateFrom, dateTo, branchId = null) {
 
 
 //raw mats at or below reorder level
-export async function getLowStockItems(from, to, branchId = null) {
-  const actualBranchId = branchId != null ? branchId : (typeof from === 'number' || from === null ? from : null)
+export async function getLowStockItems(branchId = null) {
   return supabase.rpc('get_low_stock_items', {
-    p_date_from: null,
-    p_date_to: null,
-    p_branch_id: actualBranchId,
+    p_branch_id: branchId,
   })
 }
 
@@ -124,7 +121,7 @@ export async function getSavedReports({ types, branchId, dateFrom, dateTo } = {}
       filepath,
       createdat,
       branch:branchid(BranchName),
-      generatedby
+      generator:generatedby(firstname, lastname)
     `)
     .order('createdat', { ascending: false })
     .limit(100)
@@ -262,7 +259,7 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
   }
 
   if (reportType === 'low-inventory') {
-    const { data, error } = await getLowStockItems(null, null, branchId)
+    const { data, error } = await getLowStockItems(branchId)
     if (error) return { data: [], raw: [], error }
     const raw = (data || []).map(i => ({
       product_name: i.product_name,

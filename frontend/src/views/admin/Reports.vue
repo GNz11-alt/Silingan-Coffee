@@ -752,7 +752,7 @@
             <button
               class="btn btn-generate w-100 mb-2"
               @click="generateReport"
-              :disabled="generating"
+              :disabled="generating || !genForm.category || !genForm.type"
             >
               <span
                 v-if="generating"
@@ -1735,9 +1735,9 @@ export default {
       if (
         this.genForm.dateFrom &&
         this.genForm.dateTo &&
-        this.genForm.dateFrom > this.genForm.dateTo
+        new Date(this.genForm.dateTo) < new Date(this.genForm.dateFrom)
       )
-        e.dateTo = "Date To must be after Date From.";
+        e.dateTo = "End date must be after start date.";
       this.genErrors = e;
       return !Object.keys(e).length;
     },

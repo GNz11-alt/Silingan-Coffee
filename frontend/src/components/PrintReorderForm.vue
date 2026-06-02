@@ -10,8 +10,8 @@
           </div>
           <div class="prf-header-actions">
             <button class="prf-btn-outline" @click="$emit('close')">✕ Close</button>
-            <button class="prf-btn-print" @click="doPrint">
-              <Printer :size="15" /> Print / Save PDF
+            <button class="prf-btn-print" @click="doPrint" :disabled="isExporting">
+              <Printer :size="15" /> {{ isExporting ? 'Generating...' : 'Export PDF' }}
             </button>
           </div>
         </div>
@@ -35,6 +35,18 @@
               <div class="prf-doc-field">
                 <span class="prf-field-label">Prepared by</span>
                 <span class="prf-field-val">{{ preparedBy }}</span>
+              </div>
+              <div class="prf-doc-field">
+                <span class="prf-field-label">Supplier</span>
+                <span class="prf-field-val">
+                  <input
+                    v-model="supplierName"
+                    type="text"
+                    class="prf-inline-input no-print"
+                    placeholder="Supplier name"
+                  />
+                  <span class="print-only">{{ supplierName || '_______________' }}</span>
+                </span>
               </div>
               <div class="prf-doc-field">
                 <span class="prf-field-label">Date needed</span>
@@ -228,6 +240,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { Printer } from 'lucide-vue-next'
+import { exportPurchaseOrderPdf } from '@/services/purchaseOrderService.js'
 
 const props = defineProps({
   show: Boolean,
@@ -240,6 +253,8 @@ const emit = defineEmits(['close'])
 const dateNeeded = ref('')
 const orderQtys = ref({})
 const supplierNotes = ref({})
+const supplierName = ref('')
+const isExporting = ref(false)
 
 const today = computed(() =>
   new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -283,8 +298,36 @@ watch(() => props.items, () => {
   })
 }, { immediate: true, deep: true })
 
-const doPrint = () => {
-  window.print()
+const buildOrderPayload = () => {
+  const allItems = [...outOfStock.value, ...lowStock.value]
+  return allItems.map(item => ({
+    ...item,
+    eoq: calcEOQ(item),
+    orderQty: orderQtys.value[item.rawproductid] || calcEOQ(item) || 0,
+    supplierNote: supplierNotes.value[item.rawproductid] || '',
+  }))
+}
+
+const doPrint = async () => {
+  if (isExporting.value) return
+
+  isExporting.value = true
+  try {
+    await exportPurchaseOrderPdf({
+      branchName: props.branchName,
+      preparedBy: props.preparedBy,
+      poNumber: poNumber.value,
+      dateNeeded: dateNeeded.value,
+      supplierName: supplierName.value || 'General Supplier',
+      items: buildOrderPayload(),
+      download: true,
+      saveToSupabase: false,
+    })
+  } catch (error) {
+    console.error('[PurchaseOrderPDF] Export failed:', error)
+  } finally {
+    isExporting.value = false
+  }
 }
 </script>
 
@@ -353,6 +396,10 @@ const doPrint = () => {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+}
+.prf-btn-print:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 /* Printable content */
