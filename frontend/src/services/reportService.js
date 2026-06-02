@@ -121,7 +121,7 @@ export async function getSavedReports({ types, branchId, dateFrom, dateTo } = {}
       filepath,
       createdat,
       branch:branchid(BranchName),
-      generator:generatedby(firstname, lastname)
+      generatedby
     `)
     .order('createdat', { ascending: false })
     .limit(100)
