@@ -215,7 +215,6 @@
           </div>
           <div class="receipt-btns">
             <button class="rbtn-back" @click="showReceipt = false"><ArrowLeft :size="14" /> Edit</button>
-            <!-- Print receipt button -->
             <button class="rbtn-print" @click="printReceipt">
               <Printer :size="14" /> Print
             </button>
@@ -248,7 +247,6 @@
             <label>Amount Received (₱)</label>
             <input type="number" v-model.number="cashReceived" class="cash-input" placeholder="0.00" />
             <div class="quick-amounts">
-              <!-- Exact Amount button -->
               <button class="qa-btn exact-btn" @click="cashReceived = finalTotal">
                 ₱{{ finalTotal.toFixed(2) }} <span class="exact-label"></span>
               </button>
@@ -319,7 +317,6 @@
               <tr>
                 <th>Order</th><th>Time</th><th>Items</th>
                 <th>Payment</th><th>Discount</th><th>Total</th><th>Status</th>
-                <!-- Cancel column -->
                 <th>Action</th>
               </tr>
             </thead>
@@ -343,7 +340,6 @@
                 </td>
                 <td class="total-col">₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}</td>
                 <td><span :class="['st-badge', tr.Status]">{{ tr.Status }}</span></td>
-                <!-- Cancel button — only for completed orders -->
                 <td>
                   <button
                     v-if="tr.Status === 'completed'"
@@ -383,7 +379,6 @@
       </div>
     </div>
 
-    <!-- Print styles injected into head at runtime -->
   </div>
 </template>
 
@@ -400,9 +395,8 @@ import { supabase } from '@/supabase';
 const getSizeType = (cat) => {
   if (!cat) return 'none'
   const c = cat.toLowerCase()
-  if (c.includes('hot drink')) return 'hot'
-  if (c.includes('iced coffee')) return 'iced'
-  if (c.includes('non') && c.includes('coffee')) return 'iced'
+  if (c.includes('hot drink') || c.includes('hot coffee')) return 'hot'
+  if (c.includes('iced coffee') || c.includes('iced') || c.includes('non') && c.includes('coffee')) return 'iced'
   if (c.includes('cream') && c.includes('frap')) return 'iced'
   if (c.includes('frap')) return 'iced'
   if (c.includes('smoothie')) return 'iced'
@@ -418,23 +412,32 @@ const getSizeLabels = (cat) => {
 
 const buildSizeOptions = (item) => {
   const t = getSizeType(item.Category)
-  const base = item.Price ?? 0
+  const sizePrices = item.size_prices || {}
+  
   if (t === 'hot') {
     return [
-      { label: 'Small',   oz: '8oz',  price: base },
-      { label: 'Regular', oz: '12oz', price: base + 10 },
+      { label: 'Small', oz: '8oz', price: sizePrices.Small || item.Price },
+      { label: 'Regular', oz: '12oz', price: sizePrices.Regular || (item.Price + 10) },
     ]
   }
   if (t === 'iced') {
     return [
-      { label: 'Regular', oz: '16oz', price: base },
-      { label: 'Big',     oz: '22oz', price: base + 20 },
+      { label: 'Regular', oz: '16oz', price: sizePrices.Regular || item.Price },
+      { label: 'Big', oz: '22oz', price: sizePrices.Big || (item.Price + 20) },
     ]
   }
   return []
 }
 
-const getBasePrice = (item) => item.Price?.toFixed(2) ?? '0.00'
+const getBasePrice = (item) => {
+  if (getSizeType(item.Category) !== 'none') {
+    const sizePrices = item.size_prices || {}
+    const t = getSizeType(item.Category)
+    if (t === 'hot') return (sizePrices.Small || item.Price)?.toFixed(2) ?? '0.00'
+    if (t === 'iced') return (sizePrices.Regular || item.Price)?.toFixed(2) ?? '0.00'
+  }
+  return item.Price?.toFixed(2) ?? '0.00'
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const menu = ref([]); const discounts = ref([]); const transactions = ref([]);
@@ -444,7 +447,7 @@ const activeCategory = ref('All'); const menuSearch = ref('');
 const showPayment = ref(false); const showReceipt = ref(false); const showHistory = ref(false);
 const paymentMethod = ref('cash'); const cashReceived = ref(0); const saving = ref(false);
 const currentUser = ref(null); const branchRecord = ref(null);
-const employeeRecord = ref(null); // ④ FK fix: store the employee row
+const employeeRecord = ref(null);
 
 // Size picker
 const showSizePicker = ref(false)
@@ -489,11 +492,10 @@ const avgSale      = computed(() => {
   return completed.length ? totalRevenue.value / completed.length : 0;
 });
 
-// Quick amounts: exclude exact if it matches a round number already
 const quickAmounts = computed(() => {
   const t = Math.ceil(finalTotal.value / 50) * 50;
   return [...new Set([t, 100, 200, 500, 1000, 2000])]
-    .filter(v => v !== finalTotal.value) // exclude exact — handled separately
+    .filter(v => v !== finalTotal.value)
     .sort((a, b) => a - b)
     .slice(0, 5);
 });
@@ -547,7 +549,6 @@ const fetchCurrentUser = async () => {
   const { data: u } = await supabase.from('users').select('id, username, role, branch').eq('username', username).single();
   if (u) currentUser.value = u;
 
-  // Resolve branch record
   if (branchSlug && branchSlug !== 'all') {
     const { data: bd } = await supabase.from('branch').select('BranchId, BranchName, Location').eq('BranchName', branchSlug).maybeSingle();
     if (bd) { branchRecord.value = bd; }
@@ -557,14 +558,11 @@ const fetchCurrentUser = async () => {
     }
   }
 
-  // ④ FK fix: look up employee by username/name match so we can use EmployeeId
-  // Try matching on username via users.employee_id link if it exists
   if (u?.employee_id) {
     const { data: emp } = await supabase.from('employee').select('EmployeeId').eq('EmployeeId', u.employee_id).maybeSingle();
     if (emp) { employeeRecord.value = emp; return; }
   }
 
-  // Fallback: try to match by first/last name from username
   if (username) {
     const { data: emp } = await supabase.from('employee')
       .select('EmployeeId, FirstName, LastName')
@@ -577,11 +575,10 @@ const fetchCurrentUser = async () => {
 const fetchMenu = async () => {
   loadingMenu.value = true;
   
-  // Remove BranchId from select and remove the branch filter
   const { data, error } = await supabase
     .from('product')
-    .select('ProductId, ProductName, Category, Price')  // Removed BranchId
-    .neq('Status', 'Archived')  // Only show non-archived products
+    .select('ProductId, ProductName, Category, Price, size_prices')
+    .neq('Status', 'Archived')
     .order('Category')
     .order('ProductName');
     
@@ -609,7 +606,7 @@ const fetchTransactions = async () => {
     discount ( discountid, discountname, discounttype, discountvalue ),
     orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
   `).gte('CreatedAt', today.toISOString()).lt('CreatedAt', tom.toISOString()).order('CreatedAt', { ascending: false });
-  // if (branchId.value) q = q.eq('BranchId', branchId.value); --- remove this
+  
   const { data } = await q;
   if (data) transactions.value = data;
   loadingTransactions.value = false;
@@ -645,12 +642,9 @@ const finishTransaction = async () => {
 
     if (branchId.value) payload.BranchId = branchId.value;
 
-    // FK fix: only set CashierId if we found a matching employee row
     if (employeeRecord.value?.EmployeeId) {
       payload.CashierId = employeeRecord.value.EmployeeId;
     }
-    // If no employee match found, omit CashierId entirely to avoid FK violation
-    // change thisss
 
     const { data: order, error: oErr } = await supabase.from('orders').insert(payload).select().single();
     if (oErr) throw new Error(oErr.message);
@@ -678,7 +672,7 @@ const finishTransaction = async () => {
   }
 };
 
-// ──  Print receipt ───────────────────────────────────────────────────────────
+// ── Print receipt ────────────────────────────────────────────────────────────
 const printReceipt = () => {
   const el = document.getElementById('print-receipt');
   if (!el) return;
@@ -712,7 +706,7 @@ const printReceipt = () => {
   printWin.document.close();
 };
 
-// ── Cancel order ────────────────────────────────────────────────────────────
+// ── Cancel order ─────────────────────────────────────────────────────────────
 const confirmCancelOrder = (order) => {
   cancelTarget.value = order;
   showCancelConfirm.value = true;
@@ -727,7 +721,6 @@ const doCancelOrder = async () => {
       .update({ Status: 'cancelled' })
       .eq('OrderId', cancelTarget.value.OrderId);
     if (error) throw new Error(error.message);
-    // Update locally without refetch
     const tx = transactions.value.find(t => t.OrderId === cancelTarget.value.OrderId);
     if (tx) tx.Status = 'cancelled';
     showCancelConfirm.value = false;
@@ -869,14 +862,11 @@ onMounted(async () => {
 .cash-fields label { font-size:13px; font-weight:600; color:#31201D; }
 .cash-input { width:100%; padding:13px 15px; border:2px solid #e8e0d5; border-radius:11px; font-size:26px; font-weight:700; text-align:right; outline:none; color:#31201D; box-sizing:border-box; font-family:inherit; transition:border-color 0.2s; }
 .cash-input:focus { border-color:#31201D; }
-
-/* Quick amounts grid with exact button */
 .quick-amounts { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
 .qa-btn { padding:9px; background:white; border:1px solid #e8e0d5; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.15s; color:#31201D; }
 .qa-btn:hover { border-color:#31201D; background:#fdfaf7; }
 .exact-btn { grid-column:1 / -1; background:#f0f9f0; border-color:#86efac; color:#15803d; display:flex; align-items:center; justify-content:center; gap:6px; font-size:14px; }
 .exact-btn:hover { background:#dcfce7; border-color:#4ade80; }
-
 .cash-calc { background:#f9f4ef; border-radius:11px; padding:14px; display:flex; flex-direction:column; gap:7px; }
 .cc-row { display:flex; justify-content:space-between; font-size:13px; color:#555; }
 .change-row { font-size:16px; font-weight:800; padding-top:9px; border-top:1px solid #e8e0d5; margin-top:3px; }
@@ -905,8 +895,6 @@ onMounted(async () => {
 .r-gcash { color:#0064E0; font-weight:700; }
 .r-disc { color:#16a34a; }
 .r-footer { text-align:center; margin-top:12px; font-size:11px; color:#aaa; }
-
-/* ① Receipt buttons row — 3 buttons */
 .receipt-btns { display:flex; gap:9px; margin-top:18px; }
 .rbtn-back { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#f5f0eb; border:none; padding:11px; border-radius:10px; font-weight:600; cursor:pointer; font-family:inherit; font-size:14px; }
 .rbtn-print { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; padding:11px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; transition:0.2s; }
@@ -944,13 +932,9 @@ onMounted(async () => {
 .st-badge.completed { background:#dcfce7; color:#15803d; }
 .st-badge.pending   { background:#fef9c3; color:#a16207; }
 .st-badge.cancelled { background:#fee2e2; color:#dc2626; }
-
-/* ③ Cancel order button */
 .cancel-order-btn { background:#fee2e2; border:1px solid #fca5a5; color:#dc2626; font-size:11px; font-weight:700; padding:4px 10px; border-radius:6px; cursor:pointer; font-family:inherit; transition:0.15s; }
 .cancel-order-btn:hover:not(:disabled) { background:#fecaca; border-color:#f87171; }
 .cancel-order-btn:disabled { opacity:0.5; cursor:not-allowed; }
-
-/* CANCEL CONFIRM MODAL */
 .confirm-modal { background:white; border-radius:20px; width:380px; max-width:95vw; padding:30px 28px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.22); }
 .confirm-icon { color:#dc2626; display:flex; justify-content:center; margin-bottom:14px; }
 .confirm-modal h3 { font-size:18px; font-weight:700; color:#31201D; margin:0 0 8px; }
@@ -963,7 +947,6 @@ onMounted(async () => {
 .conf-yes { flex:1; background:#dc2626; color:white; border:none; padding:12px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; transition:0.2s; }
 .conf-yes:hover:not(:disabled) { background:#b91c1c; }
 .conf-yes:disabled { opacity:0.5; cursor:not-allowed; }
-
 .spin { width:17px; height:17px; border:2px solid #eee; border-top-color:#C49A6C; border-radius:50%; animation:spin 0.7s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 </style>

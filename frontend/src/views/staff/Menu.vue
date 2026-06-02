@@ -78,6 +78,12 @@
               <Coffee :size="15" class="item-icon" />
               <h4>{{ item.ProductName }}</h4>
             </div>
+            <!-- Show size prices if available -->
+            <div v-if="getSizeType(item.Category) !== 'none' && item.size_prices" class="size-prices">
+              <span v-for="(price, size) in item.size_prices" :key="size" class="size-price-tag">
+                {{ size }}: ₱{{ price.toFixed(2) }}
+              </span>
+            </div>
           </div>
 
           <div class="recipe-status-area">
@@ -151,10 +157,10 @@
               placeholder="e.g. Iced Latte"
             />
           </div>
-                  <div class="field">
+          <div class="field">
             <label>Category *</label>
             <div class="select-wrap full">
-              <select v-model="form.Category" required>
+              <select v-model="form.Category" required @change="onCategoryChange">
                 <option value="">Select category</option>
                 <option v-for="cat in categories" :key="cat" :value="cat">
                   {{ cat }}
@@ -163,7 +169,34 @@
               <ChevronDown :size="13" class="sel-icon" />
             </div>
           </div>
-          <div class="field">
+          
+          <!-- Size Prices Section (shown only for categories with sizes) -->
+          <div class="field" v-if="getSizeType(form.Category) !== 'none'">
+            <label>Size Prices *</label>
+            <div class="sizes-container">
+              <div 
+                v-for="size in getSizeLabels(form.Category)" 
+                :key="size"
+                class="size-price-row"
+              >
+                <span class="size-name">{{ size }}</span>
+                <div class="size-price-input">
+                  <span class="currency">₱</span>
+                  <input
+                    type="number"
+                    v-model.number="form.sizePrices[size]"
+                    step="0.01"
+                    min="0"
+                    :placeholder="size + ' price'"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Base Price (for items without sizes) -->
+          <div class="field" v-if="getSizeType(form.Category) === 'none'">
             <label>Price (₱)</label>
             <input
               type="number"
@@ -334,7 +367,6 @@
         </div>
 
         <div v-else class="all-recipes-layout">
-          <!-- Category sidebar tabs -->
           <div class="recipe-sidebar">
             <button
               v-for="cat in allRecipeCategories"
@@ -350,7 +382,6 @@
             </button>
           </div>
 
-          <!-- Items panel -->
           <div class="recipe-panel">
             <div class="recipe-search">
               <SearchIcon :size="14" />
@@ -432,11 +463,26 @@ import {
   Coffee,
   ChefHat,
   BookOpen,
-  Globe,
 } from "lucide-vue-next";
 import { supabase } from "@/supabase";
 
 const route = useRoute();
+
+// ─── Size Helper Functions ────────────────────────────────────────────────────
+const getSizeType = (cat) => {
+  if (!cat) return 'none';
+  const c = cat.toLowerCase();
+  if (c.includes('hot drink') || c.includes('hot coffee') || c === 'hot drinks') return 'hot';
+  if (c.includes('iced coffee') || c.includes('iced') || c.includes('frap') || c.includes('frappe') || c.includes('smoothie')) return 'iced';
+  return 'none';
+};
+
+const getSizeLabels = (cat) => {
+  const t = getSizeType(cat);
+  if (t === 'hot') return ['Small', 'Regular'];
+  if (t === 'iced') return ['Regular', 'Big'];
+  return [];
+};
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const menuItems   = ref([]);
@@ -451,7 +497,12 @@ const showModal  = ref(false);
 const isEditing  = ref(false);
 const editingId  = ref(null);
 const saving     = ref(false);
-const form       = ref({ ProductName: "", Category: "", Price: null });
+const form       = ref({ 
+  ProductName: "", 
+  Category: "", 
+  Price: null,
+  sizePrices: {} 
+});
 
 // Recipe modal
 const showRecipeModal = ref(false);
@@ -525,10 +576,9 @@ const fetchRawProducts = async () => {
 const fetchMenuItems = async () => {
   loading.value = true;
 
-  // Simplified: Direct fetch without deduplication
   const { data: products, error } = await supabase
     .from("product")
-    .select("ProductId, ProductName, ProductType, Category, Price, CreatedAt, Status")
+    .select("ProductId, ProductName, ProductType, Category, Price, size_prices, CreatedAt, Status")
     .neq("Status", "Archived")
     .order("Category")
     .order("ProductName");
@@ -539,7 +589,6 @@ const fetchMenuItems = async () => {
     return;
   }
 
-  // Fetch recipe counts directly by ProductId
   const { data: recipes } = await supabase
     .from("recipe")
     .select("finishedproductid");
@@ -549,7 +598,6 @@ const fetchMenuItems = async () => {
     recipeCounts[r.finishedproductid] = (recipeCounts[r.finishedproductid] || 0) + 1;
   });
 
-  // Each product appears once
   menuItems.value = (products ?? []).map((p) => ({
     ...p,
     _recipeCount: recipeCounts[p.ProductId] || 0,
@@ -560,20 +608,41 @@ const fetchMenuItems = async () => {
 };
 
 // ─── Product CRUD ─────────────────────────────────────────────────────────────
+const onCategoryChange = () => {
+  // Reset size prices when category changes
+  if (getSizeType(form.value.Category) !== 'none') {
+    const sizeLabels = getSizeLabels(form.value.Category);
+    const newSizePrices = {};
+    sizeLabels.forEach(size => {
+      newSizePrices[size] = null;
+    });
+    form.value.sizePrices = newSizePrices;
+  } else {
+    form.value.sizePrices = {};
+  }
+};
+
 const openAddModal = () => {
   isEditing.value = false;
   editingId.value = null;
-  form.value = { ProductName: "", Category: "", Price: null };
+  form.value = { 
+    ProductName: "", 
+    Category: "", 
+    Price: null,
+    sizePrices: {} 
+  };
   showModal.value = true;
 };
 
-const openEditModal = (item) => {
+const openEditModal = async (item) => {
   isEditing.value = true;
   editingId.value = item.ProductId;
+  
   form.value = {
     ProductName: item.ProductName,
     Category: item.Category ?? "",
     Price: item.Price,
+    sizePrices: item.size_prices || {}
   };
   showModal.value = true;
 };
@@ -589,17 +658,30 @@ const saveItem = async () => {
     alert("Please select a category.");
     return;
   }
+  
+  // Validate size prices if category has sizes
+  const sizeLabels = getSizeLabels(form.value.Category);
+  if (sizeLabels.length > 0) {
+    for (const size of sizeLabels) {
+      if (!form.value.sizePrices[size] || form.value.sizePrices[size] <= 0) {
+        alert(`Please enter a price for ${size}`);
+        return;
+      }
+    }
+  }
+  
   saving.value = true;
 
   const payload = {
     ProductName: form.value.ProductName,
     ProductType: "finished",
     Category:    form.value.Category,
-    Price:       form.value.Price ?? null,
+    Price:       sizeLabels.length > 0 ? null : (form.value.Price ?? null),
+    size_prices: sizeLabels.length > 0 ? form.value.sizePrices : null
   };
+  
   let error;
   if (isEditing.value) {
-    // Simplified: Update directly by ProductId
     const { error: updateError } = await supabase
       .from("product")
       .update(payload)
@@ -627,7 +709,6 @@ const deleteItem = async (id) => {
   const currentUser = localStorage.getItem("username") || "Unknown";
   const now = new Date().toISOString();
 
-  // Simplified: Archive single product by ID
   const { error } = await supabase
     .from("product")
     .update({ Status: "Archived", ArchivedAt: now, ArchivedBy: currentUser })
@@ -647,7 +728,6 @@ const openRecipeModal = async (item) => {
   loadingRecipe.value = true;
   showRecipeModal.value = true;
 
-  // Simplified: Direct query by ProductId
   const { data, error } = await supabase
     .from("recipe")
     .select("recipeid, finishedproductid, rawproductid, quantityneeded, unit")
@@ -686,7 +766,6 @@ const saveRecipe = async () => {
   
   savingRecipe.value = true;
 
-  // Simplified: Delete existing recipe for this product
   const { error: delError } = await supabase
     .from("recipe")
     .delete()
@@ -698,7 +777,6 @@ const saveRecipe = async () => {
     return;
   }
 
-  // Insert new recipe rows
   const inserts = validRows.map((r) => ({
     finishedproductid: activeItem.value.ProductId,
     rawproductid: r.rawproductid,
@@ -933,7 +1011,7 @@ onMounted(async () => {
 /* MENU SECTION */
 .menu-section { margin-bottom: 32px; }
 .section-title {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: #888;
   margin-bottom: 14px;
@@ -981,24 +1059,11 @@ onMounted(async () => {
   gap: 7px;
 }
 .cat-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #c49a6c;
   background: #fff9f0;
   padding: 2px 8px;
-  border-radius: 4px;
-}
-.global-badge {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #6a9c7a;
-  background: #f0faf3;
-  border: 1px solid #c8e6d0;
-  padding: 2px 7px;
   border-radius: 4px;
 }
 
@@ -1011,9 +1076,26 @@ onMounted(async () => {
 .item-icon { color: #c49a6c; flex-shrink: 0; }
 .name-row h4 {
   margin: 0;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   color: #31201d;
+}
+
+/* Size prices display on card */
+.size-prices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.size-price-tag {
+  font-size: 16px;
+  font-weight: 600;
+  color: #6a9c7a;
+  background: #f0faf3;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #c8e6d0;
 }
 
 /* RECIPE BUTTON */
@@ -1156,6 +1238,48 @@ onMounted(async () => {
 }
 .submit-full:hover:not(:disabled) { background: #4a3330; }
 .submit-full:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Size Prices Styles */
+.sizes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.size-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f9f4ef;
+  border-radius: 8px;
+}
+.size-name {
+  font-weight: 700;
+  color: #31201d;
+  font-size: 14px;
+}
+.size-price-input {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.size-price-input .currency {
+  font-weight: 600;
+  color: #31201d;
+}
+.size-price-input input {
+  width: 120px;
+  padding: 8px 10px;
+  border: 1px solid #e8e0d5;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: right;
+}
+.size-price-input input:focus {
+  outline: none;
+  border-color: #c49a6c;
+}
 
 /* RECIPE BODY */
 .recipe-body { margin-bottom: 16px; }
