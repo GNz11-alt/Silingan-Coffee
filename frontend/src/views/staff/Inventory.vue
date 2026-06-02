@@ -1,7 +1,7 @@
 <template>
   <div class="inventory-content">
     <div class="page-header">
-      <h1>Inventory</h1>
+      <h1>Inventory Management</h1>
       <p class="branch-label">
         Managing inventory for: <strong>{{ assignedBranchName || "Loading..." }}</strong>
       </p>

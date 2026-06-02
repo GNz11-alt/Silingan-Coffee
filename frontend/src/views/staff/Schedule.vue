@@ -857,9 +857,10 @@ export default {
 <style scoped>
 /* ── Layout ────────────────────────────────────────────────────── */
 .schedule-content {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 24px 32px;
+  background: #fafafa;
+  min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
 
 /* ── Header ────────────────────────────────────────────────────── */
@@ -873,15 +874,15 @@ export default {
 }
 
 .header-section h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #1f2937;
-  margin: 0 0 0.5rem 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0 0 4px;
 }
 
 .header-subtitle {
-  color: #6b7280;
-  font-size: 0.95rem;
+  font-size: 14px;
+  color: #888;
   margin: 0;
 }
 
