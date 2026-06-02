@@ -67,6 +67,9 @@
                       class="bi bi-clock"
                     ></i>
                     {{ avail.startTime }} – {{ avail.endTime }}
+                    <span v-if="avail.branchId" class="avail-branch"
+                      >&nbsp;· {{ branchName(avail.branchId) }}</span
+                    >
                   </div>
                   <div v-if="avail.notes" class="avail-notes">
                     {{ avail.notes }}
@@ -123,24 +126,27 @@
                   <span class="avail-role">{{ avail.role }}</span>
                 </div>
                 <div class="avail-meta">
-                  <i class="bi bi-calendar3"></i>
-                  {{ formatDate(avail.availableDate) }} &nbsp;<i
-                    class="bi bi-clock"
-                  ></i>
-                  {{ avail.startTime }} – {{ avail.endTime }}
-                </div>
-                <div v-if="avail.notes" class="avail-notes">
-                  {{ avail.notes }}
+                    <i class="bi bi-calendar3"></i>
+                    {{ formatDate(avail.availableDate) }} &nbsp;<i
+                      class="bi bi-clock"
+                    ></i>
+                    {{ avail.startTime }} – {{ avail.endTime }}
+                    <span v-if="avail.branchId" class="avail-branch"
+                      >&nbsp;· {{ branchName(avail.branchId) }}</span
+                    >
+                  </div>
+                  <div v-if="avail.notes" class="avail-notes">
+                    {{ avail.notes }}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="avail-right">
-              <span
-                v-if="avail.status === 'Confirmed'"
-                class="badge-status badge-active"
-                >approved</span
-              >
-              <span v-else class="badge-status badge-inactive">rejected</span>
+              <div class="avail-right">
+                <span
+                  v-if="avail.status === 'Confirmed'"
+                  class="badge-status badge-active"
+                  >approved</span
+                >
+                <span v-else class="badge-status badge-inactive">rejected</span>
             </div>
           </div>
         </div>
@@ -177,7 +183,6 @@
             style="width: 180px"
           />
           <select
-            v-if="schedViewMode === 'table'"
             v-model="schedBranchFilter"
             class="form-select fc-brand"
             style="width: 200px"
@@ -893,7 +898,7 @@ const fetchAvailability = async () => {
   const { data } = await supabase
     .from("availability")
     .select(
-      "availabilityid, employeeid, availabledate, starttime, endtime, notes, status, employee(FirstName, LastName, Position)",
+      "availabilityid, employeeid, availabledate, starttime, endtime, notes, status, employee(FirstName, LastName, Position, BranchAssigned)",
     )
     .gte("availabledate", since)
     .order("availabilityid", { ascending: false })
@@ -911,6 +916,7 @@ const fetchAvailability = async () => {
           "?"
         : "?",
       role: a.employee?.Position || "—",
+      branchId: a.employee?.BranchAssigned || null,
       availableDate: normalizeDateKey(a.availabledate),
       startTime: normalizeTime(a.starttime),
       endTime: normalizeTime(a.endtime),
@@ -1076,6 +1082,26 @@ const checkScheduleConflict = async () => {
   return null;
 };
 
+const checkRoleCap = async (date, role, startTime, endTime, excludeId = null) => {
+  const { data } = await supabase
+    .from("schedule")
+    .select("ScheduleId, StartTime, EndTime")
+    .eq("ShiftDate", date)
+    .eq("Role", role)
+    .neq("Status", "Cancelled")
+    .neq("Status", "Archived");
+
+  if (!data) return 0;
+  let count = 0;
+  for (const s of data) {
+    if (excludeId && s.ScheduleId === excludeId) continue;
+    if (timesOverlap(startTime, endTime, s.StartTime, s.EndTime)) {
+      count++;
+    }
+  }
+  return count;
+};
+
 const saveSchedule = async (overrideConflict = false) => {
   if (!validate()) return;
 
@@ -1086,6 +1112,19 @@ const saveSchedule = async (overrideConflict = false) => {
       conflictInfo.value = conflict;
       showConflictConfirm.value = true;
       return;
+    }
+
+    const roleCount = await checkRoleCap(
+      form.value.shiftDate,
+      form.value.role,
+      form.value.startTime,
+      form.value.endTime,
+      isEditing.value ? form.value.id : null,
+    );
+    if (roleCount >= 2) {
+      throw new Error(
+        `Role "${form.value.role}" already has ${roleCount} employees scheduled for this shift (max 2 per role).`,
+      );
     }
 
     const payload = {
@@ -1210,10 +1249,23 @@ const updateAvailStatus = async (avail, status) => {
         .eq("EmployeeId", avail.employeeId)
         .maybeSingle();
 
+      const roleToUse = avail.role !== "—" ? avail.role : emp?.Position || "Staff";
+      const roleCount = await checkRoleCap(
+        avail.availableDate,
+        roleToUse,
+        avail.startTime,
+        avail.endTime,
+      );
+      if (roleCount >= 2) {
+        throw new Error(
+          `Role "${roleToUse}" already has ${roleCount} employees scheduled for this shift (max 2 per role).`,
+        );
+      }
+
       const { error: schedErr } = await supabase.from("schedule").insert([
         {
           EmployeeId: avail.employeeId,
-          Role: avail.role !== "—" ? avail.role : emp?.Position || "Staff",
+          Role: roleToUse,
           ShiftDate: avail.availableDate,
           StartTime: avail.startTime,
           EndTime: avail.endTime,
@@ -1445,6 +1497,10 @@ onMounted(async () => {
   color: #888;
   margin-top: 0.15rem;
   font-style: italic;
+}
+.avail-branch {
+  font-size: 0.76rem;
+  color: var(--text-muted);
 }
 
 .badge-status {

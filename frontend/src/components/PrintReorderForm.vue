@@ -37,18 +37,6 @@
                 <span class="prf-field-val">{{ preparedBy }}</span>
               </div>
               <div class="prf-doc-field">
-                <span class="prf-field-label">Supplier</span>
-                <span class="prf-field-val">
-                  <input
-                    v-model="supplierName"
-                    type="text"
-                    class="prf-inline-input no-print"
-                    placeholder="Supplier name"
-                  />
-                  <span class="print-only">{{ supplierName || '_______________' }}</span>
-                </span>
-              </div>
-              <div class="prf-doc-field">
                 <span class="prf-field-label">Date needed</span>
                 <span class="prf-field-val">
                   <input
@@ -155,7 +143,7 @@
                   <th>Reorder Point</th>
                   <th>EOQ Suggestion</th>
                   <th>Order Qty</th>
-                  <th>Supplier / Notes</th>
+                  <th>Notes</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,7 +179,7 @@
                       v-model="supplierNotes[item.rawproductid]"
                       type="text"
                       class="prf-notes-input no-print"
-                      placeholder="Supplier / notes..."
+                      placeholder="Notes..."
                     />
                     <span class="print-only prf-print-line">{{ supplierNotes[item.rawproductid] || '' }}</span>
                   </td>
@@ -218,7 +206,7 @@
             </div>
             <div class="prf-sig-block">
               <div class="prf-sig-line"></div>
-              <span>Received by (Supplier)</span>
+              <span>Received by</span>
             </div>
             <div class="prf-sig-block">
               <div class="prf-sig-line"></div>
@@ -232,6 +220,47 @@
         </div>
         <!-- end printable -->
 
+      </div>
+    </div>
+    <!-- ── NO-DATE CONFIRMATION ────────────────────────── -->
+    <div v-if="showDateConfirm" class="prf-overlay" @click.self="showDateConfirm = false">
+      <div class="prf-modal prf-modal--sm">
+        <div class="prf-screen-header">
+          <h2>No date selected</h2>
+        </div>
+        <div class="prf-confirm-body">
+          <p>You haven't set a <strong>Date needed</strong>. Generate the reorder form without a date?</p>
+          <label class="prf-checkbox-label">
+            <input type="checkbox" v-model="dontShowAgain" />
+            Don't show this again this session
+          </label>
+        </div>
+        <div class="prf-modal-actions">
+          <button class="prf-btn-outline" @click="showDateConfirm = false">Cancel</button>
+          <button class="prf-btn-print" @click="confirmNoDate">Generate anyway</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- ── NO-DATE CONFIRMATION ────────────────────────── -->
+  <Teleport to="body">
+    <div v-if="showDateConfirm" class="prf-overlay" @click.self="showDateConfirm = false">
+      <div class="prf-modal prf-modal--sm">
+        <div class="prf-screen-header">
+          <h2>No date selected</h2>
+        </div>
+        <div class="prf-confirm-body">
+          <p>You haven't set a <strong>Date needed</strong>. Generate the reorder form without a date?</p>
+          <label class="prf-checkbox-label">
+            <input type="checkbox" v-model="dontShowAgain" />
+            Don't show this again this session
+          </label>
+        </div>
+        <div class="prf-modal-actions">
+          <button class="prf-btn-outline" @click="showDateConfirm = false">Cancel</button>
+          <button class="prf-btn-print" @click="confirmNoDate">Generate anyway</button>
+        </div>
       </div>
     </div>
   </Teleport>
@@ -253,8 +282,9 @@ const emit = defineEmits(['close'])
 const dateNeeded = ref('')
 const orderQtys = ref({})
 const supplierNotes = ref({})
-const supplierName = ref('')
 const isExporting = ref(false)
+const showDateConfirm = ref(false)
+const dontShowAgain = ref(false)
 
 const today = computed(() =>
   new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -311,6 +341,12 @@ const buildOrderPayload = () => {
 const doPrint = async () => {
   if (isExporting.value) return
 
+  const skipConfirm = sessionStorage.getItem('prf_skip_date_confirm')
+  if (!dateNeeded.value && !skipConfirm) {
+    showDateConfirm.value = true
+    return
+  }
+
   isExporting.value = true
   try {
     await exportPurchaseOrderPdf({
@@ -318,7 +354,6 @@ const doPrint = async () => {
       preparedBy: props.preparedBy,
       poNumber: poNumber.value,
       dateNeeded: dateNeeded.value,
-      supplierName: supplierName.value || 'General Supplier',
       items: buildOrderPayload(),
       download: true,
       saveToSupabase: false,
@@ -328,6 +363,14 @@ const doPrint = async () => {
   } finally {
     isExporting.value = false
   }
+}
+
+const confirmNoDate = () => {
+  if (dontShowAgain.value) {
+    sessionStorage.setItem('prf_skip_date_confirm', 'true')
+  }
+  showDateConfirm.value = false
+  doPrint()
 }
 </script>
 
@@ -373,7 +416,40 @@ const doPrint = async () => {
 }
 .prf-header-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+}
+
+.prf-modal--sm {
+  max-width: 420px;
+  margin-top: 15vh;
+}
+.prf-confirm-body {
+  padding: 1.5rem;
+}
+.prf-confirm-body p {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  color: #333;
+  line-height: 1.5;
+}
+.prf-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #555;
+  cursor: pointer;
+}
+.prf-checkbox-label input {
+  width: 16px;
+  height: 16px;
+}
+.prf-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e5e0dd;
 }
 .prf-btn-outline {
   background: transparent;

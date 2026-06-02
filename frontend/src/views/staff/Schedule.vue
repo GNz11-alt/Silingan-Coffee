@@ -346,7 +346,8 @@
     <!-- Toast Notification -->
     <div class="toast-container" :class="{ show: toast.message }">
       <div class="toast-notification" :class="toast.type">
-        <component :is="toast.type === 'success' ? CheckCircle : AlertCircle" :size="18" />
+        <CheckCircle v-if="toast.type === 'success'" :size="18" />
+        <AlertCircle v-else :size="18" />
         <span>{{ toast.message }}</span>
         <button class="toast-close" @click="hideToast">
           <X :size="16" />
@@ -654,10 +655,13 @@ export default {
     },
 
     async loadAllSchedules() {
+      const branchId = this.currentEmployee?.BranchAssigned
+      if (!branchId) return
       try {
         const { data, error } = await supabase
           .from('schedule')
           .select('*, branch!inner("BranchName"), employee!inner(EmployeeId, FirstName, LastName)')
+          .eq('BranchId', branchId)
           .neq('Status', 'Cancelled')
           .neq('Status', 'Archived')
           .order('ShiftDate', { ascending: true })

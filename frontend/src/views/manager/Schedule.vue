@@ -67,6 +67,9 @@
                       class="bi bi-clock"
                     ></i>
                     {{ avail.startTime }} – {{ avail.endTime }}
+                    <span v-if="avail.branchId" class="avail-branch"
+                      >&nbsp;· {{ branchName(avail.branchId) }}</span
+                    >
                   </div>
                   <div v-if="avail.notes" class="avail-notes">
                     {{ avail.notes }}
@@ -123,24 +126,27 @@
                   <span class="avail-role">{{ avail.role }}</span>
                 </div>
                 <div class="avail-meta">
-                  <i class="bi bi-calendar3"></i>
-                  {{ formatDate(avail.availableDate) }} &nbsp;<i
-                    class="bi bi-clock"
-                  ></i>
-                  {{ avail.startTime }} – {{ avail.endTime }}
-                </div>
-                <div v-if="avail.notes" class="avail-notes">
-                  {{ avail.notes }}
+                    <i class="bi bi-calendar3"></i>
+                    {{ formatDate(avail.availableDate) }} &nbsp;<i
+                      class="bi bi-clock"
+                    ></i>
+                    {{ avail.startTime }} – {{ avail.endTime }}
+                    <span v-if="avail.branchId" class="avail-branch"
+                      >&nbsp;· {{ branchName(avail.branchId) }}</span
+                    >
+                  </div>
+                  <div v-if="avail.notes" class="avail-notes">
+                    {{ avail.notes }}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="avail-right">
-              <span
-                v-if="avail.status === 'Confirmed'"
-                class="badge-status badge-active"
-                >approved</span
-              >
-              <span v-else class="badge-status badge-inactive">rejected</span>
+              <div class="avail-right">
+                <span
+                  v-if="avail.status === 'Confirmed'"
+                  class="badge-status badge-active"
+                  >approved</span
+                >
+                <span v-else class="badge-status badge-inactive">rejected</span>
             </div>
           </div>
         </div>
@@ -311,6 +317,8 @@
                     :key="shift.id"
                     class="shift-badge"
                     :style="{ background: avatarColor(shift.employeeId) }"
+                    @click="showShiftDetail = shift"
+                    :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
                   >
                     <div class="shift-badge-time">{{ shift.startTime }}</div>
                     <div class="shift-badge-name">{{ shift.initials }}</div>
@@ -319,8 +327,76 @@
               </div>
             </div>
           </div>
+          <div v-if="schedEmployees.length" class="employee-legend">
+            <span class="legend-label">Employees:</span>
+            <span
+              v-for="emp in schedEmployees"
+              :key="emp.id"
+              class="legend-item"
+              :title="emp.name"
+            >
+              <span class="legend-swatch" :style="{ background: avatarColor(emp.id) }"></span>
+              {{ emp.name }}
+            </span>
+          </div>
         </div>
       </div>
+
+      <!-- ── SHIFT DETAIL ───────────────────────────────────── -->
+      <Teleport to="body">
+        <div
+          v-if="showShiftDetail"
+          class="modal-overlay"
+          @click.self="showShiftDetail = null"
+        >
+          <div class="modal-panel modal-panel--sm">
+            <div class="modal-panel-header">
+              <h5 class="mb-0">Shift Details</h5>
+              <button class="btn-close-panel" @click="showShiftDetail = null">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div class="modal-panel-body">
+              <div class="shift-detail-content">
+                <div class="shift-detail-employee">
+                  <div
+                    class="emp-avatar lg"
+                    :style="{ background: avatarColor(showShiftDetail.employeeId) }"
+                  >
+                    {{ showShiftDetail.initials }}
+                  </div>
+                  <div>
+                    <div class="shift-detail-name">{{ showShiftDetail.employeeName }}</div>
+                    <div class="shift-detail-role">{{ showShiftDetail.role }}</div>
+                  </div>
+                </div>
+                <div class="shift-detail-info">
+                  <div class="shift-detail-row">
+                    <span class="label">Date:</span>
+                    <span class="value">{{ formatDate(showShiftDetail.shiftDate) }}</span>
+                  </div>
+                  <div class="shift-detail-row">
+                    <span class="label">Time:</span>
+                    <span class="value">{{ showShiftDetail.startTime }} – {{ showShiftDetail.endTime }}</span>
+                  </div>
+                  <div class="shift-detail-row">
+                    <span class="label">Branch:</span>
+                    <span class="value">{{ branchName(showShiftDetail.branchId) }}</span>
+                  </div>
+                  <div class="shift-detail-row">
+                    <span class="label">Status:</span>
+                    <span class="value">
+                      <span class="badge-status" :class="schedStatusClass(showShiftDetail.status)">
+                        {{ showShiftDetail.status }}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
 
       <!-- ── TAB 3: CHANGE INQUIRIES ─────────────────────────── -->
       <div v-if="activeTab === 'change'">
@@ -633,6 +709,7 @@ const schedStatusFilter = ref("");
 const schedViewMode = ref("table"); // "table" or "calendar"
 const monthOffset = ref(0); // 0 = current month, -1 = last month, +1 = next month
 const showModal = ref(false);
+const showShiftDetail = ref(null);
 const showConflictConfirm = ref(false);
 const conflictInfo = ref(null);
 const employeesLoading = ref(true);
@@ -706,6 +783,15 @@ const filteredSchedules = computed(() => {
 const schedulesByDate = computed(() =>
   buildSchedulesByDate(filteredSchedules.value),
 );
+
+const schedEmployees = computed(() => {
+  const seen = new Set();
+  return schedules.value.filter((s) => {
+    if (seen.has(s.employeeId)) return false;
+    seen.add(s.employeeId);
+    return true;
+  }).map((s) => ({ id: s.employeeId, name: s.employeeName, initials: s.initials }));
+});
 
 const monthStart = computed(() => getMonthStart(monthOffset.value));
 
@@ -797,7 +883,7 @@ const fetchEmployees = async () => {
 const fetchAvailability = async () => {
   const { data: branchEmps } = await supabase
     .from("employee")
-    .select("EmployeeId, FirstName, LastName")
+    .select("EmployeeId, FirstName, LastName, Position, BranchAssigned")
     .eq("BranchAssigned", managerBranchId.value);
 
   const empMap = {};
@@ -810,6 +896,8 @@ const fetchAvailability = async () => {
         initials:
           `${e.FirstName?.[0] || ""}${e.LastName?.[0] || ""}`.toUpperCase() ||
           "?",
+        position: e.Position || "—",
+        branchId: e.BranchAssigned || null,
       };
     });
   }
@@ -836,7 +924,8 @@ const fetchAvailability = async () => {
         employeeId: a.employeeid,
         employeeName: emp?.name || "Unknown",
         initials: emp?.initials || "?",
-        role: "—",
+        role: emp?.position || "—",
+        branchId: emp?.branchId || null,
         availableDate: normalizeDateKey(a.availabledate),
         startTime: normalizeTime(a.starttime),
         endTime: normalizeTime(a.endtime),
@@ -987,6 +1076,27 @@ const validate = () => {
   return Object.keys(e).length === 0;
 };
 
+const checkRoleCap = async (date, role, startTime, endTime, excludeId = null) => {
+  const { data } = await supabase
+    .from("schedule")
+    .select("ScheduleId, StartTime, EndTime")
+    .eq("ShiftDate", date)
+    .eq("Role", role)
+    .eq("BranchId", managerBranchId.value)
+    .neq("Status", "Cancelled")
+    .neq("Status", "Archived");
+
+  if (!data) return 0;
+  let count = 0;
+  for (const s of data) {
+    if (excludeId && s.ScheduleId === excludeId) continue;
+    if (timesOverlap(startTime, endTime, s.StartTime, s.EndTime)) {
+      count++;
+    }
+  }
+  return count;
+};
+
 const checkScheduleConflict = async () => {
   const { data } = await supabase
     .from("schedule")
@@ -1030,6 +1140,19 @@ const saveSchedule = async (overrideConflict = false) => {
       conflictInfo.value = conflict;
       showConflictConfirm.value = true;
       return;
+    }
+
+    const roleCount = await checkRoleCap(
+      form.value.shiftDate,
+      form.value.role,
+      form.value.startTime,
+      form.value.endTime,
+      isEditing.value ? form.value.id : null,
+    );
+    if (roleCount >= 2) {
+      throw new Error(
+        `Role "${form.value.role}" already has ${roleCount} employees scheduled for this shift (max 2 per role).`,
+      );
     }
 
     const payload = {
@@ -1147,10 +1270,23 @@ const updateAvailStatus = async (avail, status) => {
         .eq("EmployeeId", avail.employeeId)
         .maybeSingle();
 
+      const roleToUse = avail.role !== "—" ? avail.role : emp?.Position || "Staff";
+      const roleCount = await checkRoleCap(
+        avail.availableDate,
+        roleToUse,
+        avail.startTime,
+        avail.endTime,
+      );
+      if (roleCount >= 2) {
+        throw new Error(
+          `Role "${roleToUse}" already has ${roleCount} employees scheduled for this shift (max 2 per role).`,
+        );
+      }
+
       const { error: schedErr } = await supabase.from("schedule").insert([
         {
           EmployeeId: avail.employeeId,
-          Role: avail.role !== "—" ? avail.role : emp?.Position || "Staff",
+          Role: roleToUse,
           ShiftDate: avail.availableDate,
           StartTime: avail.startTime,
           EndTime: avail.endTime,
@@ -1389,6 +1525,10 @@ onMounted(async () => {
   color: #888;
   margin-top: 0.15rem;
   font-style: italic;
+}
+.avail-branch {
+  font-size: 0.76rem;
+  color: var(--text-muted);
 }
 
 .badge-status {
@@ -1829,5 +1969,99 @@ onMounted(async () => {
 
 .fade-slide-move {
   transition: transform 0.4s ease;
+}
+
+.shift-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.shift-detail-employee {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.emp-avatar.lg {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.shift-detail-name {
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 0.25rem;
+}
+
+.shift-detail-role {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.shift-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.shift-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.shift-detail-row .label {
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 0.84rem;
+}
+
+.shift-detail-row .value {
+  color: var(--text-main);
+  font-size: 0.84rem;
+}
+
+.employee-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f9f6f4;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.employee-legend .legend-label {
+  font-weight: 600;
+  color: #5d4037;
+  margin-right: 4px;
+}
+.employee-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 4px;
+  background: #fff;
+  border: 1px solid #e8ddd8;
+}
+.employee-legend .legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 </style>

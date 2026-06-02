@@ -68,7 +68,6 @@ function buildDocument(payload) {
           stack: [
             { text: `Branch: ${payload.branchName || 'All Branches'}`, style: 'meta' },
             { text: `Prepared By: ${payload.preparedBy || 'Staff'}`, style: 'meta' },
-            { text: `Supplier: ${payload.supplierName || 'General Supplier'}`, style: 'meta' },
           ],
         },
         {
@@ -96,7 +95,7 @@ function buildDocument(payload) {
         { text: 'Reorder Point', style: 'tableHeader', alignment: 'right' },
         { text: 'EOQ', style: 'tableHeader', alignment: 'right' },
         { text: 'Order Qty', style: 'tableHeader', alignment: 'right' },
-        { text: 'Supplier Notes', style: 'tableHeader' },
+        { text: 'Notes', style: 'tableHeader' },
       ],
       ...buildRows(items),
     ]
@@ -167,7 +166,6 @@ export async function exportPurchaseOrderPdf({
   preparedBy,
   poNumber,
   dateNeeded,
-  supplierName,
   items = [],
   download = true,
   saveToSupabase = false,
@@ -191,16 +189,24 @@ export async function exportPurchaseOrderPdf({
     preparedBy,
     poNumber,
     dateNeeded,
-    supplierName,
     generatedAt,
     items: normalizedItems,
     totalOrderQty,
   })
 
   const pdfDoc = pdfMake.createPdf(docDefinition)
-  if (download) {
+
+  if (download && !saveToSupabase) {
     pdfDoc.download(fileName)
+    return {
+      fileName,
+      totalOrderQty,
+      itemCount: normalizedItems.length,
+      upload: null,
+    }
   }
+
+  if (download) pdfDoc.download(fileName)
 
   const blob = await toBlob(pdfDoc)
   const upload = saveToSupabase ? await uploadToStorage(blob, fileName) : null

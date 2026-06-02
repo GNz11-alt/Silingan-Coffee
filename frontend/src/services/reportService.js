@@ -178,13 +178,17 @@ const REPORT_FUNCTION_MAP = {
   'low-inventory':       null,
   'low-raw-materials':   null,
   'inventory-summary':   null,
-  'employee-schedule':   'report_employee_schedule',
+  'employee-schedule':   null,
   'consolidated-report': 'report_consolidated',
 }
 
 //fetch actual data rows, returns an array of objects report ready
 export async function fetchReportData(reportType, { dateFrom, dateTo, branchId } = {}) {
   const fnName = REPORT_FUNCTION_MAP[reportType]
+
+  // Normalize dates to YYYY-MM-DD strings (PostgREST URL filters can't handle Date objects)
+  if (dateFrom instanceof Date) dateFrom = dateFrom.toISOString().slice(0, 10)
+  if (dateTo instanceof Date) dateTo = dateTo.toISOString().slice(0, 10)
 
 // Inventory reports: source from rawproduct + rawproducttransaction
   if (reportType === 'inventory-on-hand') {
@@ -444,6 +448,36 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
         stock_status: status,
       })
     }
+
+    return { data: transformRowData(reportType, raw), raw, error: null }
+  }
+
+// Employee Schedule — direct query (no RPC)
+  if (reportType === 'employee-schedule') {
+    let query = supabase
+      .from('schedule')
+      .select('Role, ShiftDate, StartTime, EndTime, Status, BranchId, employee(FirstName, LastName), branch(BranchName)')
+      .neq('Status', 'Archived')
+      .gte('ShiftDate', dateFrom)
+      .lte('ShiftDate', dateTo)
+      .order('ShiftDate', { ascending: true })
+
+    if (branchId) query = query.eq('BranchId', branchId)
+
+    const { data, error } = await query
+    if (error) return { data: [], raw: [], error }
+
+    const raw = (data || []).map((s) => ({
+      employee_name: s.employee
+        ? `${s.employee.FirstName || ''} ${s.employee.LastName || ''}`.trim()
+        : 'Unknown',
+      role: s.Role || '—',
+      shift_date: s.ShiftDate ? String(s.ShiftDate).slice(0, 10) : '',
+      start_time: s.StartTime ? String(s.StartTime).slice(0, 5) : '',
+      end_time: s.EndTime ? String(s.EndTime).slice(0, 5) : '',
+      status: s.Status || 'Scheduled',
+      branch_name: s.branch?.BranchName || '—',
+    }))
 
     return { data: transformRowData(reportType, raw), raw, error: null }
   }

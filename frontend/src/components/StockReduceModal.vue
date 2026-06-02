@@ -150,7 +150,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Package, Search } from 'lucide-vue-next'
 import { supabase } from '@/supabase.js'
 
@@ -158,6 +158,7 @@ const props = defineProps({
   show: Boolean,
   items: { type: Array, default: () => [] },
   selectedBranchId: { type: Number, default: null },
+  preselectedItem: { type: Object, default: null },
 })
 const emit = defineEmits(['close', 'done'])
 
@@ -173,6 +174,21 @@ const form = ref({
   quantity: 0,
   notes: '',
   date: today,
+})
+
+watch(() => props.preselectedItem, (item) => {
+  if (item && props.show) {
+    selectedItem.value = item
+  }
+}, { immediate: true })
+watch(() => props.show, (visible) => {
+  if (!visible) {
+    selectedItem.value = null
+    search.value = ''
+    form.value = { reason: '', customReason: '', quantity: 0, notes: '', date: today }
+  } else if (props.preselectedItem) {
+    selectedItem.value = props.preselectedItem
+  }
 })
 
 const reasons = [
