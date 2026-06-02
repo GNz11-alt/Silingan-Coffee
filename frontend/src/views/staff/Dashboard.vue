@@ -2,7 +2,9 @@
   <div class="dashboard-content">
     <div class="welcome-header">
       <h1>Dashboard</h1>
-      <p class="welcome-message">Welcome back, {{ username }}!</p>
+      <p class="welcome-message">
+        Welcome back, <strong>{{ username }}!</strong>
+      </p>
       <p class="branch-label">{{ branchLabel }}</p>
     </div>
 
@@ -38,11 +40,28 @@
         <div class="stat-info">
           <h3>Low Stock Items</h3>
           <p class="stat-value">{{ isLoading ? "..." : lowStockCount }}</p>
-          <span class="stat-trend warning">in your branch</span>
+          <span
+            :class="[
+              'stat-trend',
+              lowStockCount >= 5
+                ? 'danger'
+                : lowStockCount > 0
+                  ? 'warning'
+                  : 'positive',
+            ]"
+          >
+            {{
+              lowStockCount >= 5
+                ? "needs attention"
+                : lowStockCount > 0
+                  ? "needs restocking"
+                  : "all stocked"
+            }}
+          </span>
         </div>
       </div>
 
-      <div class="stat-card growth-card">
+      <div class="stat-card">
         <div class="stat-icon">
           <component :is="Calendar" :size="28" stroke-width="1.5" />
         </div>
@@ -57,11 +76,14 @@
     <div class="bottom-section">
       <div class="recent-orders">
         <h2>Recent Orders</h2>
-        <p class="section-subtitle">Latest transactions in {{userBranch}}</p>
-
+        <p class="section-subtitle">Latest transactions in {{ branchLabel }}</p>
         <div class="orders-list">
           <div v-if="recentOrders.length === 0" class="empty-state">
-            No orders yet today.
+            <ShoppingBag :size="32" class="empty-icon" />
+            <p>No recent orders today.</p>
+            <span
+              >Orders will appear here once customers start purchasing.</span
+            >
           </div>
           <div
             class="order-item"
@@ -83,7 +105,6 @@
       <div class="quick-actions">
         <h2>Quick Actions</h2>
         <p class="section-subtitle">Common tasks</p>
-
         <div class="actions-list">
           <button
             class="action-item"
@@ -114,55 +135,43 @@ import {
 } from "lucide-vue-next";
 
 const router = useRouter();
-const username = ref(localStorage.getItem("username") || "User");
+const raw = localStorage.getItem("username") || "User";
+const name = raw.split(/[^a-zA-Z]/)[0];
+const username = ref(
+  name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
+);
 const userBranch = ref(localStorage.getItem("branch") || "");
 const isLoading = ref(true);
 
-// Stats
 const totalRevenue = ref(0);
 const totalOrders = ref(0);
 const lowStockCount = ref(0);
 const shiftsToday = ref(0);
-
-// Data
 const recentOrders = ref([]);
+const branchLabel = ref("");
 
-// Branch label display
-const branchLabels = {
-  dlsu: "De La Salle University",
-  ateneo: "Ateneo de Manila University",
-  batangas: "Batangas City",
-  lipa: "Lipa City",
-  cubao: "Cubao Expo",
-};
-const branchLabel = ref(branchLabels[userBranch.value] || userBranch.value);
+const formatCurrency = (value) =>
+  "₱" +
+  Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
-const formatCurrency = (value) => {
-  return (
-    "₱" +
-    Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })
-  );
-};
-
-const formatTime = (timestamp) => {
-  return new Date(timestamp).toLocaleTimeString("en-PH", {
+const formatTime = (timestamp) =>
+  new Date(timestamp).toLocaleTimeString("en-PH", {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
 
 const fetchDashboardData = async () => {
   isLoading.value = true;
-
   const today = new Date().toISOString().split("T")[0];
 
   const { data: branchData } = await supabase
     .from("branch")
-    .select("BranchId")
+    .select("BranchId, BranchName")
     .eq("Location", userBranch.value)
     .maybeSingle();
 
   const branchId = branchData?.BranchId;
+  branchLabel.value = branchData?.BranchName || userBranch.value;
 
   if (branchId) {
     const { data: ordersData } = await supabase
@@ -186,11 +195,9 @@ const fetchDashboardData = async () => {
       .select("Quantity, LowStockThreshold")
       .eq("BranchId", branchId);
 
-    if (inventoryData) {
-      lowStockCount.value = inventoryData.filter(
-        (item) => item.Quantity <= item.LowStockThreshold,
-      ).length;
-    }
+    lowStockCount.value = (inventoryData ?? []).filter(
+      (item) => item.Quantity <= item.LowStockThreshold && item.Quantity > 0,
+    ).length;
 
     const { data: recentData } = await supabase
       .from("orders")
@@ -198,6 +205,9 @@ const fetchDashboardData = async () => {
         "OrderId, FinalAmount, CreatedAt, orderitem(Quantity, ProductId, product(ProductName))",
       )
       .eq("BranchId", branchId)
+      .gte("CreatedAt", `${today}T00:00:00`)
+      .lte("CreatedAt", `${today}T23:59:59`)
+      .eq("Status", "completed")
       .order("CreatedAt", { ascending: false })
       .limit(5);
 
@@ -211,18 +221,17 @@ const fetchDashboardData = async () => {
     }
   }
 
-  // Fetch today's shifts for this staff
   const { data: userData } = await supabase
     .from("users")
-    .select("id")
-    .eq("username", username.value)
+    .select("employee_id")
+    .eq("username", localStorage.getItem("username"))
     .maybeSingle();
 
-  if (userData) {
+  if (userData?.employee_id) {
     const { count } = await supabase
       .from("schedule")
       .select("*", { count: "exact", head: true })
-      .eq("EmployeeId", userData.id)
+      .eq("EmployeeId", userData.employee_id)
       .eq("ShiftDate", today);
 
     shiftsToday.value = count || 0;
@@ -257,38 +266,40 @@ onMounted(() => {
 <style scoped>
 .dashboard-content {
   padding: 24px 32px;
+  background: #fafafa;
+  min-height: 100vh;
+  font-family: "Inter", sans-serif;
 }
-
 .welcome-header {
   margin-bottom: 28px;
 }
-
 .welcome-header h1 {
-  font-size: 28px;
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
+  font-size: 26px;
+  font-weight: 800;
+  color: #31201d;
+  margin: 0;
 }
-
+.welcome-header strong {
+  color: #31201d;
+}
 .welcome-message {
   font-size: 14px;
-  color: #6c757d;
+  color: #888;
+  margin: 4px 0 0;
 }
-
 .branch-label {
   font-size: 13px;
   color: #8b4513;
   font-weight: 500;
-  margin-top: 2px;
+  margin-top: 20px;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 20px;
   margin-bottom: 32px;
 }
-
 .stat-card {
   background: #ffffff;
   border-radius: 12px;
@@ -299,29 +310,24 @@ onMounted(() => {
   border: 1px solid #e9ecef;
   transition: all 0.2s ease;
 }
-
 .stat-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
-
 .stat-icon {
   color: #8b4513;
 }
-
 .stat-info h3 {
   font-size: 13px;
   color: #6c757d;
   margin-bottom: 6px;
   font-weight: 500;
 }
-
 .stat-value {
   font-size: 24px;
   font-weight: 600;
   color: #212529;
   margin-bottom: 4px;
 }
-
 .stat-trend {
   font-size: 11px;
   color: #adb5bd;
@@ -330,19 +336,10 @@ onMounted(() => {
   color: #28a745;
 }
 .stat-trend.warning {
-  color: #ffc107;
+  color: #f59e0b;
 }
-
-.growth-card {
-  background: linear-gradient(135deg, #8b4513, #a0522d);
-  border: none;
-}
-
-.growth-card .stat-icon,
-.growth-card .stat-value,
-.growth-card .stat-info h3,
-.growth-card .stat-trend {
-  color: #ffffff;
+.stat-trend.danger {
+  color: #dc2626;
 }
 
 .bottom-section {
@@ -350,7 +347,6 @@ onMounted(() => {
   grid-template-columns: 1.5fr 1fr;
   gap: 24px;
 }
-
 .recent-orders,
 .quick-actions {
   background: #ffffff;
@@ -358,7 +354,6 @@ onMounted(() => {
   padding: 24px;
   border: 1px solid #e9ecef;
 }
-
 .recent-orders h2,
 .quick-actions h2 {
   font-size: 16px;
@@ -366,7 +361,6 @@ onMounted(() => {
   color: #212529;
   margin-bottom: 4px;
 }
-
 .section-subtitle {
   font-size: 13px;
   color: #6c757d;
@@ -375,15 +369,30 @@ onMounted(() => {
 
 .empty-state {
   text-align: center;
+  padding: 28px 0;
   color: #adb5bd;
-  font-size: 13px;
-  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.empty-state p {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6c757d;
+  margin: 0;
+}
+.empty-state span {
+  font-size: 12px;
+  color: #adb5bd;
+}
+.empty-icon {
+  opacity: 0.3;
 }
 
 .orders-list {
   margin-top: 20px;
 }
-
 .order-item {
   display: flex;
   justify-content: space-between;
@@ -391,23 +400,15 @@ onMounted(() => {
   padding: 12px 0;
   border-bottom: 1px solid #f1f3f5;
 }
-
-.order-items {
-  color: #495057;
-  font-size: 12px;
-}
-
 .order-item:last-child {
   border-bottom: none;
 }
-
 .order-info {
   display: flex;
   gap: 16px;
   align-items: center;
   font-size: 13px;
 }
-
 .order-id {
   font-weight: 600;
   color: #8b4513;
@@ -416,6 +417,10 @@ onMounted(() => {
 .order-time {
   color: #adb5bd;
   min-width: 70px;
+}
+.order-items {
+  color: #495057;
+  font-size: 12px;
 }
 .order-amount {
   font-weight: 500;
@@ -428,7 +433,6 @@ onMounted(() => {
   grid-template-columns: 1fr;
   gap: 8px;
 }
-
 .action-item {
   display: flex;
   align-items: center;
@@ -444,7 +448,6 @@ onMounted(() => {
   text-align: left;
   width: 100%;
 }
-
 .action-item:hover {
   background: #fff4e6;
   border-color: #8b4513;
