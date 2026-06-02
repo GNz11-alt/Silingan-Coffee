@@ -454,9 +454,7 @@ export default {
     // Current month start
     monthStart() {
       const now = new Date()
-      const month = now.getMonth() + this.monthOffset
-      const year = now.getFullYear() + Math.floor(month / 12)
-      return new Date(year, month % 12, 1)
+      return new Date(now.getFullYear(), now.getMonth() + this.monthOffset, 1)
     },
 
     monthYearLabel() {
@@ -480,7 +478,10 @@ export default {
       for (let i = 0; i < 42; i++) {
         const d = new Date(startDate)
         d.setDate(startDate.getDate() + i)
-        const dateStr = d.toISOString().slice(0, 10)
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        const dateStr = `${y}-${m}-${day}`
         const isToday = d.getTime() === today.getTime()
         const isOtherMonth = d.getMonth() !== monthStart.getMonth()
 
@@ -637,7 +638,7 @@ export default {
         if (error) throw error
         this.mySchedules = (data || []).map(s => ({
           EmployeeId: s.EmployeeId,
-          WorkDate: s.ShiftDate,
+          WorkDate: String(s.ShiftDate || '').slice(0, 10),
           TimeIn: s.StartTime ? s.StartTime.slice(0, 5) : '',
           TimeOut: s.EndTime ? s.EndTime.slice(0, 5) : '',
           Branch: s.branch?.BranchName || '',
@@ -664,7 +665,7 @@ export default {
         this.allEmployeeSchedules = (data || []).map(s => ({
           EmployeeId: s.EmployeeId,
           Name: `${s.employee?.FirstName || ''} ${s.employee?.LastName || ''}`.trim() || 'Employee',
-          WorkDate: s.ShiftDate,
+          WorkDate: String(s.ShiftDate || '').slice(0, 10),
           TimeIn: s.StartTime ? s.StartTime.slice(0, 5) : '',
           TimeOut: s.EndTime ? s.EndTime.slice(0, 5) : '',
           Branch: s.branch?.BranchName || '',
@@ -689,8 +690,8 @@ export default {
         this.myAvailability = (data || []).map(a => ({
           AvailabilityId: a.availabilityid,
           Date: a.availabledate,
-          TimeIn: a.starttime?.slice(0, 5),
-          TimeOut: a.endtime?.slice(0, 5),
+          startTime: a.starttime?.slice(0, 5),
+          endTime: a.endtime?.slice(0, 5),
           Notes: a.notes,
           Status: a.status,
           CreatedAt: a.createdat

@@ -45,24 +45,16 @@ export function useSearch(items, options = {}) {
     totalCount.value = itemList.length
   }
 
-  watch(() => items.value, () => {
-    rebuildIndex()
-    runSearch()
-  }, { deep: true })
-
-  const debouncedUpdate = () => {
-    isSearching.value = true
-    clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
-      debouncedQuery.value = query.value
-      runSearch()
-    }, debounceMs)
+  const hasActiveScopes = () => {
+    const s = scopes.value
+    return s.branches.length > 0 ||
+      s.categories.length > 0 ||
+      s.statuses.length > 0 ||
+      s.departments.length > 0 ||
+      s.types.length > 0 ||
+      s.dateRange.from ||
+      s.dateRange.to
   }
-
-  watch(query, () => {
-    hasSearched.value = true
-    debouncedUpdate()
-  })
 
   const runSearch = () => {
     const itemList = items.value || []
@@ -76,7 +68,6 @@ export function useSearch(items, options = {}) {
 
     let filtered = itemList
 
-    // Apply scope filters first
     if (scopes.value.branches.length > 0) {
       filtered = filtered.filter(item => scopes.value.branches.includes(item.branch))
     }
@@ -102,13 +93,10 @@ export function useSearch(items, options = {}) {
       })
     }
 
-    // Save scope-filtered list before fuzzy search
     const scopeFiltered = filtered
 
-    // Apply fuzzy search
     if (q && fuseInstance) {
       filtered = fuseInstance.search(q).map(r => r.item)
-      // Intersect with scope-filtered items
       filtered = filtered.filter(item => scopeFiltered.includes(item))
     }
 
@@ -116,16 +104,25 @@ export function useSearch(items, options = {}) {
     isSearching.value = false
   }
 
-  const hasActiveScopes = () => {
-    const s = scopes.value
-    return s.branches.length > 0 ||
-      s.categories.length > 0 ||
-      s.statuses.length > 0 ||
-      s.departments.length > 0 ||
-      s.types.length > 0 ||
-      s.dateRange.from ||
-      s.dateRange.to
+  const debouncedUpdate = () => {
+    isSearching.value = true
+    clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      debouncedQuery.value = query.value
+      runSearch()
+    }, debounceMs)
   }
+
+  watch(query, (val) => {
+    if (val && val.length > 200) query.value = val.slice(0, 200)
+    hasSearched.value = true
+    debouncedUpdate()
+  })
+
+  watch(() => items.value, () => {
+    rebuildIndex()
+    runSearch()
+  }, { immediate: true, deep: true })
 
   const setScopes = (newScopes) => {
     scopes.value = { ...scopes.value, ...newScopes }

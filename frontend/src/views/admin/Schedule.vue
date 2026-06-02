@@ -6,7 +6,11 @@
         <h4 class="page-title mb-1">Schedule Management</h4>
         <p class="page-sub mb-0">Manage employee availability and schedules</p>
       </div>
-      <button class="btn btn-primary-brand" @click="openCreateModal">
+      <button
+        class="btn btn-primary-brand"
+        @click="openCreateModal"
+        :disabled="employeesLoading"
+      >
         <i class="bi bi-plus-lg me-1"></i> Create Schedule
       </button>
     </div>
@@ -18,7 +22,7 @@
         :key="tab.key"
         class="tab-btn"
         :class="{ active: activeTab === tab.key }"
-        @click="activeTab = tab.key"
+        @click="switchTab(tab.key)"
       >
         {{ tab.label }}
         <span v-if="tab.key === 'availability'" class="tab-badge">{{
@@ -159,7 +163,7 @@
           </select>
           <input
             v-if="schedViewMode === 'table'"
-            v-model="schedSearch"
+            v-model="schedSearchInput"
             type="text"
             class="form-control fc-brand"
             style="width: 200px"
@@ -436,8 +440,15 @@
             <div class="row g-3">
               <div class="col-12">
                 <label class="form-label-sm">Employee</label>
-                <select v-model="form.employeeId" class="form-select fc-brand">
-                  <option value="" disabled>Select employee</option>
+                <select
+                  v-model="form.employeeId"
+                  class="form-select fc-brand"
+                  :disabled="employeesLoading"
+                  @change="onEmployeeSelected"
+                >
+                  <option value="" disabled>
+                    {{ employeesLoading ? 'Loading employees…' : 'Select employee' }}
+                  </option>
                   <option v-for="e in employeeList" :key="e.id" :value="e.id">
                     {{ e.name }}
                   </option>
@@ -517,14 +528,49 @@
             <button class="btn btn-ghost" @click="closeModal">Cancel</button>
             <button
               class="btn btn-primary-brand"
-              @click="saveSchedule"
-              :disabled="saving"
+              @click="saveSchedule()"
+              :disabled="saving || employeesLoading"
             >
               <span
                 v-if="saving"
                 class="spinner-border spinner-border-sm me-1"
               ></span>
               {{ isEditing ? "Save Changes" : "Create Schedule" }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ── CONFLICT CONFIRM ───────────────────────────────── -->
+    <Teleport to="body">
+      <div
+        v-if="showConflictConfirm"
+        class="modal-overlay"
+        @click.self="showConflictConfirm = false"
+      >
+        <div class="modal-panel modal-panel--sm">
+          <div class="modal-panel-header">
+            <h5 class="mb-0">Schedule Conflict</h5>
+            <button class="btn-close-panel" @click="showConflictConfirm = false">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="modal-panel-body">
+            <p v-if="conflictInfo">
+              This employee already has a shift on
+              <strong>{{ formatDate(form.shiftDate) }}</strong> from
+              <strong>{{ conflictInfo.existingStart }}–{{ conflictInfo.existingEnd }}</strong>
+              ({{ conflictInfo.existingRole }}).
+            </p>
+            <p class="mb-0">Save anyway and allow double-booking?</p>
+          </div>
+          <div class="modal-panel-footer">
+            <button class="btn btn-ghost" @click="showConflictConfirm = false">
+              Cancel
+            </button>
+            <button class="btn btn-danger-brand" @click="confirmConflictSave">
+              Save Anyway
             </button>
           </div>
         </div>
@@ -639,8 +685,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch, onUnmounted } from "vue";
 import { supabase } from "@/supabase.js";
+import {
+  getMonthStart,
+  toLocalDateKey,
+  normalizeDateKey,
+  normalizeTime,
+  timesOverlap,
+  buildSchedulesByDate,
+  availabilitySinceDate,
+} from "@/composables/useScheduleHelpers.js";
 
 const isLoading = ref(true);
 const activeTab = ref("availability");
@@ -651,13 +706,18 @@ const tabs = [
   { key: "change", label: "Change Inquiries" },
 ];
 
+const schedSearchInput = ref("");
 const schedSearch = ref("");
+let schedSearchDebounce = null;
 const schedDateFilter = ref("");
 const schedBranchFilter = ref("");
 const schedStatusFilter = ref("");
 const schedViewMode = ref("table"); // "table" or "calendar"
 const monthOffset = ref(0); // 0 = current month, -1 = last month, +1 = next month
 const showModal = ref(false);
+const showConflictConfirm = ref(false);
+const conflictInfo = ref(null);
+const employeesLoading = ref(true);
 const showDeleteConfirm = ref(false);
 const showShiftDetail = ref(null);
 const isEditing = ref(false);
@@ -721,12 +781,16 @@ const filteredSchedules = computed(() => {
     const matchDate =
       !schedDateFilter.value || s.shiftDate === schedDateFilter.value;
     const matchBranch =
-      !schedBranchFilter.value || s.branchId === schedBranchFilter.value;
+      !schedBranchFilter.value || String(s.branchId) === String(schedBranchFilter.value);
     const matchStatus =
       !schedStatusFilter.value || s.status === schedStatusFilter.value;
     return matchSearch && matchDate && matchBranch && matchStatus;
   });
 });
+
+const schedulesByDate = computed(() =>
+  buildSchedulesByDate(filteredSchedules.value),
+);
 
 const schedEmployees = computed(() => {
   const seen = new Set();
@@ -738,12 +802,7 @@ const schedEmployees = computed(() => {
 });
 
 // Calendar view computed properties
-const monthStart = computed(() => {
-  const now = new Date();
-  const month = now.getMonth() + monthOffset.value;
-  const year = now.getFullYear() + Math.floor(month / 12);
-  return new Date(year, month % 12, 1);
-});
+const monthStart = computed(() => getMonthStart(monthOffset.value));
 
 const monthYearLabel = computed(() => {
   return monthStart.value.toLocaleDateString("en-PH", {
@@ -768,12 +827,11 @@ const monthDays = computed(() => {
   for (let i = 0; i < 42; i++) {
     const d = new Date(startDate);
     d.setDate(startDate.getDate() + i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = toLocalDateKey(d);
     const isToday = d.getTime() === today.getTime();
     const isOtherMonth = d.getMonth() !== start.getMonth();
 
-    // Find shifts for this day
-    const shiftsForDay = filteredSchedules.value.filter((s) => s.shiftDate === dateStr);
+    const shiftsForDay = schedulesByDate.value.get(dateStr) || [];
 
     days.push({
       dateStr,
@@ -809,24 +867,37 @@ const updateInquiryStatus = async (inq, status) => {
 };
 
 const fetchEmployees = async () => {
-  const { data } = await supabase
+  employeesLoading.value = true;
+  const { data, error } = await supabase
     .from("employee")
-    .select("EmployeeId, FirstName, LastName");
-  if (data) {
+    .select("EmployeeId, FirstName, LastName, BranchAssigned, Position, Status")
+    .eq("Status", "Active")
+    .order("FirstName");
+
+  if (error) {
+    console.error("[Schedule] fetchEmployees failed:", error);
+    employeeList.value = [];
+  } else if (data) {
     employeeList.value = data.map((e) => ({
       id: e.EmployeeId,
       name: `${e.FirstName} ${e.LastName}`,
+      branchAssigned: e.BranchAssigned,
+      position: e.Position,
     }));
   }
+  employeesLoading.value = false;
 };
 
 const fetchAvailability = async () => {
+  const since = availabilitySinceDate(30);
   const { data } = await supabase
     .from("availability")
     .select(
       "availabilityid, employeeid, availabledate, starttime, endtime, notes, status, employee(FirstName, LastName, Position)",
     )
-    .order("availabilityid", { ascending: false });
+    .gte("availabledate", since)
+    .order("availabilityid", { ascending: false })
+    .limit(200);
 
   if (data) {
     availability.value = data.map((a) => ({
@@ -840,9 +911,9 @@ const fetchAvailability = async () => {
           "?"
         : "?",
       role: a.employee?.Position || "—",
-      availableDate: a.availabledate,
-      startTime: a.starttime?.slice(0, 5),
-      endTime: a.endtime?.slice(0, 5),
+      availableDate: normalizeDateKey(a.availabledate),
+      startTime: normalizeTime(a.starttime),
+      endTime: normalizeTime(a.endtime),
       notes: a.notes,
       status: a.status || "Pending",
     }));
@@ -901,16 +972,36 @@ const fetchSchedules = async () => {
           "?"
         : "?",
       role: s.Role,
-      shiftDate: s.ShiftDate,
-      startTime: s.StartTime?.slice(0, 5),
-      endTime: s.EndTime?.slice(0, 5),
+      shiftDate: normalizeDateKey(s.ShiftDate),
+      startTime: normalizeTime(s.StartTime),
+      endTime: normalizeTime(s.EndTime),
       branchId: s.BranchId,
       status: s.Status,
     }));
   }
 };
 
+const onEmployeeSelected = () => {
+  const emp = employeeList.value.find((e) => e.id === form.value.employeeId);
+  if (!emp) return;
+  if (emp.branchAssigned) form.value.branchId = emp.branchAssigned;
+  if (emp.position && !form.value.role) form.value.role = emp.position;
+};
+
+const switchTab = (key) => {
+  if (activeTab.value !== key) fadingIds.value = new Set();
+  activeTab.value = key;
+};
+
 const openCreateModal = () => {
+  if (employeesLoading.value) {
+    showToast("Employee list is still loading. Please wait.", "error");
+    return;
+  }
+  if (!employeeList.value.length) {
+    showToast("No active employees available to schedule.", "error");
+    return;
+  }
   form.value = emptyForm();
   errors.value = {};
   isEditing.value = false;
@@ -939,9 +1030,12 @@ const validate = () => {
   if (
     form.value.startTime &&
     form.value.endTime &&
-    form.value.startTime >= form.value.endTime
+    form.value.endTime <= form.value.startTime
   )
     e.endTime = "End time must be after start time.";
+  const today = toLocalDateKey(new Date());
+  if (form.value.shiftDate && form.value.shiftDate < today)
+    e.shiftDate = "Shift date cannot be in the past.";
   errors.value = e;
   return Object.keys(e).length === 0;
 };
@@ -966,11 +1060,10 @@ const checkScheduleConflict = async () => {
       continue; // Skip the current record when editing
     }
 
-    const existingStart = existing.StartTime;
-    const existingEnd = existing.EndTime;
+    const existingStart = normalizeTime(existing.StartTime);
+    const existingEnd = normalizeTime(existing.EndTime);
 
-    // Check for overlap: newStart < existingEnd AND newEnd > existingStart
-    if (newStart < existingEnd && newEnd > existingStart) {
+    if (timesOverlap(newStart, newEnd, existingStart, existingEnd)) {
       return {
         employeeId: form.value.employeeId,
         existingStart,
@@ -983,56 +1076,60 @@ const checkScheduleConflict = async () => {
   return null;
 };
 
-const saveSchedule = async () => {
+const saveSchedule = async (overrideConflict = false) => {
   if (!validate()) return;
+
   saving.value = true;
+  try {
+    const conflict = await checkScheduleConflict();
+    if (conflict && !overrideConflict) {
+      conflictInfo.value = conflict;
+      showConflictConfirm.value = true;
+      return;
+    }
 
-  // Check for schedule conflicts
-  const conflict = await checkScheduleConflict();
-  if (conflict) {
-    showToast(
-      `Employee already has a shift from ${conflict.existingStart}–${conflict.existingEnd} (${conflict.existingRole}) on this date.`,
-      "error"
-    );
-    saving.value = false;
-    return;
-  }
+    const payload = {
+      EmployeeId: form.value.employeeId,
+      Role: form.value.role,
+      ShiftDate: form.value.shiftDate,
+      StartTime: form.value.startTime,
+      EndTime: form.value.endTime,
+      BranchId: form.value.branchId,
+      Status: form.value.status || "Scheduled",
+      BasedOnAvailabilityId: null,
+    };
 
-  const payload = {
-    EmployeeId: form.value.employeeId,
-    Role: form.value.role,
-    ShiftDate: form.value.shiftDate,
-    StartTime: form.value.startTime,
-    EndTime: form.value.endTime,
-    BranchId: form.value.branchId,
-    Status: form.value.status || "Scheduled",
-    BasedOnAvailabilityId: null,
-  };
+    if (isEditing.value) {
+      const { error } = await supabase
+        .from("schedule")
+        .update(payload)
+        .eq("ScheduleId", form.value.id);
 
-  if (isEditing.value) {
-    const { error } = await supabase
-      .from("schedule")
-      .update(payload)
-      .eq("ScheduleId", form.value.id);
-
-    if (error) showToast("Failed to update schedule.", "error");
-    else {
+      if (error) throw error;
       showToast("Schedule updated.", "success");
       await fetchSchedules();
-    }
-  } else {
-    const { error } = await supabase.from("schedule").insert([payload]);
-
-    if (error) showToast("Failed to create schedule.", "error");
-    else {
+    } else {
+      const { error } = await supabase.from("schedule").insert([payload]);
+      if (error) throw error;
       showToast("Schedule created.", "success");
       await fetchSchedules();
     }
-  }
 
-  saving.value = false;
-  closeModal();
-  activeTab.value = "schedule";
+    showConflictConfirm.value = false;
+    conflictInfo.value = null;
+    closeModal();
+    activeTab.value = "schedule";
+  } catch (error) {
+    console.error("[Schedule] saveSchedule failed:", error);
+    showToast(error?.message || "Failed to save schedule.", "error");
+  } finally {
+    saving.value = false;
+  }
+};
+
+const confirmConflictSave = () => {
+  showConflictConfirm.value = false;
+  saveSchedule(true);
 };
 
 const confirmDelete = (sched) => {
@@ -1065,93 +1162,105 @@ const deleteSchedule = async () => {
 };
 
 const updateAvailStatus = async (avail, status) => {
-  const { error } = await supabase
-    .from("availability")
-    .update({ status })
-    .eq("availabilityid", avail.id);
+  const previousStatus = avail.status;
 
-  if (error) {
-    showToast("Failed to update availability.", "error");
-    return;
-  }
+  try {
+    const { error } = await supabase
+      .from("availability")
+      .update({ status })
+      .eq("availabilityid", avail.id);
 
-  avail.status = status;
+    if (error) throw error;
 
-  if (status === "Confirmed") {
-    // Check for schedule conflicts before creating
-    const { data: conflicts } = await supabase
-      .from("schedule")
-      .select("StartTime, EndTime, Role")
-      .eq("EmployeeId", avail.employeeId)
-      .eq("ShiftDate", avail.availableDate)
-      .neq("Status", "Cancelled")
-      .neq("Status", "Archived");
+    avail.status = status;
 
-    if (conflicts && conflicts.length > 0) {
-      const newStart = avail.startTime;
-      const newEnd = avail.endTime;
-      
-      for (const existing of conflicts) {
-        if (newStart < existing.EndTime && newEnd > existing.StartTime) {
-          showToast(
-            `Employee already has a shift from ${existing.StartTime}–${existing.EndTime} (${existing.Role}) on this date.`,
-            "error"
-          );
-          return;
+    if (status === "Confirmed") {
+      if (avail.endTime <= avail.startTime) {
+        throw new Error("Cannot approve: end time must be after start time.");
+      }
+
+      const { data: conflicts } = await supabase
+        .from("schedule")
+        .select("StartTime, EndTime, Role")
+        .eq("EmployeeId", avail.employeeId)
+        .eq("ShiftDate", avail.availableDate)
+        .neq("Status", "Cancelled")
+        .neq("Status", "Archived");
+
+      if (conflicts?.length) {
+        for (const existing of conflicts) {
+          if (
+            timesOverlap(
+              avail.startTime,
+              avail.endTime,
+              existing.StartTime,
+              existing.EndTime,
+            )
+          ) {
+            throw new Error(
+              `Employee already has a shift from ${normalizeTime(existing.StartTime)}–${normalizeTime(existing.EndTime)} (${existing.Role}) on this date.`,
+            );
+          }
         }
       }
+
+      const { data: emp } = await supabase
+        .from("employee")
+        .select("BranchAssigned, Position")
+        .eq("EmployeeId", avail.employeeId)
+        .maybeSingle();
+
+      const { error: schedErr } = await supabase.from("schedule").insert([
+        {
+          EmployeeId: avail.employeeId,
+          Role: avail.role !== "—" ? avail.role : emp?.Position || "Staff",
+          ShiftDate: avail.availableDate,
+          StartTime: avail.startTime,
+          EndTime: avail.endTime,
+          Status: "Scheduled",
+          BranchId: emp?.BranchAssigned || null,
+          BasedOnAvailabilityId: avail.id,
+        },
+      ]);
+
+      if (schedErr) throw schedErr;
+
+      await fetchSchedules();
+      showToast("Availability approved and schedule created.", "success");
+    } else {
+      showToast("Availability rejected.", "success");
     }
 
-    // Look up employee's branch
-    const { data: emp } = await supabase
-      .from("employee")
-      .select("BranchAssigned")
-      .eq("EmployeeId", avail.employeeId)
-      .maybeSingle();
-
-    const { error: schedErr } = await supabase.from("schedule").insert([
-      {
-        EmployeeId: avail.employeeId,
-        Role: avail.role,
-        ShiftDate: avail.availableDate,
-        StartTime: avail.startTime,
-        EndTime: avail.endTime,
-        Status: "Scheduled",
-        BranchId: emp?.BranchAssigned || null,
-        BasedOnAvailabilityId: avail.id,
-      },
-    ]);
-
-    if (schedErr) {
-      showToast(
-        "Availability approved but failed to create schedule.",
-        "error",
+    fadingIds.value = new Set([...fadingIds.value, avail.id]);
+    setTimeout(() => {
+      fadingIds.value = new Set(
+        [...fadingIds.value].filter((id) => id !== avail.id),
       );
-      return;
-    }
-    await fetchSchedules();
-    showToast("Availability approved and schedule created.", "success");
-  } else {
-    showToast(`Availability rejected.`, "success");
+    }, 20000);
+  } catch (error) {
+    console.error("[Schedule] updateAvailStatus failed:", error);
+    avail.status = previousStatus;
+    await supabase
+      .from("availability")
+      .update({ status: previousStatus })
+      .eq("availabilityid", avail.id);
+    showToast(error?.message || "Failed to update availability.", "error");
   }
-
-  // Start 20-second fade-out before removing from pending view
-  fadingIds.value = new Set([...fadingIds.value, avail.id]);
-  setTimeout(() => {
-    fadingIds.value = new Set(
-      [...fadingIds.value].filter((id) => id !== avail.id),
-    );
-  }, 20000);
 };
 
 const clearSchedFilters = () => {
+  schedSearchInput.value = "";
   schedSearch.value = "";
   schedDateFilter.value = "";
   schedBranchFilter.value = "";
   schedStatusFilter.value = "";
 };
 
-const branchName = (id) => branches.value.find((b) => b.id === id)?.name || "—";
+const branchName = (id) => {
+  if (id == null || id === "") return "—";
+  const match = branches.value.find((b) => String(b.id) === String(id));
+  return match?.name || `Branch #${id}`;
+};
 
 const avatarColor = (id) => {
   const colors = [
@@ -1187,6 +1296,17 @@ const showToast = (message, type = "success") => {
     toast.value.show = false;
   }, 3000);
 };
+
+watch(schedSearchInput, (value) => {
+  clearTimeout(schedSearchDebounce);
+  schedSearchDebounce = setTimeout(() => {
+    schedSearch.value = value;
+  }, 200);
+});
+
+onUnmounted(() => {
+  clearTimeout(schedSearchDebounce);
+});
 
 onMounted(async () => {
   await Promise.all([

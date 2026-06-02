@@ -1,7 +1,7 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '@/supabase.js'
 
-export function useSearchData() {
+export function useSearchData(userBranch = null) {
   const allItems = ref([])
   const isLoading = ref(true)
   const error = ref(null)
@@ -13,24 +13,29 @@ export function useSearchData() {
 
     try {
       // Fetch inventory stock for accurate product stock status
-      const { data: inventoryRows } = await supabase
+      let inventoryQuery = supabase
         .from('inventory')
         .select('ProductId, Quantity, LowStockThreshold, BranchId')
+      if (userBranch) inventoryQuery = inventoryQuery.eq('BranchId', userBranch)
+      const { data: inventoryRows } = await inventoryQuery
       const stockMap = {}
       for (const inv of inventoryRows || []) {
         const key = `${inv.ProductId}:${inv.BranchId}`
         stockMap[key] = { qty: inv.Quantity, threshold: inv.LowStockThreshold }
       }
 
-      // Fetch products
+      // Fetch products (shared across branches; stock tracked in inventory)
       const { data: products } = await supabase
         .from('product')
-        .select('ProductId, ProductName, Category, Price, BranchId, CreatedAt')
+        .select('ProductId, ProductName, Category, Price, CreatedAt')
 
       if (products) {
         products.forEach(p => {
-          const invKey = `${p.ProductId}:${p.BranchId}`
-          const stock = stockMap[invKey]
+          const invEntry = Object.entries(stockMap).find(([k]) =>
+            k.startsWith(`${p.ProductId}:`)
+          )
+          const stock = invEntry?.[1]
+          const stockBranch = invEntry ? invEntry[0].split(':')[1] : null
           let stockStatus = 'Out of Stock'
           if (stock) {
             if (stock.qty === 0) stockStatus = 'Out of Stock'
@@ -44,14 +49,14 @@ export function useSearchData() {
             description: p.Category || 'Menu item',
             details: `₱${(p.Price || 0).toFixed(2)}`,
             status: stockStatus,
-            branch: String(p.BranchId || ''),
+            branch: stockBranch || 'all',
             category: p.Category || 'Uncategorized',
             date: p.CreatedAt,
           })
         })
       }
 
-      // Fetch raw materials
+      // Fetch raw materials (global, not branch-specific)
       const { data: rawProducts } = await supabase
         .from('rawproduct')
         .select('rawproductid, name, category, unit, stockquantity, reorderlevel, expirationdate')
@@ -78,10 +83,13 @@ export function useSearchData() {
         })
       }
 
-      // Fetch employees
-      const { data: employees } = await supabase
+      // Fetch employees (exclude archived)
+      let employeeQuery = supabase
         .from('employee')
         .select('EmployeeId, FirstName, LastName, Position, Department, BranchAssigned, Status')
+        .neq('Status', 'Archived')
+      if (userBranch) employeeQuery = employeeQuery.eq('BranchAssigned', userBranch)
+      const { data: employees } = await employeeQuery
 
       if (employees) {
         employees.forEach(e => {
@@ -100,11 +108,13 @@ export function useSearchData() {
       }
 
       // Fetch orders (limit to recent 500 for performance)
-      const { data: orders } = await supabase
+      let orderQuery = supabase
         .from('orders')
         .select('OrderId, TotalAmount, FinalAmount, PaymentMethod, Status, CreatedAt, BranchId')
         .order('CreatedAt', { ascending: false })
         .limit(500)
+      if (userBranch) orderQuery = orderQuery.eq('BranchId', userBranch)
+      const { data: orders } = await orderQuery
 
       if (orders) {
         orders.forEach(o => {

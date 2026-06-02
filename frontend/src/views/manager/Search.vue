@@ -15,6 +15,10 @@
       </div>
     </header>
 
+    <div v-if="searchError" class="alert-error mb-3">
+      <i class="bi bi-exclamation-triangle me-2"></i>{{ searchError }}
+    </div>
+
     <div class="universal-search-card">
       <div class="card-header">
         <SearchIcon class="search-icon-tan" :size="20" />
@@ -140,24 +144,26 @@ import SearchAutocomplete from "@/components/SearchAutocomplete.vue";
 import SearchFilters from "@/components/SearchFilters.vue";
 import SearchResults from "@/components/SearchResults.vue";
 
-const { allItems, isLoading: dataLoading } = useSearchData();
 const { branches } = useBranches();
 const { isAdmin, userBranchId, userBranchName, resolveBranch } =
   useUserBranch();
 const router = useRouter();
+
+const { allItems, isLoading: dataLoading, error: searchError } = useSearchData(userBranchId.value);
 
 const search = useSearch(allItems);
 
 const ROUTE_MAP = {
   product: { path: "/manager/menu-pricing" },
   rawmaterial: { path: "/manager/inventory" },
+  employee: { path: "/manager/employees" },
   sale: { path: "/manager/sales" },
 };
 
 function onResultSelect(result) {
   const route = ROUTE_MAP[result.type];
   if (!route) return;
-  const entityId = result.id.split("-")[1];
+  const entityId = result.id.replace(/^[a-z]+-/, "");
   router.push({ path: route.path, query: { edit: entityId } });
 }
 
@@ -497,5 +503,14 @@ onMounted(async () => {
   color: #888;
   font-size: 13px;
   margin: 0;
+}
+
+.alert-error {
+  background: #f5ede8;
+  border: 1px solid #d4b8b0;
+  color: #7b1d1d;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
 }
 </style>
