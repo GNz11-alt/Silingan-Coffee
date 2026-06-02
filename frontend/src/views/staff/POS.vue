@@ -17,7 +17,7 @@
         </div>
       </div>
       <div class="topbar-right">
-        <button class="history-btn" @click="showHistory = true">
+        <button class="history-btn" @click="openHistory">
           <History :size="15" /> Today's Sales
           <span v-if="transactions.length > 0" class="history-count">{{ transactions.length }}</span>
         </button>
@@ -63,7 +63,6 @@
               <span v-if="isInCart(item.ProductId)" class="cart-qty-badge">
                 {{ getCartTotalQty(item.ProductId) }}
               </span>
-              <!-- Size indicator chip -->
               <span v-if="getSizeType(item.Category) !== 'none'" class="size-chip">
                 {{ getSizeLabels(item.Category).join(' / ') }}
               </span>
@@ -179,7 +178,8 @@
 
         <!-- Receipt Step -->
         <div v-if="showReceipt" class="receipt-view">
-          <div class="receipt-paper">
+          <!-- Printable receipt area -->
+          <div id="print-receipt" class="receipt-paper">
             <div class="receipt-header">
               <div class="r-icon-circle"><Coffee :size="20" /></div>
               <h3>Silingan Coffee</h3>
@@ -215,6 +215,10 @@
           </div>
           <div class="receipt-btns">
             <button class="rbtn-back" @click="showReceipt = false"><ArrowLeft :size="14" /> Edit</button>
+            <!-- rint receipt button -->
+            <button class="rbtn-print" @click="printReceipt">
+              <Printer :size="14" /> Print
+            </button>
             <button class="rbtn-confirm" :disabled="saving" @click="finishTransaction">
               {{ saving ? 'Saving...' : 'Confirm & Finalize' }}
             </button>
@@ -244,6 +248,10 @@
             <label>Amount Received (₱)</label>
             <input type="number" v-model.number="cashReceived" class="cash-input" placeholder="0.00" />
             <div class="quick-amounts">
+              <!-- Exact Amount button -->
+              <button class="qa-btn exact-btn" @click="cashReceived = finalTotal">
+                ₱{{ finalTotal.toFixed(2) }} <span class="exact-label"></span>
+              </button>
               <button v-for="v in quickAmounts" :key="v" class="qa-btn" @click="cashReceived = v">
                 ₱{{ v.toLocaleString() }}
               </button>
@@ -311,10 +319,12 @@
               <tr>
                 <th>Order</th><th>Time</th><th>Items</th>
                 <th>Payment</th><th>Discount</th><th>Total</th><th>Status</th>
+                <!-- Cancel column -->
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="tr in transactions" :key="tr.OrderId">
+              <tr v-for="tr in transactions" :key="tr.OrderId" :class="{ 'cancelled-row': tr.Status === 'cancelled' }">
                 <td><span class="id-tag">#{{ tr.OrderId }}</span></td>
                 <td class="muted">{{ formatTime(tr.CreatedAt) }}</td>
                 <td>
@@ -333,6 +343,18 @@
                 </td>
                 <td class="total-col">₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}</td>
                 <td><span :class="['st-badge', tr.Status]">{{ tr.Status }}</span></td>
+                <!-- Cancel button — only for completed orders -->
+                <td>
+                  <button
+                    v-if="tr.Status === 'completed'"
+                    class="cancel-order-btn"
+                    :disabled="cancellingId === tr.OrderId"
+                    @click="confirmCancelOrder(tr)"
+                  >
+                    {{ cancellingId === tr.OrderId ? '...' : 'Cancel' }}
+                  </button>
+                  <span v-else class="muted">—</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -340,6 +362,28 @@
       </div>
     </div>
 
+    <!-- ── CANCEL CONFIRM MODAL ── -->
+    <div v-if="showCancelConfirm" class="overlay" @click.self="showCancelConfirm = false">
+      <div class="confirm-modal">
+        <div class="confirm-icon"><XCircle :size="32" /></div>
+        <h3>Cancel Order #{{ cancelTarget?.OrderId }}?</h3>
+        <p>This will mark the order as cancelled. This action cannot be undone.</p>
+        <div class="confirm-items">
+          <div v-for="it in cancelTarget?.orderitem" :key="it.OrderItemId" class="confirm-item-line">
+            {{ it.Quantity }}x {{ it.product?.ProductName ?? '—' }}
+          </div>
+        </div>
+        <div class="confirm-total">Total: ₱{{ (cancelTarget?.FinalAmount ?? 0).toFixed(2) }}</div>
+        <div class="confirm-btns">
+          <button class="conf-no" @click="showCancelConfirm = false">Keep Order</button>
+          <button class="conf-yes" :disabled="cancellingId !== null" @click="doCancelOrder">
+            {{ cancellingId ? 'Cancelling...' : 'Yes, Cancel Order' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Print styles injected into head at runtime -->
   </div>
 </template>
 
@@ -348,24 +392,11 @@ import { ref, computed, onMounted } from 'vue';
 import {
   Coffee, History, Search, ShoppingCart, Plus, Minus, Trash2, X,
   Tag, ChevronDown, CreditCard, Banknote, Smartphone, ArrowLeft,
-  Cookie, Layers, UtensilsCrossed, Sandwich, Leaf
+  Cookie, Layers, UtensilsCrossed, Sandwich, Leaf, Printer, XCircle
 } from 'lucide-vue-next';
 import { supabase } from '@/supabase';
 
-// ── Size configuration ─────────────────────────────────────────────────────────
-// Categories that have sizes and how the prices work:
-// Hot Drinks: Small 8oz = Price, Regular 12oz = Price + 10 (approx from menu)
-// Iced Coffee, Non-Coffee, Frap, Smoothies, Cream Frap: Regular 16oz = Price, Big 22oz = Price + 15-20
-// Fixed: Others (Sprite, Royal...), Sandwiches, Pastry, Rice Meal, Pika-pika, Add Ons
-
-const HOT_DRINKS_CATS    = ['Hot Drinks', 'Hot Drink\'s', 'Hot Drink', 'Hot']
-const ICED_COFFEE_CATS   = ['Iced Coffee', 'Iced Coffees']
-const NON_COFFEE_CATS    = ['Non Coffee', 'Non-Coffee']
-const FRAP_CATS          = ['Coffee Based Frap', 'Coffee-Based Frap', 'Frap']
-const CREAM_FRAP_CATS    = ['Cream Based Frap', 'Cream-Based Frap', 'Cream Frap']
-const SMOOTHIE_CATS      = ['Smoothies', 'Smoothie']
-
-// normalise category to size type
+// ── Size configuration ────────────────────────────────────────────────────────
 const getSizeType = (cat) => {
   if (!cat) return 'none'
   const c = cat.toLowerCase()
@@ -385,9 +416,6 @@ const getSizeLabels = (cat) => {
   return []
 }
 
-// Build size options for the modal based on product base price
-// Hot: Small(8oz) = base price, Regular(12oz) = base + ~10
-// Iced: Regular(16oz) = base price, Big(22oz) = base + ~20
 const buildSizeOptions = (item) => {
   const t = getSizeType(item.Category)
   const base = item.Price ?? 0
@@ -408,7 +436,7 @@ const buildSizeOptions = (item) => {
 
 const getBasePrice = (item) => item.Price?.toFixed(2) ?? '0.00'
 
-// State 
+// ── State ─────────────────────────────────────────────────────────────────────
 const menu = ref([]); const discounts = ref([]); const transactions = ref([]);
 const loadingMenu = ref(false); const loadingTransactions = ref(false);
 const cart = ref([]); const selectedDiscount = ref(null);
@@ -416,13 +444,19 @@ const activeCategory = ref('All'); const menuSearch = ref('');
 const showPayment = ref(false); const showReceipt = ref(false); const showHistory = ref(false);
 const paymentMethod = ref('cash'); const cashReceived = ref(0); const saving = ref(false);
 const currentUser = ref(null); const branchRecord = ref(null);
+const employeeRecord = ref(null); // ④ FK fix: store the employee row
 
 // Size picker
 const showSizePicker = ref(false)
 const sizePickerItem = ref(null)
 const sizeOptions    = ref([])
 
-// Computed 
+// Cancel order
+const showCancelConfirm = ref(false)
+const cancelTarget      = ref(null)
+const cancellingId      = ref(null)
+
+// ── Computed ──────────────────────────────────────────────────────────────────
 const cashierName   = computed(() => currentUser.value?.username ?? localStorage.getItem('username') ?? 'Staff');
 const branchId      = computed(() => branchRecord.value?.BranchId ?? null);
 const branchAddress = computed(() => branchRecord.value?.Location ?? '');
@@ -449,28 +483,31 @@ const discountAmount = computed(() => {
 
 const finalTotal   = computed(() => Math.max(0, cartTotal.value - discountAmount.value));
 const changeAmount = computed(() => cashReceived.value - finalTotal.value);
-const totalRevenue = computed(() => transactions.value.reduce((s, t) => s + (t.FinalAmount ?? 0), 0));
-const avgSale      = computed(() => transactions.value.length ? totalRevenue.value / transactions.value.length : 0);
-
-const quickAmounts = computed(() => {
-  const t = Math.ceil(finalTotal.value / 50) * 50;
-  return [...new Set([t, 100, 200, 500, 1000, 2000])].sort((a,b)=>a-b).slice(0,6);
+const totalRevenue = computed(() => transactions.value.filter(t => t.Status !== 'cancelled').reduce((s, t) => s + (t.FinalAmount ?? 0), 0));
+const avgSale      = computed(() => {
+  const completed = transactions.value.filter(t => t.Status !== 'cancelled');
+  return completed.length ? totalRevenue.value / completed.length : 0;
 });
 
-// ── Cart helpers ───────────────────────────────────────────────────────────────
-// Cart key = ProductId + size (so same product in different sizes = different cart rows)
+// Quick amounts: exclude exact if it matches a round number already
+const quickAmounts = computed(() => {
+  const t = Math.ceil(finalTotal.value / 50) * 50;
+  return [...new Set([t, 100, 200, 500, 1000, 2000])]
+    .filter(v => v !== finalTotal.value) // exclude exact — handled separately
+    .sort((a, b) => a - b)
+    .slice(0, 5);
+});
+
+// ── Cart helpers ──────────────────────────────────────────────────────────────
 const makeCartKey  = (item, size) => `${item.ProductId}-${size ?? 'none'}`
 const isInCart     = (id) => cart.value.some(i => i.ProductId === id)
 const getCartTotalQty = (id) => cart.value.filter(i => i.ProductId === id).reduce((s,i) => s + i.qty, 0)
 
-// ── Handle menu card tap ───────────────────────────────────────────────────────
 const handleMenuCardClick = (item) => {
   const t = getSizeType(item.Category)
   if (t === 'none') {
-    // No size — add directly
     addToCartDirect(item)
   } else {
-    // Has sizes — open picker
     sizePickerItem.value = item
     sizeOptions.value = buildSizeOptions(item)
     showSizePicker.value = true
@@ -490,8 +527,7 @@ const addToCartWithSize = (item, sizeOpt) => {
   const ex = cart.value.find(i => i.cartKey === key)
   if (ex) { ex.qty++; return }
   cart.value.push({
-    ...item,
-    qty: 1,
+    ...item, qty: 1,
     size: `${sizeOpt.label} (${sizeOpt.oz})`,
     effectivePrice: sizeOpt.price,
     cartKey: key
@@ -502,18 +538,39 @@ const increaseQty    = (i) => cart.value[i].qty++
 const decreaseQty    = (i) => { if (cart.value[i].qty > 1) cart.value[i].qty--; else removeFromCart(i) }
 const removeFromCart = (i) => cart.value.splice(i, 1)
 
-// Fetch 
+// ── Fetch ─────────────────────────────────────────────────────────────────────
 const fetchCurrentUser = async () => {
   const username   = localStorage.getItem('username');
   const branchSlug = localStorage.getItem('branch');
   if (!username) return;
+
   const { data: u } = await supabase.from('users').select('id, username, role, branch').eq('username', username).single();
   if (u) currentUser.value = u;
+
+  // Resolve branch record
   if (branchSlug && branchSlug !== 'all') {
     const { data: bd } = await supabase.from('branch').select('BranchId, BranchName, Location').eq('BranchName', branchSlug).maybeSingle();
-    if (bd) { branchRecord.value = bd; return; }
-    const { data: bl } = await supabase.from('branch').select('BranchId, BranchName, Location').ilike('Location', '%' + branchSlug + '%').maybeSingle();
-    if (bl) branchRecord.value = bl;
+    if (bd) { branchRecord.value = bd; }
+    else {
+      const { data: bl } = await supabase.from('branch').select('BranchId, BranchName, Location').ilike('Location', '%' + branchSlug + '%').maybeSingle();
+      if (bl) branchRecord.value = bl;
+    }
+  }
+
+  // ④ FK fix: look up employee by username/name match so we can use EmployeeId
+  // Try matching on username via users.employee_id link if it exists
+  if (u?.employee_id) {
+    const { data: emp } = await supabase.from('employee').select('EmployeeId').eq('EmployeeId', u.employee_id).maybeSingle();
+    if (emp) { employeeRecord.value = emp; return; }
+  }
+
+  // Fallback: try to match by first/last name from username
+  if (username) {
+    const { data: emp } = await supabase.from('employee')
+      .select('EmployeeId, FirstName, LastName')
+      .or(`FirstName.ilike.%${username}%,LastName.ilike.%${username}%`)
+      .maybeSingle();
+    if (emp) employeeRecord.value = emp;
   }
 };
 
@@ -547,29 +604,49 @@ const fetchTransactions = async () => {
   loadingTransactions.value = false;
 };
 
-// Payment 
-const openPayment = () => { cashReceived.value = 0; paymentMethod.value = 'cash'; showReceipt.value = false; showPayment.value = true; };
+const openHistory = async () => {
+  showHistory.value = true;
+  await fetchTransactions();
+};
+
+// ── Payment ───────────────────────────────────────────────────────────────────
+const openPayment = () => {
+  cashReceived.value = 0;
+  paymentMethod.value = 'cash';
+  showReceipt.value = false;
+  showPayment.value = true;
+};
 
 const finishTransaction = async () => {
-  if (saving.value) return; saving.value = true;
+  if (saving.value) return;
+  saving.value = true;
   try {
     const payload = {
-      PaymentMethod: paymentMethod.value, Status: 'completed',
-      TotalAmount: cartTotal.value, DiscountId: selectedDiscount.value?.discountid ?? null,
-      DiscountedAmount: discountAmount.value, FinalAmount: finalTotal.value,
+      PaymentMethod: paymentMethod.value,
+      Status: 'completed',
+      TotalAmount: cartTotal.value,
+      DiscountId: selectedDiscount.value?.discountid ?? null,
+      DiscountedAmount: discountAmount.value,
+      FinalAmount: finalTotal.value,
       cashpaid: paymentMethod.value === 'cash' ? cashReceived.value : finalTotal.value,
       changegiven: paymentMethod.value === 'cash' ? Math.max(0, changeAmount.value) : 0,
     };
+
     if (branchId.value) payload.BranchId = branchId.value;
-    if (currentUser.value?.id) payload.CashierId = currentUser.value.id;
+
+    // FK fix: only set CashierId if we found a matching employee row
+    if (employeeRecord.value?.EmployeeId) {
+      payload.CashierId = employeeRecord.value.EmployeeId;
+    }
+    // If no employee match found, omit CashierId entirely to avoid FK violation
+    // change thisss
 
     const { data: order, error: oErr } = await supabase.from('orders').insert(payload).select().single();
     if (oErr) throw new Error(oErr.message);
 
-    // Insert order items — use effectivePrice (size-adjusted) as UnitPrice
     const { error: iErr } = await supabase.from('orderitem').insert(
       cart.value.map(i => ({
-        OrderId:  order.OrderId,
+        OrderId:   order.OrderId,
         ProductId: i.ProductId,
         Quantity:  i.qty,
         UnitPrice: i.effectivePrice,
@@ -579,22 +656,88 @@ const finishTransaction = async () => {
     if (iErr) throw new Error(iErr.message);
 
     await fetchTransactions();
-    cart.value = []; selectedDiscount.value = null;
-    showPayment.value = false; showReceipt.value = false;
-  } catch (err) { alert('Failed: ' + err.message); }
-  finally { saving.value = false; }
+    cart.value = [];
+    selectedDiscount.value = null;
+    showPayment.value = false;
+    showReceipt.value = false;
+  } catch (err) {
+    alert('Failed: ' + err.message);
+  } finally {
+    saving.value = false;
+  }
 };
 
-// Helpers 
+// ──  Print receipt ───────────────────────────────────────────────────────────
+const printReceipt = () => {
+  const el = document.getElementById('print-receipt');
+  if (!el) return;
+
+  const printWin = window.open('', '_blank', 'width=400,height=600');
+  printWin.document.write(`
+    <html>
+      <head>
+        <title>Receipt - Silingan Coffee</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Courier New', monospace; font-size: 12px; color: #000; padding: 12px; width: 300px; }
+          .receipt-header { text-align: center; margin-bottom: 10px; }
+          .receipt-header h3 { font-size: 15px; font-weight: bold; margin: 6px 0 2px; }
+          .receipt-header p { font-size: 11px; color: #555; }
+          .r-row { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px; }
+          .r-divider { border-top: 1px dashed #999; margin: 8px 0; }
+          .r-item { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px; }
+          .r-total { font-weight: bold; font-size: 13px; }
+          .r-change { font-weight: bold; color: #000; }
+          .r-footer { text-align: center; margin-top: 10px; font-size: 11px; color: #777; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        ${el.innerHTML}
+        <script>window.onload = () => { window.print(); window.close(); }<\/script>
+      </body>
+    </html>
+  `);
+  printWin.document.close();
+};
+
+// ── Cancel order ────────────────────────────────────────────────────────────
+const confirmCancelOrder = (order) => {
+  cancelTarget.value = order;
+  showCancelConfirm.value = true;
+};
+
+const doCancelOrder = async () => {
+  if (!cancelTarget.value) return;
+  cancellingId.value = cancelTarget.value.OrderId;
+  try {
+    const { error } = await supabase
+      .from('orders')
+      .update({ Status: 'cancelled' })
+      .eq('OrderId', cancelTarget.value.OrderId);
+    if (error) throw new Error(error.message);
+    // Update locally without refetch
+    const tx = transactions.value.find(t => t.OrderId === cancelTarget.value.OrderId);
+    if (tx) tx.Status = 'cancelled';
+    showCancelConfirm.value = false;
+    cancelTarget.value = null;
+  } catch (err) {
+    alert('Failed to cancel: ' + err.message);
+  } finally {
+    cancellingId.value = null;
+  }
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const getCatIcon = (cat) => {
   if (!cat || cat === 'All') return Layers;
   const c = cat.toLowerCase();
-  if (c.includes('hot'))        return Coffee;
-  if (c.includes('iced'))       return Coffee;
-  if (c.includes('non'))        return Coffee;
-  if (c.includes('frap'))       return Coffee;
-  if (c.includes('smoothie'))   return Leaf;
-  if (c.includes('sandwich'))   return Sandwich;
+  if (c.includes('hot'))      return Coffee;
+  if (c.includes('iced'))     return Coffee;
+  if (c.includes('non'))      return Coffee;
+  if (c.includes('frap'))     return Coffee;
+  if (c.includes('smoothie')) return Leaf;
+  if (c.includes('sandwich')) return Sandwich;
   if (c.includes('pastry') || c.includes('rice') || c.includes('pika')) return Cookie;
   return UtensilsCrossed;
 };
@@ -660,7 +803,6 @@ onMounted(async () => {
 .ci-info { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .ci-name { font-size:12px; font-weight:700; color:#31201D; flex:1; }
 .ci-size-tag { background:#31201D; color:white; font-size:10px; font-weight:700; padding:2px 7px; border-radius:8px; white-space:nowrap; }
-.ci-price-row { }
 .ci-price { font-size:11px; color:#bbb; }
 .ci-controls { display:flex; align-items:center; gap:6px; }
 .qty-btn { width:22px; height:22px; border-radius:5px; border:1px solid #e8e0d5; background:white; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#31201D; transition:0.15s; }
@@ -716,9 +858,14 @@ onMounted(async () => {
 .cash-fields label { font-size:13px; font-weight:600; color:#31201D; }
 .cash-input { width:100%; padding:13px 15px; border:2px solid #e8e0d5; border-radius:11px; font-size:26px; font-weight:700; text-align:right; outline:none; color:#31201D; box-sizing:border-box; font-family:inherit; transition:border-color 0.2s; }
 .cash-input:focus { border-color:#31201D; }
+
+/* Quick amounts grid with exact button */
 .quick-amounts { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
 .qa-btn { padding:9px; background:white; border:1px solid #e8e0d5; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.15s; color:#31201D; }
 .qa-btn:hover { border-color:#31201D; background:#fdfaf7; }
+.exact-btn { grid-column:1 / -1; background:#f0f9f0; border-color:#86efac; color:#15803d; display:flex; align-items:center; justify-content:center; gap:6px; font-size:14px; }
+.exact-btn:hover { background:#dcfce7; border-color:#4ade80; }
+
 .cash-calc { background:#f9f4ef; border-radius:11px; padding:14px; display:flex; flex-direction:column; gap:7px; }
 .cc-row { display:flex; justify-content:space-between; font-size:13px; color:#555; }
 .change-row { font-size:16px; font-weight:800; padding-top:9px; border-top:1px solid #e8e0d5; margin-top:3px; }
@@ -747,14 +894,18 @@ onMounted(async () => {
 .r-gcash { color:#0064E0; font-weight:700; }
 .r-disc { color:#16a34a; }
 .r-footer { text-align:center; margin-top:12px; font-size:11px; color:#aaa; }
+
+/* ① Receipt buttons row — 3 buttons */
 .receipt-btns { display:flex; gap:9px; margin-top:18px; }
 .rbtn-back { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#f5f0eb; border:none; padding:11px; border-radius:10px; font-weight:600; cursor:pointer; font-family:inherit; font-size:14px; }
+.rbtn-print { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; padding:11px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; transition:0.2s; }
+.rbtn-print:hover { background:#e0f2fe; }
 .rbtn-confirm { flex:2; background:#31201D; color:white; border:none; padding:11px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; transition:0.2s; }
 .rbtn-confirm:hover:not(:disabled) { background:#4a3330; }
 .rbtn-confirm:disabled { opacity:0.5; cursor:not-allowed; }
 
 /* HISTORY MODAL */
-.history-modal { background:white; border-radius:20px; width:880px; max-width:95vw; max-height:88vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+.history-modal { background:white; border-radius:20px; width:960px; max-width:95vw; max-height:88vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
 .hm-header { display:flex; justify-content:space-between; align-items:flex-start; padding:22px 26px; border-bottom:1px solid #f0ebe4; flex-shrink:0; }
 .hm-header h2 { font-size:19px; font-weight:700; color:#31201D; margin:0 0 3px; }
 .hm-header p { font-size:13px; color:#888; margin:0; }
@@ -768,6 +919,8 @@ onMounted(async () => {
 .hm-table th { text-align:left; padding:10px 15px; background:#fdfaf7; color:#888; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid #f0ebe4; position:sticky; top:0; }
 .hm-table td { padding:11px 15px; border-bottom:1px solid #f9f4ef; font-size:13px; vertical-align:top; }
 .hm-table tr:hover td { background:#fdfaf7; }
+.cancelled-row td { opacity:0.5; text-decoration:line-through; text-decoration-color:#ccc; }
+.cancelled-row .st-badge, .cancelled-row .cancel-order-btn { text-decoration:none; }
 .id-tag { background:#f0ebe4; padding:3px 7px; border-radius:4px; font-family:monospace; font-weight:700; font-size:12px; color:#31201D; }
 .muted { color:#bbb; font-size:12px; }
 .h-item-line { line-height:1.7; }
@@ -780,6 +933,26 @@ onMounted(async () => {
 .st-badge.completed { background:#dcfce7; color:#15803d; }
 .st-badge.pending   { background:#fef9c3; color:#a16207; }
 .st-badge.cancelled { background:#fee2e2; color:#dc2626; }
+
+/* ③ Cancel order button */
+.cancel-order-btn { background:#fee2e2; border:1px solid #fca5a5; color:#dc2626; font-size:11px; font-weight:700; padding:4px 10px; border-radius:6px; cursor:pointer; font-family:inherit; transition:0.15s; }
+.cancel-order-btn:hover:not(:disabled) { background:#fecaca; border-color:#f87171; }
+.cancel-order-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+/* CANCEL CONFIRM MODAL */
+.confirm-modal { background:white; border-radius:20px; width:380px; max-width:95vw; padding:30px 28px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.22); }
+.confirm-icon { color:#dc2626; display:flex; justify-content:center; margin-bottom:14px; }
+.confirm-modal h3 { font-size:18px; font-weight:700; color:#31201D; margin:0 0 8px; }
+.confirm-modal p { font-size:13px; color:#888; margin:0 0 16px; line-height:1.5; }
+.confirm-items { background:#f9f4ef; border-radius:10px; padding:12px 14px; text-align:left; margin-bottom:10px; }
+.confirm-item-line { font-size:13px; color:#31201D; line-height:1.8; }
+.confirm-total { font-size:15px; font-weight:800; color:#31201D; margin-bottom:20px; }
+.confirm-btns { display:flex; gap:9px; }
+.conf-no { flex:1; background:#f5f0eb; border:none; padding:12px; border-radius:10px; font-weight:600; cursor:pointer; font-family:inherit; font-size:14px; }
+.conf-yes { flex:1; background:#dc2626; color:white; border:none; padding:12px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; transition:0.2s; }
+.conf-yes:hover:not(:disabled) { background:#b91c1c; }
+.conf-yes:disabled { opacity:0.5; cursor:not-allowed; }
+
 .spin { width:17px; height:17px; border:2px solid #eee; border-top-color:#C49A6C; border-radius:50%; animation:spin 0.7s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 </style>
