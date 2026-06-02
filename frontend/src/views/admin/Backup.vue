@@ -59,6 +59,17 @@
 
       <div class="stat-card">
         <div class="stat-icon">
+          <component :is="UtensilsCrossed" :size="28" stroke-width="1.5" />
+        </div>
+        <div class="stat-info">
+          <h3>Menu</h3>
+          <p class="stat-value">{{ archivedMenuItems.length }}</p>
+          <span class="stat-trend positive">Menu items</span>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">
           <component :is="File" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">
@@ -314,7 +325,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { Database, Package, Users, File, Calendar } from "lucide-vue-next";
+import {
+  Database,
+  Package,
+  Users,
+  File,
+  Calendar,
+  UtensilsCrossed,
+} from "lucide-vue-next";
 import { supabase } from "@/supabase.js";
 
 // ── Current user ───────────────────────────────────────────
@@ -847,7 +865,7 @@ onMounted(loadAll);
 /* ── Stat Grid ──────────────────────────────── */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 20px;
   margin-bottom: 24px;
 }
