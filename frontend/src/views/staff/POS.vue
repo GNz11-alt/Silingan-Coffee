@@ -576,10 +576,21 @@ const fetchCurrentUser = async () => {
 
 const fetchMenu = async () => {
   loadingMenu.value = true;
-  let q = supabase.from('product').select('ProductId, ProductName, Category, Price, BranchId');
-  if (branchId.value) q = q.eq('BranchId', branchId.value);
-  const { data } = await q.order('Category').order('ProductName');
-  if (data) menu.value = data;
+  
+  // Remove BranchId from select and remove the branch filter
+  const { data, error } = await supabase
+    .from('product')
+    .select('ProductId, ProductName, Category, Price')  // Removed BranchId
+    .neq('Status', 'Archived')  // Only show non-archived products
+    .order('Category')
+    .order('ProductName');
+    
+  if (error) {
+    console.error("Error fetching menu:", error);
+  } else {
+    menu.value = data || [];
+  }
+  
   loadingMenu.value = false;
 };
 
@@ -598,7 +609,7 @@ const fetchTransactions = async () => {
     discount ( discountid, discountname, discounttype, discountvalue ),
     orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
   `).gte('CreatedAt', today.toISOString()).lt('CreatedAt', tom.toISOString()).order('CreatedAt', { ascending: false });
-  if (branchId.value) q = q.eq('BranchId', branchId.value);
+  // if (branchId.value) q = q.eq('BranchId', branchId.value); --- remove this
   const { data } = await q;
   if (data) transactions.value = data;
   loadingTransactions.value = false;
