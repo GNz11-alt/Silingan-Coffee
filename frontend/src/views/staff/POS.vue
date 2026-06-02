@@ -215,7 +215,7 @@
           </div>
           <div class="receipt-btns">
             <button class="rbtn-back" @click="showReceipt = false"><ArrowLeft :size="14" /> Edit</button>
-            <!-- rint receipt button -->
+            <!-- Print receipt button -->
             <button class="rbtn-print" @click="printReceipt">
               <Printer :size="14" /> Print
             </button>
