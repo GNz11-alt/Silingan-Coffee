@@ -246,12 +246,11 @@
                 <span :class="['status-badge', getStatus(item)]">{{ getStatusText(item) }}</span>
               </td>
               <td class="actions-cell">
-                <button class="icon-btn restock" @click="openRestockModal(item)" title="Add Stock"><RefreshCw :size="14" /></button>
-                <!-- ④ NEW: Reduce stock per-row button -->
-                <button class="icon-btn reduce" @click="openReduceModalForItem(item)" title="Reduce Stock"><MinusCircle :size="14" /></button>
-                <button class="icon-btn batches" @click="openBatchDetail(item)" title="View Batches"><Layers :size="14" /></button>
-                <button class="icon-btn delete" @click="confirmDelete(item)" title="Remove"><Trash2 :size="14" /></button>
-              </td>
+              <button class="icon-btn edit" @click="openEditModal(item)" title="Edit Item"><Pencil :size="14" /></button>
+              <button class="icon-btn batches" @click="openBatchDetail(item)" title="View Batches"><Layers :size="14" /></button>
+              <button class="icon-btn reduce" @click="openReduceModalForItem(item)" title="Reduce Stock"><MinusCircle :size="14" /></button>
+              <button class="icon-btn delete" @click="confirmDelete(item)" title="Archive"><Trash2 :size="14" /></button>
+            </td>
             </tr>
             <tr v-if="!filteredItems.length">
               <td colspan="9" class="empty-row">No items found.</td>
@@ -632,6 +631,75 @@
       </div>
     </Teleport>
 
+    <!-- ══ EDIT ITEM MODAL ══ -->
+<div v-if="showEditModal" class="modal" @click.self="closeEditModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div>
+        <h2>Edit Item</h2>
+        <p class="modal-sub">Update details for <strong>{{ editItemForm.name || 'this item' }}</strong></p>
+      </div>
+      <button class="close-btn" @click="closeEditModal">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Item Name *</label>
+        <input type="text" v-model="editItemForm.name" placeholder="e.g. Whole Milk" />
+        <span v-if="editItemErrors.name" class="field-error">{{ editItemErrors.name }}</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category</label>
+          <select v-model="editItemForm.category">
+            <option value="">Select</option>
+            <option value="Coffee Beans">Coffee Beans</option>
+            <option value="Dairy">Dairy</option>
+            <option value="Syrup">Syrup</option>
+            <option value="Powder">Powder</option>
+            <option value="Sweetener">Sweetener</option>
+            <option value="Baking">Baking</option>
+            <option value="Supplies">Supplies</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Unit *</label>
+          <select v-model="editItemForm.unit">
+            <option value="g">g</option>
+            <option value="kg">kg</option>
+            <option value="ml">ml</option>
+            <option value="l">l</option>
+            <option value="pcs">pcs</option>
+            <option value="oz">oz</option>
+          </select>
+          <span v-if="editItemErrors.unit" class="field-error">{{ editItemErrors.unit }}</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Reorder Point <span class="label-hint">— alert threshold</span></label>
+          <input type="number" v-model.number="editItemForm.reorderlevel" min="0" placeholder="e.g. 500" />
+        </div>
+        <div class="form-group">
+          <label>Lead Time (days) <span class="label-hint">— days to arrival</span></label>
+          <input type="number" v-model.number="editItemForm.leadtimedays" min="1" placeholder="2" />
+        </div>
+      </div>
+      <div class="hasexpiry-toggle-row">
+        <input type="checkbox" id="edit-hasexpiry-toggle" v-model="editItemForm.hasexpiry" />
+        <label for="edit-hasexpiry-toggle">This item has an expiration date</label>
+        <span class="hasexpiry-hint">{{ editItemForm.hasexpiry ? "e.g. milk, syrups, dairy" : "e.g. cups, straws, napkins" }}</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" @click="closeEditModal">Cancel</button>
+        <button class="btn-primary" :disabled="savingEdit" @click="saveEditItem">
+          {{ savingEdit ? "Saving..." : "Save Changes" }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
     <!-- ══ ① BATCH RESTOCK MODAL ══ -->
     <BatchRestockModal
       :show="showBatchRestockModal"
@@ -674,7 +742,7 @@ import { useRoute } from "vue-router";
 import {
   Plus, Package, AlertCircle, Search, Trash2, TrendingUp,
   Layers, ChevronDown, CalendarX, XCircle, RefreshCw, Info,
-  MinusCircle, ClipboardList, Printer,
+  MinusCircle, ClipboardList, Printer, Pencil,
 } from "lucide-vue-next";
 import { supabase } from "@/supabase.js";
 
@@ -1175,6 +1243,66 @@ const doDelete = async () => {
   showDeleteConfirm.value = false;
 };
 
+// ── EDIT ITEM ─────────────────────────────────────────────────────────────────
+const showEditModal = ref(false);
+const savingEdit = ref(false);
+const editItemErrors = ref({});
+const editItemForm = ref({
+  rawproductid: null, name: "", category: "", unit: "g",
+  reorderlevel: 0, leadtimedays: 2, hasexpiry: true,
+});
+
+const openEditModal = (item) => {
+  editItemErrors.value = {};
+  editItemForm.value = {
+    rawproductid: item.rawproductid,
+    name: item.name ?? "",
+    category: item.category ?? "",
+    unit: item.unit ?? "g",
+    reorderlevel: item.reorderlevel ?? 0,
+    leadtimedays: item.leadtimedays ?? 2,
+    hasexpiry: item.hasexpiry ?? true,
+  };
+  showEditModal.value = true;
+};
+
+const closeEditModal = () => {
+  showEditModal.value = false;
+  editItemErrors.value = {};
+};
+
+const saveEditItem = async () => {
+  const e = {};
+  if (!editItemForm.value.name.trim()) e.name = "Name is required.";
+  if (!editItemForm.value.unit) e.unit = "Unit is required.";
+  editItemErrors.value = e;
+  if (Object.keys(e).length > 0) return;
+
+  savingEdit.value = true;
+
+  const { error } = await supabase
+    .from("rawproduct")
+    .update({
+      name: editItemForm.value.name.trim(),
+      category: editItemForm.value.category || null,
+      unit: editItemForm.value.unit,
+      reorderlevel: editItemForm.value.reorderlevel || null,
+      leadtimedays: editItemForm.value.leadtimedays || 2,
+      hasexpiry: editItemForm.value.hasexpiry,
+    })
+    .eq("rawproductid", editItemForm.value.rawproductid);
+
+  if (error) {
+    showToast("Failed to update item: " + error.message, "error");
+  } else {
+    showToast(`✓ "${editItemForm.value.name}" updated successfully.`, "success");
+    await fetchRawMaterials();
+    closeEditModal();
+  }
+
+  savingEdit.value = false;
+};
+
 // ── STATUS HELPERS ────────────────────────────────────────────────────────────
 const getStatus = (item) => {
   if ((item.stockquantity ?? 0) <= 0) return "out";
@@ -1397,7 +1525,7 @@ onMounted(async () => {
 .fefo-status-badge.expired { background: #ffebee; color: #dc2626; }
 
 /* ─── ACTION ICONS ─────────────────────────────────────── */
-.actions-cell { display: flex; gap: 6px; }
+.actions-cell { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; height: 100%; }
 .icon-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 6px; transition: 0.2s; display: flex; }
 .icon-btn.restock { color: #2e7d32; }
 .icon-btn.restock:hover { background: #e8f5e9; }
@@ -1407,6 +1535,9 @@ onMounted(async () => {
 .icon-btn.batches:hover { background: #f3e8ff; }
 .icon-btn.delete { color: #dc3545; }
 .icon-btn.delete:hover { background: #ffebee; }
+
+.icon-btn.edit { color: #0369a1; }
+.icon-btn.edit:hover { background: #e0f2fe; }
 
 /* ─── MODAL ────────────────────────────────────────────── */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
