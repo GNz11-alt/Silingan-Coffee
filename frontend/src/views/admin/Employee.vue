@@ -49,12 +49,15 @@
         <option value="On Leave">On Leave</option>
         <option value="Inactive">Inactive</option>
       </select>
-      <select v-model="filterBranch" class="form-select filter-select">
-        <option value="">All Branches</option>
+      <select v-model="filterBranch" class="form-select filter-select" :class="{ 'is-invalid': branchLoadError }">
+        <option value="">{{ branchLoadError ? 'Error loading branches' : 'All Branches' }}</option>
         <option v-for="b in branches" :key="b.id" :value="b.id">
           {{ b.name }}
         </option>
       </select>
+      <button v-if="branchLoadError" class="btn btn-outline-danger btn-sm" @click="fetchBranches" title="Retry loading branches" type="button">
+        <i class="bi bi-arrow-clockwise"></i> Retry
+      </button>
       <button class="btn btn-outline-secondary btn-sm" @click="clearFilters">
         Clear Filters
       </button>
@@ -217,12 +220,17 @@
 
               <div class="col-6">
                 <label class="form-label-sm">Branch</label>
-                <select v-model="form.branchId" class="form-select fc-brand">
-                  <option value="" disabled>Select branch</option>
-                  <option v-for="b in branches" :key="b.id" :value="b.id">
-                    {{ b.name }}
-                  </option>
-                </select>
+                <div class="d-flex gap-1">
+                  <select v-model="form.branchId" class="form-select fc-brand" :class="{ 'is-invalid': branchLoadError }">
+                    <option value="" disabled>{{ branchLoadError ? 'Error loading branches' : 'Select branch' }}</option>
+                    <option v-for="b in branches" :key="b.id" :value="b.id">
+                      {{ b.name }}
+                    </option>
+                  </select>
+                  <button v-if="branchLoadError" class="btn btn-outline-danger btn-sm" @click="fetchBranches" type="button" title="Retry loading branches">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </div>
                 <div v-if="errors.branch" class="text-danger small mt-1">
                   {{ errors.branch }}
                 </div>
@@ -402,6 +410,7 @@ const errors = ref({});
 const employees = ref([]);
 
 const branches = ref([]);
+const branchLoadError = ref(false);
 const departments = ["Kitchen", "Service", "Management", "Maintenance"];
 const positions = [
   "Store Manager",
@@ -433,43 +442,59 @@ const form = ref(emptyForm());
 
 // Fetch branches from Supabase
 const fetchBranches = async () => {
-  const { data } = await supabase.from("branch").select("BranchId, BranchName");
-  if (data) {
-    branches.value = data.map((b) => ({
-      id: String(b.BranchId),
-      name: b.BranchName,
-    }));
+  branchLoadError.value = false;
+  try {
+    const { data, error } = await supabase.from("branch").select("BranchId, BranchName");
+    if (error) throw error;
+    if (data) {
+      branches.value = data.map((b) => ({
+        id: String(b.BranchId),
+        name: b.BranchName,
+      }));
+    }
+  } catch (err) {
+    console.error("[Employee] Failed to load branches:", err);
+    branchLoadError.value = true;
+    showToast(`Failed to load branches: ${err.message || err}`, "error");
   }
 };
 
 // Fetch employees from Supabase
 const fetchEmployees = async () => {
   isLoading.value = true;
-  const { data, error } = await supabase
-    .from("employee")
-    .select(
-      "EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status",
-    )
-    .neq("Status", "Archived")
-    .order("EmployeeId", { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from("employee")
+      .select(
+        "EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status",
+      )
+      .neq("Status", "Archived")
+      .order("EmployeeId", { ascending: true });
 
-  if (data) {
-    employees.value = data.map((e) => ({
-      id: e.EmployeeId,
-      firstName: e.FirstName,
-      lastName: e.LastName,
-      email: e.Email,
-      phone: e.Phone,
-      position: e.Position,
-      department: e.Department,
-      hourlyRate: e.HourlyRate,
-      address: e.Address,
-      dateHired: e.DateHired,
-      branchId: String(e.BranchAssigned),
-      status: e.Status,
-    }));
+    if (error) throw error;
+
+    if (data) {
+      employees.value = data.map((e) => ({
+        id: e.EmployeeId,
+        firstName: e.FirstName,
+        lastName: e.LastName,
+        email: e.Email,
+        phone: e.Phone,
+        position: e.Position,
+        department: e.Department,
+        hourlyRate: e.HourlyRate,
+        address: e.Address,
+        dateHired: e.DateHired,
+        branchId: String(e.BranchAssigned),
+        status: e.Status,
+      }));
+    }
+  } catch (err) {
+    console.error("[Employee] Failed to fetch employees:", err);
+    showToast(`Failed to load employees: ${err.message || err}`, "error");
+  } finally {
+    isLoading.value = false;
   }
-  isLoading.value = false;
 };
 
 const filteredEmployees = computed(() => {
@@ -596,15 +621,17 @@ const saveEmployee = async () => {
     Status: form.value.status,
   };
 
-  if (isEditing.value) {
-    const { error } = await supabase
-      .from("employee")
-      .update(payload)
-      .eq("EmployeeId", form.value.id);
+  try {
+    if (isEditing.value) {
+      const { error } = await supabase
+        .from("employee")
+        .update(payload)
+        .eq("EmployeeId", form.value.id);
 
-    if (error) {
-      showToast("Failed to update employee.", "error");
-    } else {
+      if (error) {
+        throw new Error(`Failed to update employee details: ${error.message}`);
+      }
+
       // Update corresponding user record if branch changed
       const originalEmployee = employees.value.find(
         (e) => e.id === form.value.id,
@@ -618,33 +645,62 @@ const saveEmployee = async () => {
             /\s+/g,
             "",
           );
-        const { data: userRecord } = await supabase
+        const { data: userRecord, error: userSelectError } = await supabase
           .from("users")
           .select("id")
           .eq("username", generatedUsername)
           .maybeSingle();
 
+        if (userSelectError) {
+          throw new Error(`Failed to find linked user: ${userSelectError.message}`);
+        }
+
         if (userRecord) {
-          await supabase
+          const { error: userUpdateError } = await supabase
             .from("users")
             .update({ branch: form.value.branchId })
             .eq("id", userRecord.id);
+
+          if (userUpdateError) {
+            throw new Error(`Employee updated, but user branch update failed: ${userUpdateError.message}`);
+          }
         }
       }
       showToast("Employee updated successfully.", "success");
       await fetchEmployees();
-    }
-  } else {
-    // Step 1: Insert employee first to get the EmployeeId back
-    const { data: empData, error: empError } = await supabase
-      .from("employee")
-      .insert([payload])
-      .select("EmployeeId")
-      .single();
-
-    if (empError || !empData) {
-      showToast("Failed to add employee.", "error");
+      closeModal();
     } else {
+      // Step 0: Pre-check duplicate username to avoid silent collision (ERR-4)
+      const generatedUsername =
+        `${form.value.firstName.toLowerCase()}.${form.value.lastName.toLowerCase()}`.replace(
+          /\s+/g,
+          "",
+        );
+
+      const { data: existingUser, error: checkError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("username", generatedUsername)
+        .maybeSingle();
+
+      if (checkError) {
+        throw new Error(`Failed to check username availability: ${checkError.message}`);
+      }
+      if (existingUser) {
+        throw new Error(`An account with the username "${generatedUsername}" already exists.`);
+      }
+
+      // Step 1: Insert employee first to get the EmployeeId back
+      const { data: empData, error: empError } = await supabase
+        .from("employee")
+        .insert([payload])
+        .select("EmployeeId")
+        .single();
+
+      if (empError || !empData) {
+        throw new Error(`Failed to add employee: ${empError?.message || "No data returned"}`);
+      }
+
       const newEmployeeId = empData.EmployeeId;
 
       // Determine role based on position
@@ -665,13 +721,6 @@ const saveEmployee = async () => {
       };
       const hashedPassword = rolePasswordMap[userRole];
 
-      // Step 2: Create user account linked to the new employee
-      const generatedUsername =
-        `${form.value.firstName.toLowerCase()}.${form.value.lastName.toLowerCase()}`.replace(
-          /\s+/g,
-          "",
-        );
-
       const userPayload = {
         username: generatedUsername,
         password: hashedPassword,
@@ -681,29 +730,44 @@ const saveEmployee = async () => {
         employee_id: newEmployeeId,
       };
 
+      // Step 2: Create user account linked to the new employee
       const { error: userError } = await supabase
         .from("users")
         .insert([userPayload]);
 
       if (userError) {
-        showToast("Employee added but user account creation failed.", "error");
-      } else {
-        const roleDefaultPlaintext = {
-          admin: "Admin@1234",
-          manager: "Manager@1234",
-          staff: "Staff@1234",
-        };
-        showToast(
-          `Employee added. Login: ${generatedUsername} / Default password: ${roleDefaultPlaintext[userRole]}`,
-          "success",
-        );
-      }
-      await fetchEmployees();
-    }
-  }
+        // Rollback: delete the created employee record since user account creation failed (ERR-3)
+        console.error("[Employee] User creation failed, rolling back employee insert...");
+        const { error: rollbackError } = await supabase
+          .from("employee")
+          .delete()
+          .eq("EmployeeId", newEmployeeId);
 
-  saving.value = false;
-  closeModal();
+        if (rollbackError) {
+          console.error("[Employee] Rollback failed! Orphan employee record left:", newEmployeeId, rollbackError);
+        }
+
+        throw new Error(`Employee record created, but user account creation failed: ${userError.message}. Changes rolled back.`);
+      }
+
+      const roleDefaultPlaintext = {
+        admin: "Admin@1234",
+        manager: "Manager@1234",
+        staff: "Staff@1234",
+      };
+      showToast(
+        `Employee added. Login: ${generatedUsername} / Default password: ${roleDefaultPlaintext[userRole]}`,
+        "success",
+      );
+      await fetchEmployees();
+      closeModal();
+    }
+  } catch (err) {
+    console.error("[Employee] Save failed:", err);
+    showToast(err.message || "An unexpected error occurred while saving.", "error");
+  } finally {
+    saving.value = false;
+  }
 };
 
 const confirmDelete = (emp) => {
