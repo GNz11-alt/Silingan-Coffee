@@ -334,6 +334,7 @@ const archivedEmployees = ref([]);
 const archivedSchedules = ref([]);
 const archivedInventory = ref([]);
 const archivedSales = ref([]);
+const archivedMenuItems = ref([]);
 
 const showRestoreModal = ref(false);
 const showBackupModal = ref(false);
@@ -348,6 +349,9 @@ const buildArchiveId = (i) => `A${String(i + 1).padStart(3, "0")}`;
 
 // ── Unified list ───────────────────────────────────────────
 const allItems = computed(() => {
+  console.log("allItems recomputing...");
+  console.log("archivedInventory in computed:", archivedInventory.value);
+  console.log("archivedMenuItems in computed:", archivedMenuItems.value);
   const items = [];
 
   archivedEmployees.value.forEach((e) => {
@@ -420,7 +424,7 @@ const allItems = computed(() => {
     archiveId: buildArchiveId(idx),
   }));
 });
-
+console.log("archivedMenuItems at computed eval:", archivedMenuItems.value);
 const totalArchived = computed(() => allItems.value.length);
 
 const filteredItems = computed(() =>
@@ -428,10 +432,10 @@ const filteredItems = computed(() =>
     const q = search.value.toLowerCase();
     const matchSearch =
       !q ||
-      item.name.toLowerCase().includes(q) ||
-      item.details.toLowerCase().includes(q) ||
-      item.archiveId.toLowerCase().includes(q) ||
-      item.archivedBy.toLowerCase().includes(q);
+      (item.name ?? "").toLowerCase().includes(q) ||
+      (item.details ?? "").toLowerCase().includes(q) ||
+      (item.archiveId ?? "").toLowerCase().includes(q) ||
+      (item.archivedBy ?? "").toLowerCase().includes(q);
     const matchType = !filterType.value || item.type === filterType.value;
     return matchSearch && matchType;
   }),
@@ -496,13 +500,16 @@ const fetchArchivedSchedules = async () => {
 };
 
 const fetchArchivedInventory = async () => {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("rawproduct")
     .select(
       "rawproductid, name, category, unit, status, archivedDate, archivedBy",
     )
     .eq("status", "Archived")
     .order("rawproductid", { ascending: true });
+
+  console.log("fetchArchivedInventory data:", data);
+  console.log("fetchArchivedInventory error:", error);
 
   if (data) {
     archivedInventory.value = data.map((i) => ({
@@ -512,6 +519,7 @@ const fetchArchivedInventory = async () => {
       archivedDate: i.archivedDate,
       archivedBy: i.archivedBy || currentUser,
     }));
+    console.log("archivedInventory.value after map:", archivedInventory.value);
   }
 };
 
@@ -658,8 +666,6 @@ const doBackup = async () => {
     showBackupModal.value = false;
   }
 };
-
-const archivedMenuItems = ref([]);
 
 const fetchArchivedMenuItems = async () => {
   const { data } = await supabase

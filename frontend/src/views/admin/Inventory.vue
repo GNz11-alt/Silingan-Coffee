@@ -1247,11 +1247,6 @@ const fetchDailyUsageFromSales = async () => {
     .gte("orders.CreatedAt", since)
     .neq("orders.Status", "cancelled");
 
-  if (oi_err) {
-    console.error("fetchDailyUsageFromSales orderitem error:", oi_err);
-    return {};
-  }
-
   const unitsSold = {};
   for (const row of orderItems ?? []) {
     const pid = row.ProductId;
@@ -1261,11 +1256,6 @@ const fetchDailyUsageFromSales = async () => {
   const { data: recipes, error: r_err } = await supabase
     .from("recipe")
     .select("rawproductid, finishedproductid, quantityneeded");
-
-  if (r_err) {
-    console.error("fetchDailyUsageFromSales recipe error:", r_err);
-    return {};
-  }
 
   const usageMap = {};
   for (const recipe of recipes ?? []) {
@@ -1428,7 +1418,7 @@ const fetchRawMaterials = async () => {
     .select(
       "rawproductid, name, category, unit, reorderlevel, leadtimedays, expirationdate, createdat, updatedat, hasexpiry, status, archivedDate, archivedBy",
     )
-    .neq("status", "Archived")
+    .or("status.is.null,status.neq.Archived")
     .order("name");
 
   if (error) {
@@ -1455,7 +1445,10 @@ const fetchRawMaterials = async () => {
     hasexpiry: item.hasexpiry ?? true,
     _dailyUsage: dailyUsageMap[item.rawproductid] ?? 0,
   }));
-
+  const activeIds = new Set(allRawItems.value.map((i) => i.rawproductid));
+  allBatches.value = allBatches.value.filter((b) =>
+    activeIds.has(b.rawproductid),
+  );
   isLoading.value = false;
 };
 
@@ -1482,7 +1475,6 @@ const fetchBatches = async () => {
     .order("rawtransactionid", { ascending: true });
 
   if (error) {
-    console.error("fetchBatches error:", error);
     fetchBatchError.value = "Failed to load batches: " + error.message;
     loadingBatches.value = false;
     return;
@@ -1574,7 +1566,6 @@ const saveNewItem = async () => {
           expirationdate: newItemForm.value.expirationdate || null,
         },
       ]);
-    if (txErr) console.error("Initial batch insert error:", txErr);
   }
 
   showToast(
@@ -1666,7 +1657,6 @@ const saveRestock = async () => {
     .insert([batchRow]);
 
   if (txErr) {
-    console.error("Batch transaction insert error:", txErr);
     showToast(`Stock updated but batch log failed: ${txErr.message}`, "error");
     savingRestock.value = false;
     await Promise.all([fetchBatches(), fetchRawMaterials()]);
@@ -1716,7 +1706,6 @@ const openBatchDetail = async (item) => {
   const { data, error } = await query;
 
   if (error) {
-    console.error("openBatchDetail error:", error);
     showToast("Could not load batches: " + error.message, "error");
     loadingItemBatches.value = false;
     return;

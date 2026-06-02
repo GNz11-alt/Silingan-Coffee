@@ -380,30 +380,29 @@ onUnmounted(() => {
 <style scoped>
 .search-module {
   padding: 24px 32px;
+  font-family: "Inter", sans-serif;
   background: #fafafa;
   min-height: 100vh;
-  font-family: "Inter", sans-serif;
 }
 
 .module-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  align-items: flex-start;
+  margin-bottom: 20px;
 }
 .header-titles h1 {
   font-size: 26px;
   font-weight: 800;
   color: #31201d;
-  margin: 0 0 4px;
+  margin: 0 0 6px;
 }
 .search-context {
   font-size: 14px;
   color: #888;
-  margin: 0;
+  margin: 4px 0 0;
 }
 .active-context {
-  font-weight: 600;
   color: #31201d;
 }
 

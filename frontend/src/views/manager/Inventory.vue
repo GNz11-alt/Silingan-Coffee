@@ -1437,6 +1437,7 @@ const fetchRawMaterials = async () => {
     .select(
       "rawproductid, name, category, unit, reorderlevel, leadtimedays, expirationdate, createdat, updatedat, hasexpiry",
     )
+    .or("status.is.null,status.neq.Archived")
     .order("name");
 
   if (error) {
@@ -1472,6 +1473,12 @@ const fetchRawMaterials = async () => {
     hasexpiry: item.hasexpiry ?? true,
     _dailyUsage: dailyUsageMap[item.rawproductid] ?? 0,
   }));
+
+  // Strip batches for archived items
+  const activeIds = new Set(allRawItems.value.map((i) => i.rawproductid));
+  allBatches.value = allBatches.value.filter((b) =>
+    activeIds.has(b.rawproductid),
+  );
 
   isLoading.value = false;
 };
@@ -1742,30 +1749,23 @@ const doDelete = async () => {
         await openBatchDetail(batchDetailItem.value);
     }
   } else {
-    // Only delete this branch's batches — don't touch other branches' stock
-    const branchBatches = allBatches.value.filter(
-      (b) => b.rawproductid === deleteTarget.value.rawproductid,
-    );
-    const removedQty = branchBatches.reduce((s, b) => s + (b.quantity ?? 0), 0);
-    const { data: fresh } = await supabase
+    const currentUser = localStorage.getItem("username") || "Unknown";
+    const now = new Date().toISOString();
+    const { error } = await supabase
       .from("rawproduct")
-      .select("stockquantity")
-      .eq("rawproductid", deleteTarget.value.rawproductid)
-      .single();
-    const newQty = Math.max(0, (fresh?.stockquantity ?? 0) - removedQty);
-    await supabase
-      .from("rawproduct")
-      .update({ stockquantity: newQty })
+      .update({
+        status: "Archived",
+        archivedDate: now,
+        archivedBy: currentUser,
+      })
       .eq("rawproductid", deleteTarget.value.rawproductid);
-    // Delete only this branch's transaction rows — not the global product row
-    await supabase
-      .from("rawproducttransaction")
-      .delete()
-      .eq("rawproductid", deleteTarget.value.rawproductid)
-      .eq("branchid", assignedBranchId.value);
-    showToast("Item removed from this branch.", "success");
-    if (showBatchDetail.value) showBatchDetail.value = false;
-    await Promise.all([fetchBatches(), fetchRawMaterials()]);
+    if (error) {
+      showToast("Failed to archive item: " + error.message, "error");
+    } else {
+      showToast("Item archived and can be restored from Backup.", "success");
+      if (showBatchDetail.value) showBatchDetail.value = false;
+      await Promise.all([fetchBatches(), fetchRawMaterials()]);
+    }
   }
 
   deleting.value = false;
