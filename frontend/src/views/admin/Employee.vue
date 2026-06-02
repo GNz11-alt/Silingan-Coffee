@@ -91,10 +91,10 @@
               </button>
               <button
                 class="icon-btn danger"
-                title="Delete"
+                title="Archive"
                 @click="confirmDelete(emp)"
               >
-                <i class="bi bi-trash"></i>
+                <i class="bi bi-archive"></i>
               </button>
             </div>
           </div>
@@ -249,6 +249,9 @@
                   class="form-control fc-brand"
                   placeholder="+63 917 XXX XXXX"
                 />
+                <div v-if="errors.phone" class="text-danger small mt-1">
+                  {{ errors.phone }}
+                </div>
               </div>
 
               <div class="col-12">
@@ -273,6 +276,14 @@
                 <div v-if="errors.hourlyRate" class="text-danger small mt-1">
                   {{ errors.hourlyRate }}
                 </div>
+                <!-- Soft warning: below minimum wage floor -->
+                <div
+                  v-if="!errors.hourlyRate && form.hourlyRate > 0 && form.hourlyRate < 71"
+                  class="text-warning small mt-1"
+                >
+                  <i class="bi bi-exclamation-triangle me-1"></i>
+                  Below minimum wage (₱71/hr). Confirm this is intentional.
+                </div>
               </div>
 
               <div class="col-6">
@@ -281,6 +292,7 @@
                   v-model="form.dateHired"
                   type="date"
                   class="form-control fc-brand"
+                  :max="todayISO"
                 />
                 <div v-if="errors.dateHired" class="text-danger small mt-1">
                   {{ errors.dateHired }}
@@ -316,7 +328,7 @@
       </div>
     </Teleport>
 
-    <!-- ── DELETE CONFIRM ──────────────────────────────────── -->
+    <!-- ── ARCHIVE CONFIRM ──────────────────────────────────── -->
     <Teleport to="body">
       <div
         v-if="showDeleteConfirm"
@@ -325,22 +337,25 @@
       >
         <div class="modal-panel modal-panel--sm">
           <div class="modal-panel-header">
-            <h5 class="mb-0">Are you sure?</h5>
+            <h5 class="mb-0">Archive Employee?</h5>
             <button class="btn-close-panel" @click="showDeleteConfirm = false">
               <i class="bi bi-x-lg"></i>
             </button>
           </div>
           <div class="modal-panel-body">
             <p class="mb-0">
-              This action will archived this employee from the system.
+              This will archive
+              <strong>{{ deleteTarget?.firstName }} {{ deleteTarget?.lastName }}</strong>.
+              They will no longer appear in the system but their records will be preserved.
             </p>
           </div>
           <div class="modal-panel-footer modal-panel-footer--start">
             <button class="btn btn-ghost" @click="showDeleteConfirm = false">
               Cancel
             </button>
-            <button class="btn btn-delete-brand" @click="deleteEmployee">
-              Delete
+            <button class="btn btn-delete-brand" @click="deleteEmployee" :disabled="archiving">
+              <span v-if="archiving" class="spinner-border spinner-border-sm me-1"></span>
+              Archive Employee
             </button>
           </div>
         </div>
@@ -380,6 +395,7 @@ const showModal = ref(false);
 const showDeleteConfirm = ref(false);
 const isEditing = ref(false);
 const saving = ref(false);
+const archiving = ref(false);
 const deleteTarget = ref(null);
 const toast = ref({ show: false, message: "", type: "success" });
 const errors = ref({});
@@ -523,18 +539,40 @@ const closeModal = () => {
   showModal.value = false;
 };
 
+// Today's date in YYYY-MM-DD for the hire date max attribute
+const todayISO = new Date().toISOString().split("T")[0];
+
 const validate = () => {
   const e = {};
+
+  // Name
   if (!form.value.firstName.trim() || !form.value.lastName.trim())
     e.name = "Full name is required.";
+
+  // Position & department
   if (!form.value.position) e.position = "Position is required.";
   if (!form.value.department) e.department = "Department is required.";
   if (!form.value.branchId) e.branch = "Branch is required.";
+
+  // Email
   if (!form.value.email || !/\S+@\S+\.\S+/.test(form.value.email))
     e.email = "Valid email is required.";
+
+  // VAL-1: Phone — optional but must be valid PH format if provided
+  if (form.value.phone && !/^(\+63|0)\d{9,10}$/.test(form.value.phone.replace(/\s|-/g, "")))
+    e.phone = "Enter a valid PH number (e.g. +63 917 123 4567 or 0917 123 4567).";
+
+  // Hourly rate — must be > 0 (warning for <71 is shown inline, not a hard block)
   if (!form.value.hourlyRate || form.value.hourlyRate <= 0)
     e.hourlyRate = "Hourly rate must be greater than 0.";
-  if (!form.value.dateHired) e.dateHired = "Hire date is required.";
+
+  // VAL-2: Hire date — required and must not be in the future
+  if (!form.value.dateHired) {
+    e.dateHired = "Hire date is required.";
+  } else if (form.value.dateHired > todayISO) {
+    e.dateHired = "Hire date cannot be in the future.";
+  }
+
   errors.value = e;
   return Object.keys(e).length === 0;
 };
@@ -674,29 +712,47 @@ const confirmDelete = (emp) => {
 };
 
 const deleteEmployee = async () => {
-  const currentUser = localStorage.getItem("username") || "Unknown";
-  const now = new Date().toISOString();
+  archiving.value = true;
+  try {
+    const currentUser = localStorage.getItem("username") || "Unknown";
+    const now = new Date().toISOString();
 
-  // Archive employee
-  const { error } = await supabase
-    .from("employee")
-    .update({ Status: "Archived", ArchivedAt: now, ArchivedBy: currentUser })
-    .eq("EmployeeId", deleteTarget.value.id);
+    // Archive employee record (soft-delete)
+    const { error } = await supabase
+      .from("employee")
+      .update({ Status: "Archived", ArchivedAt: now, ArchivedBy: currentUser })
+      .eq("EmployeeId", deleteTarget.value.id);
 
-  if (error) {
-    showToast("Failed to delete employee.", "error");
-    return;
+    if (error) {
+      showToast(`Failed to archive employee: ${error.message}`, "error");
+      return;
+    }
+
+    // Archive linked user account
+    const { error: userError } = await supabase
+      .from("users")
+      .update({ status: "archived" })
+      .eq("employee_id", deleteTarget.value.id);
+
+    if (userError) {
+      // Employee was archived but user account failed — log and warn
+      console.error("[Employee] Failed to archive linked user:", userError.message);
+      showToast("Employee archived, but user account deactivation failed.", "error");
+    } else {
+      showToast(
+        `${deleteTarget.value.firstName} ${deleteTarget.value.lastName} has been archived.`,
+        "success"
+      );
+    }
+
+    await fetchEmployees();
+    showDeleteConfirm.value = false;
+  } catch (err) {
+    console.error("[Employee] Unexpected archive error:", err);
+    showToast("An unexpected error occurred. Please try again.", "error");
+  } finally {
+    archiving.value = false;
   }
-
-  // Archive linked user explicitly with correct username
-  await supabase
-    .from("users")
-    .update({ status: "archived" })
-    .eq("employee_id", deleteTarget.value.id); 
-
-  showToast("Employee deleted.", "success");
-  await fetchEmployees();
-  showDeleteConfirm.value = false;
 };
 
 const clearFilters = () => {
@@ -760,7 +816,8 @@ onMounted(async () => {
   await fetchEmployees();
   const editId = route.query.edit;
   if (editId) {
-    const emp = employees.value.find((e) => String(e.EmployeeId) === editId);
+    // FIX: use mapped 'id' field, not raw DB column 'EmployeeId'
+    const emp = employees.value.find((e) => String(e.id) === editId);
     if (emp) openEditModal(emp);
   }
 });

@@ -1346,7 +1346,7 @@ const categories = computed(() =>
 
 const eoqItems = computed(() =>
   allRawItems.value.filter(
-    (i) => i.reorderlevel && (i.stockquantity ?? 0) <= i.reorderlevel,
+    (i) => i.reorderlevel != null && (i.stockquantity ?? 0) <= i.reorderlevel,
   ),
 );
 
@@ -1354,7 +1354,7 @@ const allBranchStats = computed(() => ({
   total: allRawItems.value.length,
   low: allRawItems.value.filter(
     (i) =>
-      i.reorderlevel &&
+      i.reorderlevel != null &&
       i.stockquantity > 0 &&
       i.stockquantity <= i.reorderlevel,
   ).length,
@@ -1436,7 +1436,10 @@ const fetchRawMaterials = async () => {
     if (selectedBranchId.value) {
       batches = batches.filter((b) => b.branchid === selectedBranchId.value);
     }
-    item.stockquantity = batches.reduce((sum, b) => sum + (b.quantity ?? 0), 0);
+    item.stockquantity = batches.reduce((sum, b) => {
+      const qty = b.transactiontype === 'in' ? (b.quantity ?? 0) : -(b.quantity ?? 0);
+      return sum + qty;
+    }, 0);
   });
 
   allRawItems.value = items.map((item) => ({
@@ -1470,7 +1473,6 @@ const fetchBatches = async () => {
       rawproduct ( name, unit, category )
     `,
     )
-    .eq("transactiontype", "in")
     .gt("quantity", 0)
     .order("rawtransactionid", { ascending: true });
 
@@ -1485,6 +1487,7 @@ const fetchBatches = async () => {
 };
 
 const onBranchChange = async () => {
+  await fetchBatches();
   await fetchRawMaterials();
 };
 
@@ -1811,20 +1814,20 @@ const doDelete = async () => {
 // STATUS HELPERS
 const getStatus = (item) => {
   if ((item.stockquantity ?? 0) <= 0) return "out";
-  if (item.reorderlevel && item.stockquantity <= item.reorderlevel)
+  if (item.reorderlevel != null && item.stockquantity <= item.reorderlevel)
     return "low";
   return "good";
 };
 const getStatusText = (item) => {
   if ((item.stockquantity ?? 0) <= 0) return "Out of Stock";
-  if (item.reorderlevel && item.stockquantity <= item.reorderlevel)
+  if (item.reorderlevel != null && item.stockquantity <= item.reorderlevel)
     return "Low Stock";
   return "In Stock";
 };
 const getStatusAfterRestock = (item, qty) => {
   const n = (item.stockquantity ?? 0) + qty;
   if (n <= 0) return "out";
-  if (item.reorderlevel && n <= item.reorderlevel) return "low";
+  if (item.reorderlevel != null && n <= item.reorderlevel) return "low";
   return "good";
 };
 const getStatusTextAfterRestock = (item, qty) => {

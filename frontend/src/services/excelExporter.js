@@ -58,30 +58,54 @@ const BUILDERS = {
   },
 
   'low-inventory': (rows) => {
-    const headers = ['Product Name', 'Category', 'Current Stock', 'Reorder Level', 'Shortage', 'Days of Stock', 'Expiration Date', 'Branch'];
+    const headers = ['Product Name', 'Category', 'We Have', 'Minimum Safe', 'Need More', 'Days Until Expiry', 'Expiration Date', 'Branch'];
     const data = rows.map(r => [
-      r['Product Name'] || r.name,
+      r['Product Name'] || r.product_name || r['Product'],
       r['Category'] || r.category,
-      r['Current Stock'] || r.stockquantity,
-      r['Reorder Level'] || r.reorderlevel,
-      r['Shortage'] || (Math.max(0, (r['Reorder Level'] || r.reorderlevel) - (r['Current Stock'] || r.stockquantity))),
-      fmtTimeRemaining(r['Days of Stock Remaining'] ?? r.days_of_stock_remaining),
-      r['Expiration Date'] || r.expirationdate || 'N/A',
+      r['How Many We Have'] ?? r.we_have ?? 0,
+      r['Minimum Safe Amount'] ?? r.minimum_safe ?? 0,
+      r['Need More'] ?? r.need_more ?? 0,
+      r['Days Until Expiry'] ?? r.days_until_expiry ?? '—',
+      r['Expiration Date'] || r.expiration_date || 'N/A',
       r['Branch'] || r.branch_name || 'All',
     ]);
-    return { headers, data, colWidths: [26, 16, 14, 14, 12, 14, 16, 16], numericCols: [2, 3, 4] };
+    return { headers, data, colWidths: [26, 16, 12, 14, 12, 14, 16, 16], numericCols: [2, 3, 4] };
+  },
+
+  'low-raw-materials': (rows) => {
+    const headers = ['Raw Material', 'Category', 'We Have', 'Min Safe', 'Daily Usage', 'Lead Time', 'Suggested Order'];
+    const data = rows.map(r => {
+      const safe = r['Minimum Safe Amount'] ?? r.minimum_safe ?? 0;
+      const daily = r['Used Per Day (Average)'] ?? (r.daily_usage || safe / 14);
+      const leadtime = r['Days to Arrive After Ordering'] ?? r.lead_time_days ?? r.leadtimedays ?? 7;
+      const suggested = r['Suggested Order Amount'] ?? r.suggested_order ?? Math.ceil(Math.max(0, safe - (r['How Many We Have'] ?? r.we_have ?? 0)) * 1.2);
+      return [
+        r['Raw Material'] || r.name || r['Product Name'],
+        r['Category'] || r.category,
+        r['How Many We Have'] ?? r.we_have ?? 0,
+        safe,
+        Number(daily).toFixed(2),
+        leadtime,
+        suggested,
+      ];
+    });
+    return { headers, data, colWidths: [26, 16, 12, 12, 14, 12, 16], numericCols: [2, 3, 4, 6] };
   },
 
   'stock-turnover': (rows) => {
     const headers = ['Product Name', 'Category', 'Unit', 'Daily Consumption', 'Days of Stock', 'Stock Status'];
-    const data = rows.map(r => [
-      r['Product Name'] || r.name,
-      r['Category'] || r.category,
-      r['Unit'] || r.unit,
-      Number(r['Daily Consumption Rate'] || r.daily_consumption_rate || 0).toFixed(2),
-      fmtTimeRemaining(r['Days of Stock Remaining'] ?? r.days_of_stock_remaining),
-      (r['Days of Stock Remaining'] ?? r.days_of_stock_remaining) <= 3 ? 'Critical' : 'Adequate',
-    ]);
+    const data = rows.map(r => {
+      const days = r['Days of Stock Remaining'] ?? r.days_of_stock_remaining;
+      const status = days === 'N/A' ? 'N/A' : (days <= 3 ? 'Critical' : 'Adequate');
+      return [
+        r['Product Name'] || r.name,
+        r['Category'] || r.category,
+        r['Unit'] || r.unit,
+        Number(r['Daily Consumption Rate'] || r.daily_consumption_rate || 0).toFixed(2),
+        fmtTimeRemaining(days),
+        status,
+      ];
+    });
     return { headers, data, colWidths: [26, 16, 10, 16, 14, 14], numericCols: [3, 4] };
   },
 
@@ -96,13 +120,13 @@ const BUILDERS = {
       Number(r['Unit Price'] || r.unit_price || 0),
       Number(r['Subtotal'] || r.subtotal || 0),
       Number(r['Discount'] || r.discount || 0),
-      Number(r['Net Sales'] || r.subtotal || 0) - Number(r['Discount'] || r.discount || 0),
+      Number(r['Net Sales'] || r.net_sales || 0),
       r['Status'] || r.status || 'Completed',
     ]);
     const totals = ['', '', '', '', rows.reduce((s, r) => s + (r['Quantity'] || r.quantity || 0), 0), '', 
                    rows.reduce((s, r) => s + Number(r['Subtotal'] || r.subtotal || 0), 0),
                    rows.reduce((s, r) => s + Number(r['Discount'] || r.discount || 0), 0),
-                   rows.reduce((s, r) => s + (Number(r['Subtotal'] || r.subtotal || 0) - Number(r['Discount'] || r.discount || 0)), 0), ''];
+                   rows.reduce((s, r) => s + Number(r['Net Sales'] || r.net_sales || 0), 0), ''];
     return { headers, data, totals, colWidths: [14, 18, 12, 28, 12, 12, 14, 12, 14, 12], numericCols: [4, 5, 6, 7, 8], formats: { F: CURRENCY_FMT, G: CURRENCY_FMT, H: CURRENCY_FMT, I: CURRENCY_FMT } };
   },
 
@@ -121,29 +145,16 @@ const BUILDERS = {
     return { headers, data, totals, colWidths: [22, 18, 14, 16, 16, 14], numericCols: [2, 3, 4, 5], formats: { D: CURRENCY_FMT, E: CURRENCY_FMT, F: PERCENT_FMT } };
   },
 
-  'sales-monthly': (rows) => {
-    const headers = ['Month', 'Branch', 'Total Orders', 'Total Revenue', 'Avg Order Value'];
+  'sales-summary': (rows) => {
+    const headers = ['Period', 'Branch', 'Total Orders', 'Total Revenue', 'Avg Order Value'];
     const data = rows.map(r => [
-      r['Month'] || r.year_month,
+      r['Period'] || r.period_label,
       r['Branch'] || r.branch_name,
       r['Total Orders'] || r.total_orders,
       Number(r['Total Revenue'] || r.total_revenue || 0),
       Number(r['Avg Order Value'] || r.avg_order_value || 0),
     ]);
-    return { headers, data, colWidths: [14, 20, 14, 16, 16], numericCols: [2, 3, 4], formats: { D: CURRENCY_FMT, E: CURRENCY_FMT } };
-  },
-
-  'sales-weekly': (rows) => {
-    const headers = ['Week Start', 'Week End', 'Branch', 'Total Orders', 'Total Revenue', 'Avg Order Value'];
-    const data = rows.map(r => [
-      r['Week Start'] || r.week_start,
-      r['Week End'] || r.week_end,
-      r['Branch'] || r.branch_name,
-      r['Total Orders'] || r.total_orders,
-      Number(r['Total Revenue'] || r.total_revenue || 0),
-      Number(r['Avg Order Value'] || r.avg_order_value || 0),
-    ]);
-    return { headers, data, colWidths: [14, 14, 20, 14, 16, 16], numericCols: [3, 4, 5], formats: { E: CURRENCY_FMT, F: CURRENCY_FMT } };
+    return { headers, data, colWidths: [22, 20, 14, 16, 16], numericCols: [2, 3, 4], formats: { D: CURRENCY_FMT, E: CURRENCY_FMT } };
   },
 
   'sales-forecast': (rows) => {
@@ -171,10 +182,10 @@ const BUILDERS = {
     return { headers, data, colWidths: [22, 16, 14, 12, 12, 12, 16] };
   },
 
-  'inventory-monthly': (rows) => {
-    const headers = ['Month', 'Branch', 'Product', 'Category', 'Unit', 'Qty Used', 'Current Stock', 'Status'];
+  'inventory-summary': (rows) => {
+    const headers = ['Period', 'Branch', 'Product', 'Category', 'Unit', 'Qty Used', 'Current Stock', 'Status'];
     const data = rows.map(r => [
-      r['Month'] || r.year_month,
+      r['Period'] || r.period_label,
       r['Branch'] || r.branch_name,
       r['Product'] || r.product_name,
       r['Category'] || r.category,
@@ -183,23 +194,7 @@ const BUILDERS = {
       r['Current Stock'] || r.current_stock,
       r['Status'] || r.stock_status || 'In Stock',
     ]);
-    return { headers, data, colWidths: [14, 18, 24, 14, 10, 14, 14, 14], numericCols: [5, 6] };
-  },
-
-  'inventory-weekly': (rows) => {
-    const headers = ['Week Start', 'Week End', 'Branch', 'Product', 'Category', 'Unit', 'Qty Used', 'Current Stock', 'Status'];
-    const data = rows.map(r => [
-      r['Week Start'] || r.week_start,
-      r['Week End'] || r.week_end,
-      r['Branch'] || r.branch_name,
-      r['Product'] || r.product_name,
-      r['Category'] || r.category,
-      r['Unit'] || r.unit,
-      Number(r['Qty Used'] || r.total_quantity_used || 0),
-      r['Current Stock'] || r.current_stock,
-      r['Status'] || r.stock_status || 'In Stock',
-    ]);
-    return { headers, data, colWidths: [14, 14, 18, 24, 14, 10, 14, 14, 14], numericCols: [6, 7] };
+    return { headers, data, colWidths: [22, 18, 24, 14, 10, 14, 14, 14], numericCols: [5, 6] };
   },
 
   'consolidated-report': (rows) => {
@@ -387,13 +382,12 @@ function getReportTypeLabel(reportType) {
     'inventory-on-hand': 'Inventory On-Hand',
     'inventory-aging': 'Inventory Aging',
     'low-inventory': 'Low Inventory Alert',
+    'low-raw-materials': 'Low Raw Materials',
     'stock-turnover': 'Stock Turnover Analysis',
-    'inventory-monthly': 'Inventory Monthly Summary',
-    'inventory-weekly': 'Inventory Weekly Summary',
+    'inventory-summary': 'Inventory Summary',
     'sales-pipeline': 'Sales Pipeline',
     'sales-performance': 'Sales Performance',
-    'sales-monthly': 'Monthly Sales Report',
-    'sales-weekly': 'Weekly Sales Report',
+    'sales-summary': 'Sales Summary',
     'sales-forecast': 'Sales Forecast',
     'employee-schedule': 'Employee Schedule',
     'consolidated-report': 'Consolidated Report',
