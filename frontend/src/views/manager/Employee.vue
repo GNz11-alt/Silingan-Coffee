@@ -80,10 +80,10 @@
               </button>
               <button
                 class="icon-btn danger"
-                title="Delete"
+                title="Archive"
                 @click="confirmDelete(emp)"
               >
-                <i class="bi bi-trash"></i>
+                <i class="bi bi-archive"></i>
               </button>
             </div>
           </div>
@@ -195,12 +195,17 @@
 
               <div class="col-6">
                 <label class="form-label-sm">Branch</label>
-                <select v-model="form.branchId" class="form-select fc-brand">
-                  <option value="" disabled>Select branch</option>
-                  <option v-for="b in branches" :key="b.id" :value="b.id">
-                    {{ b.name }}
-                  </option>
-                </select>
+                <div class="d-flex gap-1">
+                  <select v-model="form.branchId" class="form-select fc-brand" :class="{ 'is-invalid': branchLoadError }">
+                    <option value="" disabled>{{ branchLoadError ? 'Error loading branches' : 'Select branch' }}</option>
+                    <option v-for="b in branches" :key="b.id" :value="b.id">
+                      {{ b.name }}
+                    </option>
+                  </select>
+                  <button v-if="branchLoadError" class="btn btn-outline-danger btn-sm" @click="fetchBranches" type="button" title="Retry loading branches">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </div>
                 <div v-if="errors.branch" class="text-danger small mt-1">
                   {{ errors.branch }}
                 </div>
@@ -227,6 +232,9 @@
                   class="form-control fc-brand"
                   placeholder="+63 917 XXX XXXX"
                 />
+                <div v-if="errors.phone" class="text-danger small mt-1">
+                  {{ errors.phone }}
+                </div>
               </div>
 
               <div class="col-12">
@@ -251,6 +259,14 @@
                 <div v-if="errors.hourlyRate" class="text-danger small mt-1">
                   {{ errors.hourlyRate }}
                 </div>
+                <!-- Soft warning: below minimum wage floor -->
+                <div
+                  v-if="!errors.hourlyRate && form.hourlyRate > 0 && form.hourlyRate < 71"
+                  class="text-warning small mt-1"
+                >
+                  <i class="bi bi-exclamation-triangle me-1"></i>
+                  Below minimum wage (₱71/hr). Confirm this is intentional.
+                </div>
               </div>
 
               <div class="col-6">
@@ -259,6 +275,7 @@
                   v-model="form.dateHired"
                   type="date"
                   class="form-control fc-brand"
+                  :max="todayISO"
                 />
                 <div v-if="errors.dateHired" class="text-danger small mt-1">
                   {{ errors.dateHired }}
@@ -294,7 +311,7 @@
       </div>
     </Teleport>
 
-    <!-- ── DELETE CONFIRM ──────────────────────────────────── -->
+    <!-- ── ARCHIVE CONFIRM ──────────────────────────────────── -->
     <Teleport to="body">
       <div
         v-if="showDeleteConfirm"
@@ -303,22 +320,25 @@
       >
         <div class="modal-panel modal-panel--sm">
           <div class="modal-panel-header">
-            <h5 class="mb-0">Are you sure?</h5>
+            <h5 class="mb-0">Archive Employee?</h5>
             <button class="btn-close-panel" @click="showDeleteConfirm = false">
               <i class="bi bi-x-lg"></i>
             </button>
           </div>
           <div class="modal-panel-body">
             <p class="mb-0">
-              This action will archived this employee from the system.
+              This will archive
+              <strong>{{ deleteTarget?.firstName }} {{ deleteTarget?.lastName }}</strong>.
+              They will no longer appear in the system but their records will be preserved.
             </p>
           </div>
           <div class="modal-panel-footer modal-panel-footer--start">
             <button class="btn btn-ghost" @click="showDeleteConfirm = false">
               Cancel
             </button>
-            <button class="btn btn-delete-brand" @click="deleteEmployee">
-              Delete
+            <button class="btn btn-delete-brand" @click="deleteEmployee" :disabled="archiving">
+              <span v-if="archiving" class="spinner-border spinner-border-sm me-1"></span>
+              Archive Employee
             </button>
           </div>
         </div>
@@ -354,15 +374,20 @@ const filterStatus = ref("");
 const showModal = ref(false);
 const showDeleteConfirm = ref(false);
 const saving = ref(false);
+const archiving = ref(false);
 const deleteTarget = ref(null);
 const toast = ref({ show: false, message: "", type: "success" });
 const errors = ref({});
 const employees = ref([]);
 
 const branches = ref([]);
+const branchLoadError = ref(false);
 const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
 const managerBranchId = ref(null);
 const currentBranchName = ref("");
+// Today's date in YYYY-MM-DD for the hire date max attribute
+const todayISO = new Date().toISOString().split("T")[0];
+
 const departments = ["Kitchen", "Service", "Management", "Maintenance"];
 const positions = [
   "Store Manager",
@@ -392,47 +417,67 @@ const emptyForm = () => ({
 
 const form = ref(emptyForm());
 
-// Fetch branches from Supabase
+// Fetch branches from Supabase (scoped to manager's branch SEC-4)
 const fetchBranches = async () => {
-  const { data } = await supabase.from("branch").select("BranchId, BranchName");
-  if (data) {
-    branches.value = data.map((b) => ({ id: String(b.BranchId), name: b.BranchName }));
+  branchLoadError.value = false;
+  try {
+    let query = supabase.from("branch").select("BranchId, BranchName");
+    if (managerBranchId.value) {
+      query = query.eq("BranchId", managerBranchId.value);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    if (data) {
+      branches.value = data.map((b) => ({ id: String(b.BranchId), name: b.BranchName }));
+    }
+  } catch (err) {
+    console.error("[Employee] Failed to load branches:", err);
+    branchLoadError.value = true;
+    showToast(`Failed to load branches: ${err.message || err}`, "error");
   }
 };
 
-// Fetch employees from Supabase (optionally scoped to branch)
+// Fetch employees from Supabase (scoped to branch, with retry/error checking)
 const fetchEmployees = async () => {
   isLoading.value = true;
-  let query = supabase
-    .from("employee")
-    .select(
-      "EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status",
-    )
-    .neq("Status", "Archived");
+  try {
+    let query = supabase
+      .from("employee")
+      .select(
+        "EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status",
+      )
+      .neq("Status", "Archived");
 
-  if (managerBranchId.value) {
-    query = query.eq("BranchAssigned", managerBranchId.value);
+    if (managerBranchId.value) {
+      query = query.eq("BranchAssigned", managerBranchId.value);
+    }
+
+    const { data, error } = await query.order("EmployeeId", { ascending: true });
+
+    if (error) throw error;
+
+    if (data) {
+      employees.value = data.map((e) => ({
+        id: e.EmployeeId,
+        firstName: e.FirstName,
+        lastName: e.LastName,
+        email: e.Email,
+        phone: e.Phone,
+        position: e.Position,
+        department: e.Department,
+        hourlyRate: e.HourlyRate,
+        address: e.Address,
+        dateHired: e.DateHired,
+        branchId: String(e.BranchAssigned),
+        status: e.Status,
+      }));
+    }
+  } catch (err) {
+    console.error("[Employee] Failed to fetch employees:", err);
+    showToast(`Failed to load employees: ${err.message || err}`, "error");
+  } finally {
+    isLoading.value = false;
   }
-
-  const { data, error } = await query.order("EmployeeId", { ascending: true });
-
-  if (data) {
-    employees.value = data.map((e) => ({
-      id: e.EmployeeId,
-      firstName: e.FirstName,
-      lastName: e.LastName,
-      email: e.Email,
-      phone: e.Phone,
-      position: e.Position,
-      department: e.Department,
-      hourlyRate: e.HourlyRate,
-      address: e.Address,
-      dateHired: e.DateHired,
-      branchId: String(e.BranchAssigned),
-      status: e.Status,
-    }));
-  }
-  isLoading.value = false;
 };
 
 const filteredEmployees = computed(() => {
@@ -458,7 +503,7 @@ const stats = computed(() => {
     {
       label: "Total Employees",
       value: employees.value.length,
-      sub: "All branches",
+      sub: currentBranchName.value || "My branch",
       icon: "bi bi-people",
     },
     {
@@ -476,7 +521,7 @@ const stats = computed(() => {
     {
       label: "Store Managers",
       value: managers,
-      sub: "One per branch",
+      sub: "Branch managers",
       icon: "bi bi-person-badge",
     },
   ];
@@ -494,6 +539,7 @@ const closeModal = () => {
 
 const validate = () => {
   const e = {};
+  
   if (!form.value.firstName.trim() || !form.value.lastName.trim())
     e.name = "Full name is required.";
   if (!form.value.position) e.position = "Position is required.";
@@ -501,9 +547,21 @@ const validate = () => {
   if (!form.value.branchId) e.branch = "Branch is required.";
   if (!form.value.email || !/\S+@\S+\.\S+/.test(form.value.email))
     e.email = "Valid email is required.";
+  
+  // VAL-1: Phone validation
+  if (form.value.phone && !/^(\+63|0)\d{9,10}$/.test(form.value.phone.replace(/\s|-/g, "")))
+    e.phone = "Enter a valid PH number (e.g. +63 917 123 4567 or 0917 123 4567).";
+    
   if (!form.value.hourlyRate || form.value.hourlyRate <= 0)
     e.hourlyRate = "Hourly rate must be greater than 0.";
-  if (!form.value.dateHired) e.dateHired = "Hire date is required.";
+    
+  // VAL-2: Future hire dates guard
+  if (!form.value.dateHired) {
+    e.dateHired = "Hire date is required.";
+  } else if (form.value.dateHired > todayISO) {
+    e.dateHired = "Hire date cannot be in the future.";
+  }
+  
   errors.value = e;
   return Object.keys(e).length === 0;
 };
@@ -527,37 +585,50 @@ const saveEmployee = async () => {
     Status: form.value.status,
   };
 
-  const { error } = await supabase
-    .from("employee")
-    .update(payload)
-    .eq("EmployeeId", form.value.id);
+  try {
+    const { error } = await supabase
+      .from("employee")
+      .update(payload)
+      .eq("EmployeeId", form.value.id);
 
-  if (error) {
-    showToast("Failed to update employee.", "error");
-  } else {
+    if (error) {
+      throw new Error(`Failed to update employee: ${error.message}`);
+    }
+
     // Update corresponding user record if branch changed
     const originalEmployee = employees.value.find(e => e.id === form.value.id);
     if (originalEmployee && originalEmployee.branchId !== form.value.branchId) {
-      const { data: userRecord } = await supabase
+      const { data: userRecord, error: userSelectError } = await supabase
         .from("users")
         .select("id")
         .eq("username", form.value.email)
         .maybeSingle();
 
+      if (userSelectError) {
+        throw new Error(`Failed to check user account: ${userSelectError.message}`);
+      }
+
       if (userRecord) {
-        await supabase
+        const { error: userUpdateError } = await supabase
           .from("users")
           .update({ branch: form.value.branchId })
           .eq("id", userRecord.id);
+          
+        if (userUpdateError) {
+          throw new Error(`Employee updated, but user branch update failed: ${userUpdateError.message}`);
+        }
       }
     }
 
     showToast("Employee updated successfully.", "success");
     await fetchEmployees();
+    closeModal();
+  } catch (err) {
+    console.error("[Employee] Save failed:", err);
+    showToast(err.message || "An unexpected error occurred while saving.", "error");
+  } finally {
+    saving.value = false;
   }
-
-  saving.value = false;
-  closeModal();
 };
 
 const confirmDelete = (emp) => {
@@ -566,34 +637,56 @@ const confirmDelete = (emp) => {
 };
 
 const deleteEmployee = async () => {
-  const currentUser = localStorage.getItem("username") || "Unknown";
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("employee")
-    .update({ Status: "Archived", ArchivedAt: now, ArchivedBy: currentUser })
-    .eq("EmployeeId", deleteTarget.value.id);
+  archiving.value = true;
+  try {
+    const currentUser = localStorage.getItem("username") || "Unknown";
+    const now = new Date().toISOString();
+    
+    // Archive employee
+    const { error } = await supabase
+      .from("employee")
+      .update({ Status: "Archived", ArchivedAt: now, ArchivedBy: currentUser })
+      .eq("EmployeeId", deleteTarget.value.id);
 
-  if (error) {
-    showToast("Failed to delete employee.", "error");
-  } else {
+    if (error) {
+      throw new Error(`Failed to archive employee record: ${error.message}`);
+    }
+
     // Archive corresponding user account
-    const { data: userRecord } = await supabase
+    const { data: userRecord, error: userSelectError } = await supabase
       .from("users")
       .select("id")
       .eq("username", deleteTarget.value.email)
       .maybeSingle();
 
+    if (userSelectError) {
+      throw new Error(`Failed to locate user account: ${userSelectError.message}`);
+    }
+
     if (userRecord) {
-      await supabase
+      const { error: userError } = await supabase
         .from("users")
         .update({ status: "archived" })
         .eq("id", userRecord.id);
+        
+      if (userError) {
+        console.error("[Employee] Failed to archive linked user account:", userError.message);
+        showToast("Employee archived, but user account deactivation failed.", "error");
+      } else {
+        showToast(`${deleteTarget.value.firstName} ${deleteTarget.value.lastName} has been archived.`, "success");
+      }
+    } else {
+      showToast(`${deleteTarget.value.firstName} ${deleteTarget.value.lastName} has been archived.`, "success");
     }
 
-    showToast("Employee deleted.", "success");
     await fetchEmployees();
+    showDeleteConfirm.value = false;
+  } catch (err) {
+    console.error("[Employee] Archive failed:", err);
+    showToast(err.message || "An unexpected error occurred during archive.", "error");
+  } finally {
+    archiving.value = false;
   }
-  showDeleteConfirm.value = false;
 };
 
 const clearFilters = () => {
