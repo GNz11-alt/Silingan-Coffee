@@ -250,11 +250,13 @@ const formatCurrency = (value) =>
   "₱" +
   Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
 
-const formatTime = (timestamp) =>
-  new Date(timestamp).toLocaleTimeString("en-PH", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+const formatTime = (iso) =>
+  iso
+    ? new Date(iso + 'Z').toLocaleTimeString('en-PH', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '—';
 
 const fetchDashboardData = async () => {
   isLoading.value = true;

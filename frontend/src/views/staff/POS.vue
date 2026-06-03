@@ -649,7 +649,7 @@ const finishTransaction = async () => {
     const { data: order, error: oErr } = await supabase.from('orders').insert(payload).select().single();
     if (oErr) throw new Error(oErr.message);
 
-    const { error: iErr } = await supabase.from('orderitem').insert(
+const { error: iErr } = await supabase.from('orderitem').insert(
       cart.value.map(i => ({
         OrderId:   order.OrderId,
         ProductId: i.ProductId,
@@ -659,6 +659,9 @@ const finishTransaction = async () => {
       }))
     );
     if (iErr) throw new Error(iErr.message);
+
+    // ── Deduct raw material stock based on recipes ──
+    await deductInventoryForOrder(cart.value, branchId.value);
 
     await fetchTransactions();
     cart.value = [];
@@ -706,6 +709,57 @@ const printReceipt = () => {
   printWin.document.close();
 };
 
+// ── Deduct inventory based on recipes ────────────────────────────────────────
+const deductInventoryForOrder = async (cartItems, branchId) => {
+  // Collect all ProductIds sold
+  const productIds = cartItems.map(i => i.ProductId);
+
+  // Fetch all matching recipes in one query
+  const { data: recipes, error: recipeErr } = await supabase
+    .from('recipe')
+    .select('finishedproductid, rawproductid, quantityneeded')
+    .in('finishedproductid', productIds);
+
+  if (recipeErr) {
+    console.error('Failed to fetch recipes for inventory deduction:', recipeErr.message);
+    return; // Non-fatal: order is already saved, log the error and continue
+  }
+
+  if (!recipes || recipes.length === 0) return;
+
+  // Aggregate total deduction per raw product
+  // (handles multiple cart items using the same raw material)
+  const deductions = {}; // rawproductid → total qty to deduct
+
+  for (const item of cartItems) {
+    const itemRecipes = recipes.filter(r => r.finishedproductid === item.ProductId);
+    for (const recipe of itemRecipes) {
+      const totalUsed = recipe.quantityneeded * item.qty;
+      deductions[recipe.rawproductid] = (deductions[recipe.rawproductid] ?? 0) + totalUsed;
+    }
+  }
+
+  // Insert one "out" transaction per raw product
+  const transactions = Object.entries(deductions).map(([rawproductid, qty]) => ({
+    rawproductid: parseInt(rawproductid),
+    branchid: branchId ?? null,
+    transactiontype: 'out',
+    quantity: qty,
+    expirationdate: null,
+  }));
+
+  if (transactions.length === 0) return;
+
+  const { error: txErr } = await supabase
+    .from('rawproducttransaction')
+    .insert(transactions);
+
+  if (txErr) {
+    // Non-fatal: log it but don't fail the sale
+    console.error('Inventory deduction failed (order saved):', txErr.message);
+  }
+};
+
 // ── Cancel order ─────────────────────────────────────────────────────────────
 const confirmCancelOrder = (order) => {
   cancelTarget.value = order;
@@ -746,7 +800,13 @@ const getCatIcon = (cat) => {
   return UtensilsCrossed;
 };
 
-const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' }) : '—';
+const formatTime = (iso) =>
+  iso
+    ? new Date(iso + 'Z').toLocaleTimeString('en-PH', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '—';
 
 onMounted(async () => {
   await fetchCurrentUser();
