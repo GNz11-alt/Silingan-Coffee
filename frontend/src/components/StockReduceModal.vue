@@ -13,7 +13,7 @@
         <div class="srm-body">
           <!-- Item selector -->
           <div v-if="!selectedItem" class="srm-step">
-            <p class="srm-step-label"><span class="srm-step-num">1</span> Which item?</p>
+            <p class="srm-step-label">Which item?</p>
             <div class="srm-search-wrap">
               <Search :size="14" />
               <input v-model="search" type="text" placeholder="Search items..." class="srm-search" />
@@ -150,7 +150,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { Package, Search } from 'lucide-vue-next'
 import { supabase } from '@/supabase.js'
 
@@ -158,7 +158,6 @@ const props = defineProps({
   show: Boolean,
   items: { type: Array, default: () => [] },
   selectedBranchId: { type: Number, default: null },
-  preselectedItem: { type: Object, default: null },
 })
 const emit = defineEmits(['close', 'done'])
 
@@ -174,21 +173,6 @@ const form = ref({
   quantity: 0,
   notes: '',
   date: today,
-})
-
-watch(() => props.preselectedItem, (item) => {
-  if (item && props.show) {
-    selectedItem.value = item
-  }
-}, { immediate: true })
-watch(() => props.show, (visible) => {
-  if (!visible) {
-    selectedItem.value = null
-    search.value = ''
-    form.value = { reason: '', customReason: '', quantity: 0, notes: '', date: today }
-  } else if (props.preselectedItem) {
-    selectedItem.value = props.preselectedItem
-  }
 })
 
 const reasons = [
@@ -303,7 +287,7 @@ const confirm = async () => {
   display: flex; justify-content: space-between; align-items: flex-start;
   padding: 20px 22px; border-bottom: 1px solid #e9ecef;
 }
-.srm-header h2 { font-size: 17px; font-weight: 700; color: #212529; margin: 0 0 2px; }
+.srm-header h2 { font-size: 19px; font-weight: 700; color: #212529; margin: 0 0 2px; }
 .srm-sub { font-size: 13px; color: #888; margin: 0; }
 .srm-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #6c757d; }
 .srm-body { padding: 20px 22px; flex: 1; overflow-y: auto; }
@@ -314,7 +298,7 @@ const confirm = async () => {
 
 /* Step label */
 .srm-step-label {
-  font-size: 13px; font-weight: 700; color: #495057;
+  font-size: 18px; font-weight: 700; color: #1a1d1f;
   margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
 }
 .srm-step-num {

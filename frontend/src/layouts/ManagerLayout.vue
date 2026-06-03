@@ -9,20 +9,24 @@
           />
         </button>
 
-        <div class="brand-section">
-          <div class="logo-wrapper">
-            <img
-              src="@/assets/images/logo.png"
-              alt="Silingan Coffee"
-              class="logo"
-            />
+          <div class="brand-section">
+            <div class="logo-wrapper">
+              <img
+                src="@/assets/images/logo.png"
+                alt="Silingan Coffee"
+                class="logo"
+              />
+            </div>
+            <div class="brand-text" v-show="!isSidebarCollapsed">
+              <h2>Silingan Coffee</h2>
+              <p class="user-role">Administrator</p>
+            </div>
           </div>
-          <div class="brand-text" v-show="!isSidebarCollapsed">
-            <h2>Silingan Coffee</h2>
-            <p class="user-role">Manager</p>
-            <p class="user-branch">{{ branch }}</p>
+
+          <div class="datetime-section" v-show="!isSidebarCollapsed">
+            <p class="datetime-time">{{ currentTime }}</p>
+            <p class="datetime-date">{{ currentDate }}</p>
           </div>
-        </div>
       </div>
 
       <nav class="sidebar-nav">
@@ -144,7 +148,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import {
   Home,
@@ -173,6 +177,16 @@ const unreadCount = ref(0);
 const showNotifPanel = ref(false);
 const { fetchNotifications } = useNotifications();
 
+const now = ref(new Date());
+let clockInterval = null;
+
+const currentTime = computed(() =>
+  now.value.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+);
+const currentDate = computed(() =>
+  now.value.toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+);
+
 const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
 
 const toggleSidebar = () => {
@@ -199,12 +213,16 @@ if (savedState !== null) {
 }
 
 onMounted(async () => {
-  await resolveBranch();
-  branch.value = userBranchName.value;
-  if (userBranchId.value) {
-    const notifs = await fetchNotifications(userBranchId.value)
-    unreadCount.value = notifs.length
-  }
+  clockInterval = setInterval(() => {
+    now.value = new Date();
+  }, 1000);
+ 
+  const notifs = await fetchNotifications(null);
+  unreadCount.value = notifs.length;
+});
+ 
+onUnmounted(() => {
+  clearInterval(clockInterval);
 });
 </script>
 
@@ -346,6 +364,25 @@ onMounted(async () => {
   border-radius: 4px;
   font-weight: bold;
   margin-left: auto;
+}
+
+.datetime-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.datetime-time {
+  font-size: 20px;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.datetime-date {
+  font-size: 11px;
+  color: #a69794;
+  margin-top: 2px;
 }
 
 .logout-btn {

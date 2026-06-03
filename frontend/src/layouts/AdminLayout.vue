@@ -22,6 +22,11 @@
             <p class="user-role">Administrator</p>
           </div>
         </div>
+
+        <div class="datetime-section" v-show="!isSidebarCollapsed">
+          <p class="datetime-time">{{ currentTime }}</p>
+          <p class="datetime-date">{{ currentDate }}</p>
+        </div>
       </div>
 
       <nav class="sidebar-nav">
@@ -161,7 +166,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import {
   Home,
@@ -190,6 +195,27 @@ const unreadCount = ref(0);
 const showNotifPanel = ref(false);
 const { fetchNotifications } = useNotifications();
 
+// Clock
+const now = ref(new Date());
+let clockInterval = null;
+
+const currentTime = computed(() =>
+  now.value.toLocaleTimeString("en-PH", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  })
+);
+
+const currentDate = computed(() =>
+  now.value.toLocaleDateString("en-PH", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+);
+
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
   localStorage.setItem("sidebarCollapsed", isSidebarCollapsed.value);
@@ -214,9 +240,17 @@ if (savedState !== null) {
 }
 
 onMounted(async () => {
-  const notifs = await fetchNotifications(null)
-  unreadCount.value = notifs.length
-})
+  clockInterval = setInterval(() => {
+    now.value = new Date();
+  }, 1000);
+
+  const notifs = await fetchNotifications(null);
+  unreadCount.value = notifs.length;
+});
+
+onUnmounted(() => {
+  clearInterval(clockInterval);
+});
 </script>
 
 <style scoped>
@@ -288,6 +322,25 @@ onMounted(async () => {
 
 .user-role {
   font-size: 14px;
+  color: #a69794;
+  margin-top: 2px;
+}
+
+.datetime-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.datetime-time {
+  font-size: 20px;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.datetime-date {
+  font-size: 11px;
   color: #a69794;
   margin-top: 2px;
 }

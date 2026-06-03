@@ -19,9 +19,13 @@
           </div>
           <div class="brand-text" v-show="!isSidebarCollapsed">
             <h2>Silingan Coffee</h2>
-            <p class="user-role">Staff</p>
-            <p class="user-branch">{{ branch }}</p>
+            <p class="user-role">Administrator</p>
           </div>
+        </div>
+
+        <div class="datetime-section" v-show="!isSidebarCollapsed">
+          <p class="datetime-time">{{ currentTime }}</p>
+          <p class="datetime-date">{{ currentDate }}</p>
         </div>
       </div>
 
@@ -135,7 +139,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import {
   Home,
@@ -155,6 +159,16 @@ import {
 import { useUserBranch } from "@/composables/useUserBranch.js";
 import NotificationPanel from "@/components/NotificationPanel.vue";
 import { useNotifications } from "@/composables/useNotifications.js";
+
+const now = ref(new Date());
+let clockInterval = null;
+
+const currentTime = computed(() =>
+  now.value.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+);
+const currentDate = computed(() =>
+  now.value.toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+);
 
 const router = useRouter();
 const isSidebarCollapsed = ref(false);
@@ -189,12 +203,16 @@ if (savedState !== null) {
 }
 
 onMounted(async () => {
-  await resolveBranch();
-  branch.value = userBranchName.value;
-  if (userBranchId.value) {
-    const notifs = await fetchNotifications(userBranchId.value)
-    unreadCount.value = notifs.length
-  }
+  clockInterval = setInterval(() => {
+    now.value = new Date();
+  }, 1000);
+ 
+  const notifs = await fetchNotifications(null);
+  unreadCount.value = notifs.length;
+});
+ 
+onUnmounted(() => {
+  clearInterval(clockInterval);
 });
 </script>
 
@@ -340,6 +358,25 @@ onMounted(async () => {
 
 .logout-btn {
   margin-top: 10px;
+}
+
+.datetime-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.datetime-time {
+  font-size: 20px;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.datetime-date {
+  font-size: 11px;
+  color: #a69794;
+  margin-top: 2px;
 }
 
 .main-content {
