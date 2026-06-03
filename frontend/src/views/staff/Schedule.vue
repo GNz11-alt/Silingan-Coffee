@@ -264,7 +264,12 @@
             <form class="inquiry-form">
               <div class="form-group">
                 <label>Shift Date to Change</label>
-                <input type="date" v-model="inquiryForm.ShiftDate" />
+                <select v-model="inquiryForm.ShiftDate" class="inquiry-date-select">
+                  <option value="" disabled>Select a scheduled date</option>
+                  <option v-for="d in scheduledDates" :key="d" :value="d">
+                    {{ formatShiftDate(d) }}
+                  </option>
+                </select>
               </div>
               <div class="form-group">
                 <label>Request Type</label>
@@ -515,6 +520,18 @@ export default {
         })
       }
       return days
+    },
+
+    scheduledDates() {
+      const seen = {}
+      return this.mySchedules
+        .filter(s => {
+          if (seen[s.WorkDate]) return false
+          seen[s.WorkDate] = true
+          return true
+        })
+        .map(s => s.WorkDate)
+        .sort()
     },
 
     upcomingShifts() {

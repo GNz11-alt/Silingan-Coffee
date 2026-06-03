@@ -28,6 +28,9 @@
         <span v-if="tab.key === 'availability'" class="tab-badge">{{
           pendingCount
         }}</span>
+        <span v-if="tab.key === 'change'" class="tab-badge">{{
+          inquiryPendingCount
+        }}</span>
       </button>
     </div>
 
@@ -415,10 +418,16 @@
                   <span class="avail-role">{{ inq.role }}</span>
                 </div>
                 <div class="avail-meta">
-                  Requesting shift change for
+                  <strong>{{ inq.requestType || 'Shift Change' }}</strong> for
                   <strong>{{ formatDate(inq.requestDate) }}</strong>
                 </div>
+                <div v-if="inq.preferredDate" class="avail-meta">
+                  Preferred: <strong>{{ formatDate(inq.preferredDate) }}</strong>
+                </div>
                 <div class="avail-notes">{{ inq.reason }}</div>
+                <div v-if="inq.managerNote" class="avail-notes manager-note" style="margin-top: 4px;">
+                  <strong>Manager:</strong> {{ inq.managerNote }}
+                </div>
               </div>
             </div>
             <div class="avail-right">
@@ -751,6 +760,10 @@ const pendingCount = computed(
   () => availability.value.filter((a) => a.status === "Pending").length,
 );
 
+const inquiryPendingCount = computed(
+  () => changeInquiries.value.filter((c) => c.status === "Pending").length,
+);
+
 const resolvedAvail = computed(() =>
   availability.value.filter(
     (a) => a.status === "Confirmed" || a.status === "Cancelled",
@@ -847,14 +860,37 @@ const updateInquiryStatus = async (inq, status) => {
     .update({ status: status })
     .eq("inquiryid", inq.id);
 
-  if (error) showToast("Failed to update inquiry.", "error");
-  else {
-    inq.status = status;
-    showToast(
-      `Inquiry ${status === "Approved" ? "approved" : "denied"}.`,
-      "success",
-    );
+  if (error) {
+    showToast("Failed to update inquiry.", "error");
+    console.error("[Schedule] updateInquiryStatus failed:", error);
+    return;
   }
+
+  if (status === "Approved") {
+    if (inq.requestType === "Day Off Request" || inq.requestType === "Emergency Leave") {
+      const { error: schedErr } = await supabase
+        .from("schedule")
+        .update({ Status: "Cancelled" })
+        .eq("EmployeeId", inq.employeeId)
+        .eq("ShiftDate", inq.requestDate);
+      if (schedErr)
+        console.error("[Schedule] Failed to cancel schedule:", schedErr);
+    } else if (inq.requestType === "Shift Swap" && inq.preferredDate) {
+      const { error: schedErr } = await supabase
+        .from("schedule")
+        .update({ ShiftDate: inq.preferredDate })
+        .eq("EmployeeId", inq.employeeId)
+        .eq("ShiftDate", inq.requestDate);
+      if (schedErr)
+        console.error("[Schedule] Failed to swap shift:", schedErr);
+    }
+  }
+
+  showToast(
+    `Inquiry ${status === "Approved" ? "approved" : "denied"}.`,
+    "success",
+  );
+  await fetchChangeInquiries();
 };
 
 const fetchEmployees = async () => {
@@ -939,7 +975,7 @@ const fetchAvailability = async () => {
 const fetchChangeInquiries = async () => {
   const { data: branchEmps } = await supabase
     .from("employee")
-    .select("EmployeeId, FirstName, LastName")
+    .select("EmployeeId, FirstName, LastName, Position")
     .eq("BranchAssigned", managerBranchId.value);
 
   const empMap = {};
@@ -952,6 +988,7 @@ const fetchChangeInquiries = async () => {
         initials:
           `${e.FirstName?.[0] || ""}${e.LastName?.[0] || ""}`.toUpperCase() ||
           "?",
+        role: e.Position || "—",
       };
     });
   }
@@ -961,11 +998,18 @@ const fetchChangeInquiries = async () => {
     return;
   }
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("changeinquiry")
     .select("*")
     .in("employeeid", empIds)
     .order("inquiryid", { ascending: false });
+
+  if (error) {
+    console.error("[Schedule] fetchChangeInquiries failed:", error);
+    showToast("Failed to load change inquiries.", "error");
+    changeInquiries.value = [];
+    return;
+  }
 
   if (data) {
     changeInquiries.value = data.map((c) => {
@@ -975,10 +1019,13 @@ const fetchChangeInquiries = async () => {
         employeeId: c.employeeid,
         employeeName: emp?.name || "Unknown",
         initials: emp?.initials || "?",
-        role: "—",
+        role: emp?.role || "—",
         requestDate: c.requestdate,
+        requestType: c.requesttype || "Shift Change",
+        preferredDate: c.preferreddate,
         reason: c.reason,
         status: c.status,
+        managerNote: c.managernote,
       };
     });
   }
@@ -1026,6 +1073,9 @@ const onEmployeeSelected = () => {
 const switchTab = (key) => {
   if (activeTab.value !== key) fadingIds.value = new Set();
   activeTab.value = key;
+  if (key === "change") fetchChangeInquiries();
+  if (key === "availability") fetchAvailability();
+  if (key === "schedule") fetchSchedules();
 };
 
 const openCreateModal = () => {
