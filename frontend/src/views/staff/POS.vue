@@ -58,15 +58,21 @@
             :class="{ 'in-cart': isInCart(item.ProductId) }"
             @click="handleMenuCardClick(item)"
           >
-            <div class="menu-card-img">
-              <component :is="getCatIcon(item.Category)" :size="40" class="menu-card-icon" />
-              <span v-if="isInCart(item.ProductId)" class="cart-qty-badge">
-                {{ getCartTotalQty(item.ProductId) }}
-              </span>
-              <span v-if="getSizeType(item.Category) !== 'none'" class="size-chip">
-                {{ getSizeLabels(item.Category).join(' / ') }}
-              </span>
-            </div>
+                      <div class="menu-card-img">
+            <img 
+              v-if="item.image_url" 
+              :src="item.image_url" 
+              :alt="item.ProductName"
+              class="menu-card-photo"
+            />
+            <component v-else :is="getCatIcon(item.Category)" :size="40" class="menu-card-icon" />
+            <span v-if="isInCart(item.ProductId)" class="cart-qty-badge">
+              {{ getCartTotalQty(item.ProductId) }}
+            </span>
+            <span v-if="getSizeType(item.Category) !== 'none'" class="size-chip">
+              {{ getSizeLabels(item.Category).join(' / ') }}
+            </span>
+          </div>
             <div class="menu-card-info">
               <span class="menu-card-name">{{ item.ProductName }}</span>
               <span class="menu-card-cat">{{ item.Category }}</span>
@@ -577,10 +583,11 @@ const fetchMenu = async () => {
   
   const { data, error } = await supabase
     .from('product')
-    .select('ProductId, ProductName, Category, Price, size_prices')
+    .select('ProductId, ProductName, Category, Price, size_prices, image_url')
     .neq('Status', 'Archived')
     .order('Category')
     .order('ProductName');
+
     
   if (error) {
     console.error("Error fetching menu:", error);
@@ -856,6 +863,13 @@ onMounted(async () => {
 .menu-card-name { display:block; font-size:17px; font-weight:700; color:#31201D; line-height:1.3; margin-bottom:2px; }
 .menu-card-cat { display:block; font-size:10px; color:#bbb; margin-bottom:4px; }
 .menu-card-price { display:block; font-size:14px; font-weight:800; color:#31201D; }
+
+.menu-card-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 /* CART PANEL */
 .cart-panel { background:white; border-left:1px solid #ede8e2; display:flex; flex-direction:column; overflow:hidden; }
