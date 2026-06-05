@@ -13,7 +13,7 @@ const routes = [
   // Default redirect to admin dashboard
   {
     path: "/dashboard",
-    redirect: "/admin/dashboard",
+    redirect: "/login",
   },
 
   // Public routes
@@ -210,7 +210,7 @@ const routes = [
   // Catch-all redirect to admin dashboard
   {
     path: "/:pathMatch(.*)*",
-    redirect: "/admin/dashboard",
+    redirect: "/login",
   },
 ];
 

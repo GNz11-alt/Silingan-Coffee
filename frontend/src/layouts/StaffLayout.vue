@@ -31,6 +31,15 @@
 
       <nav class="sidebar-nav">
         <router-link
+          to="/staff/search"
+          class="nav-item"
+          :class="{ active: $route.path === '/staff/search' }"
+        >
+          <component :is="SearchIcon" class="nav-icon" :size="20" />
+          <span v-show="!isSidebarCollapsed">Search</span>
+        </router-link>
+        
+        <router-link
           to="/staff/dashboard"
           class="nav-item"
           :class="{ active: $route.path === '/staff/dashboard' }"
@@ -73,15 +82,6 @@
         >
           <component :is="Coffee" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Menu & Pricing</span>
-        </router-link>
-
-        <router-link
-          to="/staff/search"
-          class="nav-item"
-          :class="{ active: $route.path === '/staff/search' }"
-        >
-          <component :is="SearchIcon" class="nav-icon" :size="20" />
-          <span v-show="!isSidebarCollapsed">Search</span>
         </router-link>
 
         <router-link

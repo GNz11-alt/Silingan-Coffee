@@ -31,6 +31,15 @@
 
       <nav class="sidebar-nav">
         <router-link
+          to="/manager/search"
+          class="nav-item"
+          :class="{ active: $route.path === '/manager/search' }"
+        >
+          <component :is="SearchIcon" class="nav-icon" :size="20" />
+          <span v-show="!isSidebarCollapsed">Search</span>
+        </router-link>
+        
+        <router-link
           to="/manager/dashboard"
           class="nav-item"
           :class="{ active: $route.path === '/manager/dashboard' }"
@@ -91,15 +100,6 @@
         >
           <component :is="Database" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Backup & Restore</span>
-        </router-link>
-
-        <router-link
-          to="/manager/search"
-          class="nav-item"
-          :class="{ active: $route.path === '/manager/search' }"
-        >
-          <component :is="SearchIcon" class="nav-icon" :size="20" />
-          <span v-show="!isSidebarCollapsed">Search</span>
         </router-link>
 
         <router-link

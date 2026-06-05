@@ -175,9 +175,6 @@
           <component :is="Users" :size="18" class="panel-icon" />
           <h5>Registered Users</h5>
         </div>
-        <p class="panel-sub">
-          All users registered in the system. Active session tracking is not yet implemented.
-        </p>
         <div v-if="isLoadingUsers" class="text-center py-4">
           <div class="spinner-border spinner-border-sm text-secondary"></div>
           <p class="mt-2 text-muted small">Loading users...</p>
@@ -218,37 +215,6 @@
       </div>
     </div>
 
-    <!-- TAB: TASKS -->
-    <div v-if="activeTab === 'tasks'" class="tab-content">
-      <div class="panel">
-        <div class="panel-header">
-          <component :is="CheckSquare" :size="18" class="panel-icon" />
-          <h5>Maintenance Tasks</h5>
-        </div>
-        <div v-if="isLoadingTasks" class="text-center py-4">
-          <div class="spinner-border spinner-border-sm text-secondary"></div>
-        </div>
-        <div v-else class="tasks-list">
-          <div class="task-row" v-for="task in tasks" :key="task.id">
-            <div class="task-info">
-              <div class="task-name">{{ task.name }}</div>
-              <div class="task-sub">{{ task.description }}</div>
-            </div>
-            <div class="task-right">
-              <span class="task-last">Last run: {{ task.lastRun }}</span>
-              <button class="btn-run" @click="runTask(task)" :disabled="task.running">
-                <span v-if="task.running" class="spinner-border spinner-border-sm"></span>
-                <span v-else>Run</span>
-              </button>
-            </div>
-          </div>
-          <div v-if="!tasks.length" class="text-center text-muted py-4" style="font-size: 13px">
-            No tasks found.
-          </div>
-        </div>
-      </div>
-    </div>
-
     <Teleport to="body">
       <div v-if="toast.show" class="toast-wrap" :class="toast.type">
         <i :class="toast.type === 'success' ? 'bi bi-check-circle' : 'bi bi-exclamation-circle'" class="me-2"></i>
@@ -263,7 +229,7 @@ import { ref, computed, onMounted } from "vue";
 import { supabase } from "@/supabase.js";
 import {
   CheckCircle, Clock, Users, Database, HardDrive,
-  Shield, AlertTriangle, CheckSquare,
+  Shield, AlertTriangle,
 } from "lucide-vue-next";
 
 const branches = ref([]);
@@ -273,7 +239,6 @@ const activeTab = ref("overview");
 const tabs = [
   { key: "overview", label: "Overview" },
   { key: "sessions", label: "User Sessions" },
-  { key: "tasks", label: "Tasks" },
 ];
 
 const isLoadingStats = ref(false);
