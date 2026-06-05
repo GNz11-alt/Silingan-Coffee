@@ -69,9 +69,12 @@
           :class="{ 'item-disabled': item._disabled }"
         >
           <div class="card-top">
-            <span class="cat-label">{{
-              item.Category ?? "Uncategorized"
-            }}</span>
+            <div class="card-image" v-if="item.image_url">
+              <img :src="item.image_url" :alt="item.ProductName" />
+            </div>
+            <div class="card-image placeholder" v-else>
+              <Coffee :size="28" />
+            </div>
           </div>
           <div class="card-body">
             <div class="name-row">
@@ -169,6 +172,21 @@
               <ChevronDown :size="13" class="sel-icon" />
             </div>
           </div>
+          <!--upload pics here-->
+                      <div class="field">
+              <label>Product Image</label>
+              <div class="image-upload-area">
+                <img 
+                  v-if="form.image_url" 
+                  :src="form.image_url" 
+                  class="preview-img" 
+                />
+                <label class="upload-label">
+                  <input type="file" accept="image/*" @change="handleImageUpload" hidden />
+                  {{ form.image_url ? 'Change Image' : '+ Upload Image' }}
+                </label>
+              </div>
+            </div>
           
           <!-- Size Prices Section (shown only for categories with sizes) -->
           <div class="field" v-if="getSizeType(form.Category) !== 'none'">
@@ -501,7 +519,8 @@ const form       = ref({
   ProductName: "", 
   Category: "", 
   Price: null,
-  sizePrices: {} 
+  sizePrices: {},
+  image_url: null 
 });
 
 // Recipe modal
@@ -629,7 +648,8 @@ const openAddModal = () => {
     ProductName: "", 
     Category: "", 
     Price: null,
-    sizePrices: {} 
+    sizePrices: {}, 
+    image_url: item.image_url || null
   };
   showModal.value = true;
 };
@@ -645,6 +665,29 @@ const openEditModal = async (item) => {
     sizePrices: item.size_prices || {}
   };
   showModal.value = true;
+};
+
+const uploadImage = async (file) => {
+  const ext = file.name.split('.').pop();
+  const path = `products/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from('product-images')
+    .upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage
+    .from('product-images')
+    .getPublicUrl(path);
+  return data.publicUrl;
+};
+
+const handleImageUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    form.value.image_url = await uploadImage(file);
+  } catch (err) {
+    alert('Image upload failed: ' + err.message);
+  }
 };
 
 const closeModal = () => { showModal.value = false; };
@@ -677,7 +720,8 @@ const saveItem = async () => {
     ProductType: "finished",
     Category:    form.value.Category,
     Price:       sizeLabels.length > 0 ? null : (form.value.Price ?? null),
-    size_prices: sizeLabels.length > 0 ? form.value.sizePrices : null
+    size_prices: sizeLabels.length > 0 ? form.value.sizePrices : null,
+    image_url:   form.value.image_url ?? null 
   };
   
   let error;
@@ -1052,6 +1096,43 @@ onMounted(async () => {
 }
 .menu-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
 .item-disabled { opacity: 0.45; filter: grayscale(0.6); }
+
+.card-image {
+  width: 100%;
+  height: 130px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f5f0eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.card-image.placeholder { color: #d4b896; }
+.preview-img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.upload-label {
+  display: inline-block;
+  padding: 8px 16px;
+  background: #f5f0eb;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #31201d;
+  transition: 0.2s;
+}
+.upload-label:hover { background: #ede5d8; }
 
 .card-top {
   display: flex;

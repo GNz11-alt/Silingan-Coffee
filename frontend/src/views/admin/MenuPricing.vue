@@ -69,9 +69,6 @@
           :class="{ 'item-disabled': item._disabled }"
         >
           <div class="card-top">
-            <span class="cat-label">{{
-              item.Category ?? "Uncategorized"
-            }}</span>
             <div class="card-image" v-if="item.image_url">
               <img :src="item.image_url" :alt="item.ProductName" />
             </div>
