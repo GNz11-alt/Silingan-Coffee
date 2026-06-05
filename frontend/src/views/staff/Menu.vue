@@ -597,7 +597,7 @@ const fetchMenuItems = async () => {
 
   const { data: products, error } = await supabase
     .from("product")
-    .select("ProductId, ProductName, ProductType, Category, Price, size_prices, CreatedAt, Status")
+    .select("ProductId, ProductName, ProductType, Category, Price, size_prices, image_url, CreatedAt, Status")
     .neq("Status", "Archived")
     .order("Category")
     .order("ProductName");
@@ -649,7 +649,7 @@ const openAddModal = () => {
     Category: "", 
     Price: null,
     sizePrices: {}, 
-    image_url: item.image_url || null
+    image_url: null
   };
   showModal.value = true;
 };

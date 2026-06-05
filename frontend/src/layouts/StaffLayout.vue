@@ -19,7 +19,7 @@
           </div>
           <div class="brand-text" v-show="!isSidebarCollapsed">
             <h2>Silingan Coffee</h2>
-            <p class="user-role">Administrator</p>
+            <p class="user-role">Staff</p>
           </div>
         </div>
 
