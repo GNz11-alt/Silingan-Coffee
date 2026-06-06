@@ -508,7 +508,7 @@ const route = useRoute();
 // ─── Cache ────────────────────────────────────────────────────────────────────
 const CACHE_KEY_MENU = "cache_menu_items";
 const CACHE_KEY_RAW = "cache_raw_products";
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 30 * 60 * 1000;
 
 const saveCache = (key, data) => {
   sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
@@ -903,8 +903,8 @@ const saveRecipe = async () => {
   if (insError) {
     alert("Failed to save recipe: " + insError.message);
   } else {
-    sessionStorage.removeItem(CACHE_KEY_MENU); 
-    await fetchMenuItems(true); 
+    sessionStorage.removeItem(CACHE_KEY_MENU);
+    await fetchMenuItems(true);
     closeRecipeModal();
   }
 
@@ -973,6 +973,10 @@ const openAllRecipes = async () => {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
+  console.log(
+    "[POS] mounted, cache_pos_menu:",
+    sessionStorage.getItem("cache_pos_menu") ? "exists" : "missing",
+  );
   await Promise.all([fetchRawProducts(), fetchMenuItems()]);
 
   const editId = route.query.edit;

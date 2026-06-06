@@ -1,6 +1,5 @@
 <template>
   <div class="pos-root">
-
     <!-- TOP BAR -->
     <header class="pos-topbar">
       <div class="topbar-left">
@@ -9,7 +8,9 @@
           <span>Silingan POS</span>
         </div>
         <div class="topbar-meta">
-          <span class="meta-branch">{{ branchAddress || branchRecord?.BranchName || 'Main Branch' }}</span>
+          <span class="meta-branch">{{
+            branchAddress || branchRecord?.BranchName || "Main Branch"
+          }}</span>
           <span class="meta-sep">·</span>
           <span class="meta-cashier">{{ cashierName }}</span>
           <span class="meta-sep">·</span>
@@ -19,19 +20,21 @@
       <div class="topbar-right">
         <button class="history-btn" @click="openHistory">
           <History :size="15" /> Today's Sales
-          <span v-if="transactions.length > 0" class="history-count">{{ transactions.length }}</span>
+          <span v-if="transactions.length > 0" class="history-count">{{
+            transactions.length
+          }}</span>
         </button>
       </div>
     </header>
 
     <!-- MAIN POS LAYOUT -->
     <div class="pos-layout">
-
       <!-- LEFT: Category Sidebar -->
       <aside class="category-sidebar">
         <p class="sidebar-label">Category</p>
         <button
-          v-for="cat in ['All', ...menuCategories]" :key="cat"
+          v-for="cat in ['All', ...menuCategories]"
+          :key="cat"
           :class="['cat-btn', activeCategory === cat ? 'active' : '']"
           @click="activeCategory = cat"
         >
@@ -49,30 +52,44 @@
           </div>
         </div>
 
-        <div v-if="loadingMenu" class="menu-loading"><div class="spin"></div> Loading menu...</div>
-        <div v-else-if="filteredMenu.length === 0" class="menu-empty">No items found.</div>
+        <div v-if="loadingMenu" class="menu-loading">
+          <div class="spin"></div>
+          Loading menu...
+        </div>
+        <div v-else-if="filteredMenu.length === 0" class="menu-empty">
+          No items found.
+        </div>
         <div v-else class="menu-grid">
           <button
-            v-for="item in filteredMenu" :key="item.ProductId"
+            v-for="item in filteredMenu"
+            :key="item.ProductId"
             class="menu-card"
             :class="{ 'in-cart': isInCart(item.ProductId) }"
             @click="handleMenuCardClick(item)"
           >
-                      <div class="menu-card-img">
-            <img 
-              v-if="item.image_url" 
-              :src="item.image_url" 
-              :alt="item.ProductName"
-              class="menu-card-photo"
-            />
-            <component v-else :is="getCatIcon(item.Category)" :size="40" class="menu-card-icon" />
-            <span v-if="isInCart(item.ProductId)" class="cart-qty-badge">
-              {{ getCartTotalQty(item.ProductId) }}
-            </span>
-            <span v-if="getSizeType(item.Category) !== 'none'" class="size-chip">
-              {{ getSizeLabels(item.Category).join(' / ') }}
-            </span>
-          </div>
+            <div class="menu-card-img">
+              <img
+                v-if="item.image_url"
+                :src="item.image_url"
+                :alt="item.ProductName"
+                class="menu-card-photo"
+              />
+              <component
+                v-else
+                :is="getCatIcon(item.Category)"
+                :size="40"
+                class="menu-card-icon"
+              />
+              <span v-if="isInCart(item.ProductId)" class="cart-qty-badge">
+                {{ getCartTotalQty(item.ProductId) }}
+              </span>
+              <span
+                v-if="getSizeType(item.Category) !== 'none'"
+                class="size-chip"
+              >
+                {{ getSizeLabels(item.Category).join(" / ") }}
+              </span>
+            </div>
             <div class="menu-card-info">
               <span class="menu-card-name">{{ item.ProductName }}</span>
               <span class="menu-card-cat">{{ item.Category }}</span>
@@ -80,9 +97,7 @@
                 <template v-if="getSizeType(item.Category) !== 'none'">
                   from ₱{{ getBasePrice(item) }}
                 </template>
-                <template v-else>
-                  ₱{{ item.Price?.toFixed(2) }}
-                </template>
+                <template v-else> ₱{{ item.Price?.toFixed(2) }} </template>
               </span>
             </div>
           </button>
@@ -93,7 +108,11 @@
       <aside class="cart-panel">
         <div class="cart-panel-header">
           <h2>Current Order</h2>
-          <button v-if="cart.length > 0" class="clear-cart-btn" @click="cart = []">
+          <button
+            v-if="cart.length > 0"
+            class="clear-cart-btn"
+            @click="cart = []"
+          >
             <X :size="13" /> Clear
           </button>
         </div>
@@ -105,15 +124,25 @@
               <span v-if="item.size" class="ci-size-tag">{{ item.size }}</span>
             </div>
             <div class="ci-price-row">
-              <span class="ci-price">₱{{ item.effectivePrice?.toFixed(2) }} each</span>
+              <span class="ci-price"
+                >₱{{ item.effectivePrice?.toFixed(2) }} each</span
+              >
             </div>
             <div class="ci-controls">
-              <button class="qty-btn" @click="decreaseQty(i)"><Minus :size="11" /></button>
+              <button class="qty-btn" @click="decreaseQty(i)">
+                <Minus :size="11" />
+              </button>
               <span class="ci-qty">{{ item.qty }}</span>
-              <button class="qty-btn" @click="increaseQty(i)"><Plus :size="11" /></button>
-              <button class="ci-remove" @click="removeFromCart(i)"><Trash2 :size="13" /></button>
+              <button class="qty-btn" @click="increaseQty(i)">
+                <Plus :size="11" />
+              </button>
+              <button class="ci-remove" @click="removeFromCart(i)">
+                <Trash2 :size="13" />
+              </button>
             </div>
-            <div class="ci-subtotal">₱{{ (item.qty * item.effectivePrice).toFixed(2) }}</div>
+            <div class="ci-subtotal">
+              ₱{{ (item.qty * item.effectivePrice).toFixed(2) }}
+            </div>
           </div>
         </div>
 
@@ -130,7 +159,12 @@
             <select v-model="selectedDiscount" class="discount-sel">
               <option :value="null">No discount</option>
               <option v-for="d in discounts" :key="d.discountid" :value="d">
-                {{ d.discountname }} ({{ d.discounttype === 'percentage' ? d.discountvalue + '%' : '₱' + d.discountvalue }} off)
+                {{ d.discountname }} ({{
+                  d.discounttype === "percentage"
+                    ? d.discountvalue + "%"
+                    : "₱" + d.discountvalue
+                }}
+                off)
               </option>
             </select>
             <ChevronDown :size="12" class="sel-icon" />
@@ -139,32 +173,47 @@
 
         <!-- Totals -->
         <div v-if="cart.length > 0" class="cart-totals">
-          <div class="ct-row"><span>Subtotal</span><span>₱{{ cartTotal.toFixed(2) }}</span></div>
+          <div class="ct-row">
+            <span>Subtotal</span><span>₱{{ cartTotal.toFixed(2) }}</span>
+          </div>
           <div class="ct-row disc-line" v-if="selectedDiscount">
             <span>Discount</span><span>-₱{{ discountAmount.toFixed(2) }}</span>
           </div>
-          <div class="ct-row grand"><span>Total</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
+          <div class="ct-row grand">
+            <span>Total</span><span>₱{{ finalTotal.toFixed(2) }}</span>
+          </div>
         </div>
 
-        <button class="checkout-btn" :disabled="cart.length === 0" @click="openPayment">
+        <button
+          class="checkout-btn"
+          :disabled="cart.length === 0"
+          @click="openPayment"
+        >
           <CreditCard :size="17" /> Proceed to Payment
         </button>
       </aside>
     </div>
 
     <!-- ── SIZE PICKER MODAL ── -->
-    <div v-if="showSizePicker" class="overlay" @click.self="showSizePicker = false">
+    <div
+      v-if="showSizePicker"
+      class="overlay"
+      @click.self="showSizePicker = false"
+    >
       <div class="size-modal">
         <div class="size-modal-header">
           <div>
             <h2>{{ sizePickerItem?.ProductName }}</h2>
             <p>{{ sizePickerItem?.Category }}</p>
           </div>
-          <button class="pv-close" @click="showSizePicker = false"><X :size="19" /></button>
+          <button class="pv-close" @click="showSizePicker = false">
+            <X :size="19" />
+          </button>
         </div>
         <div class="size-options">
           <button
-            v-for="opt in sizeOptions" :key="opt.label"
+            v-for="opt in sizeOptions"
+            :key="opt.label"
             class="size-option-btn"
             @click="addToCartWithSize(sizePickerItem, opt)"
           >
@@ -181,7 +230,6 @@
     <!-- ── PAYMENT MODAL ── -->
     <div v-if="showPayment" class="overlay" @click.self="showPayment = false">
       <div class="payment-modal">
-
         <!-- Receipt Step -->
         <div v-if="showReceipt" class="receipt-view">
           <!-- Printable receipt area -->
@@ -189,43 +237,72 @@
             <div class="receipt-header">
               <div class="r-icon-circle"><Coffee :size="20" /></div>
               <h3>Silingan Coffee</h3>
-              <p>{{ branchAddress || branchRecord?.BranchName || 'Main Branch' }}</p>
+              <p>
+                {{ branchAddress || branchRecord?.BranchName || "Main Branch" }}
+              </p>
             </div>
             <div class="r-meta">
-              <div class="r-row"><span>Date</span><span>{{ currentDate }}</span></div>
-              <div class="r-row"><span>Cashier</span><span>{{ cashierName }}</span></div>
-              <div class="r-row"><span>Payment</span><span>{{ paymentMethod === 'gcash' ? 'GCash' : 'Cash' }}</span></div>
+              <div class="r-row">
+                <span>Date</span><span>{{ currentDate }}</span>
+              </div>
+              <div class="r-row">
+                <span>Cashier</span><span>{{ cashierName }}</span>
+              </div>
+              <div class="r-row">
+                <span>Payment</span
+                ><span>{{ paymentMethod === "gcash" ? "GCash" : "Cash" }}</span>
+              </div>
             </div>
             <div class="r-divider"></div>
             <div class="r-items">
               <div v-for="item in cart" :key="item.cartKey" class="r-item">
-                <span>{{ item.qty }}x {{ item.ProductName }}<span v-if="item.size"> ({{ item.size }})</span></span>
+                <span
+                  >{{ item.qty }}x {{ item.ProductName
+                  }}<span v-if="item.size"> ({{ item.size }})</span></span
+                >
                 <span>₱{{ (item.qty * item.effectivePrice).toFixed(2) }}</span>
               </div>
             </div>
             <div class="r-divider"></div>
             <div class="r-totals">
-              <div class="r-row"><span>Subtotal</span><span>₱{{ cartTotal.toFixed(2) }}</span></div>
+              <div class="r-row">
+                <span>Subtotal</span><span>₱{{ cartTotal.toFixed(2) }}</span>
+              </div>
               <div class="r-row r-disc" v-if="selectedDiscount">
                 <span>Discount ({{ selectedDiscount.discountname }})</span>
                 <span>-₱{{ discountAmount.toFixed(2) }}</span>
               </div>
-              <div class="r-row r-total"><span>Total</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
+              <div class="r-row r-total">
+                <span>Total</span><span>₱{{ finalTotal.toFixed(2) }}</span>
+              </div>
               <template v-if="paymentMethod === 'cash'">
-                <div class="r-row"><span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span></div>
-                <div class="r-row r-change"><span>Change</span><span>₱{{ Math.max(0, changeAmount).toFixed(2) }}</span></div>
+                <div class="r-row">
+                  <span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span>
+                </div>
+                <div class="r-row r-change">
+                  <span>Change</span
+                  ><span>₱{{ Math.max(0, changeAmount).toFixed(2) }}</span>
+                </div>
               </template>
-              <div v-else class="r-row r-gcash"><span>GCash</span><span>✓ Paid</span></div>
+              <div v-else class="r-row r-gcash">
+                <span>GCash</span><span>✓ Paid</span>
+              </div>
             </div>
             <div class="r-footer">Thank you for your visit! ☕</div>
           </div>
           <div class="receipt-btns">
-            <button class="rbtn-back" @click="showReceipt = false"><ArrowLeft :size="14" /> Edit</button>
+            <button class="rbtn-back" @click="showReceipt = false">
+              <ArrowLeft :size="14" /> Edit
+            </button>
             <button class="rbtn-print" @click="printReceipt">
               <Printer :size="14" /> Print
             </button>
-            <button class="rbtn-confirm" :disabled="saving" @click="finishTransaction">
-              {{ saving ? 'Saving...' : 'Confirm & Finalize' }}
+            <button
+              class="rbtn-confirm"
+              :disabled="saving"
+              @click="finishTransaction"
+            >
+              {{ saving ? "Saving..." : "Confirm & Finalize" }}
             </button>
           </div>
         </div>
@@ -235,37 +312,71 @@
           <div class="pv-header">
             <div>
               <h2>Payment</h2>
-              <p>Total: <strong>₱{{ finalTotal.toFixed(2) }}</strong></p>
+              <p>
+                Total: <strong>₱{{ finalTotal.toFixed(2) }}</strong>
+              </p>
             </div>
-            <button class="pv-close" @click="showPayment = false"><X :size="19" /></button>
+            <button class="pv-close" @click="showPayment = false">
+              <X :size="19" />
+            </button>
           </div>
 
           <div class="pm-tabs">
-            <button :class="['pm-tab', paymentMethod === 'cash' ? 'active' : '']" @click="paymentMethod = 'cash'">
+            <button
+              :class="['pm-tab', paymentMethod === 'cash' ? 'active' : '']"
+              @click="paymentMethod = 'cash'"
+            >
               <Banknote :size="17" /> Cash
             </button>
-            <button :class="['pm-tab', paymentMethod === 'gcash' ? 'active' : '']" @click="paymentMethod = 'gcash'">
+            <button
+              :class="['pm-tab', paymentMethod === 'gcash' ? 'active' : '']"
+              @click="paymentMethod = 'gcash'"
+            >
               <Smartphone :size="17" /> GCash
             </button>
           </div>
 
           <div v-if="paymentMethod === 'cash'" class="cash-fields">
             <label>Amount Received (₱)</label>
-            <input type="number" v-model.number="cashReceived" class="cash-input" placeholder="0.00" />
+            <input
+              type="number"
+              v-model.number="cashReceived"
+              class="cash-input"
+              placeholder="0.00"
+            />
             <div class="quick-amounts">
-              <button class="qa-btn exact-btn" @click="cashReceived = finalTotal">
+              <button
+                class="qa-btn exact-btn"
+                @click="cashReceived = finalTotal"
+              >
                 ₱{{ finalTotal.toFixed(2) }} <span class="exact-label"></span>
               </button>
-              <button v-for="v in quickAmounts" :key="v" class="qa-btn" @click="cashReceived = v">
+              <button
+                v-for="v in quickAmounts"
+                :key="v"
+                class="qa-btn"
+                @click="cashReceived = v"
+              >
                 ₱{{ v.toLocaleString() }}
               </button>
             </div>
             <div class="cash-calc" v-if="cashReceived > 0">
-              <div class="cc-row"><span>Total Due</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
-              <div class="cc-row"><span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span></div>
-              <div class="cc-row change-row" :class="changeAmount < 0 ? 'insufficient' : 'sufficient'">
+              <div class="cc-row">
+                <span>Total Due</span><span>₱{{ finalTotal.toFixed(2) }}</span>
+              </div>
+              <div class="cc-row">
+                <span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span>
+              </div>
+              <div
+                class="cc-row change-row"
+                :class="changeAmount < 0 ? 'insufficient' : 'sufficient'"
+              >
                 <span>Change</span>
-                <span>{{ changeAmount < 0 ? '-₱' + Math.abs(changeAmount).toFixed(2) : '₱' + changeAmount.toFixed(2) }}</span>
+                <span>{{
+                  changeAmount < 0
+                    ? "-₱" + Math.abs(changeAmount).toFixed(2)
+                    : "₱" + changeAmount.toFixed(2)
+                }}</span>
               </div>
             </div>
           </div>
@@ -280,7 +391,10 @@
 
           <button
             class="pv-next"
-            :disabled="paymentMethod === 'cash' && (cashReceived < finalTotal || cashReceived === 0)"
+            :disabled="
+              paymentMethod === 'cash' &&
+              (cashReceived < finalTotal || cashReceived === 0)
+            "
             @click="showReceipt = true"
           >
             Preview Receipt →
@@ -295,9 +409,18 @@
         <div class="hm-header">
           <div>
             <h2>Today's Sales</h2>
-            <p>{{ transactions.length }} transactions · ₱{{ totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }} revenue</p>
+            <p>
+              {{ transactions.length }} transactions · ₱{{
+                totalRevenue.toLocaleString("en-PH", {
+                  minimumFractionDigits: 2,
+                })
+              }}
+              revenue
+            </p>
           </div>
-          <button class="pv-close" @click="showHistory = false"><X :size="19" /></button>
+          <button class="pv-close" @click="showHistory = false">
+            <X :size="19" />
+          </button>
         </div>
 
         <div class="hm-stats">
@@ -315,37 +438,63 @@
           </div>
         </div>
 
-        <div v-if="loadingTransactions" class="hm-empty"><div class="spin"></div> Loading...</div>
-        <div v-else-if="transactions.length === 0" class="hm-empty">No transactions today yet.</div>
+        <div v-if="loadingTransactions" class="hm-empty">
+          <div class="spin"></div>
+          Loading...
+        </div>
+        <div v-else-if="transactions.length === 0" class="hm-empty">
+          No transactions today yet.
+        </div>
         <div v-else class="hm-table-wrap">
           <table class="hm-table">
             <thead>
               <tr>
-                <th>Order</th><th>Time</th><th>Items</th>
-                <th>Payment</th><th>Discount</th><th>Total</th><th>Status</th>
+                <th>Order</th>
+                <th>Time</th>
+                <th>Items</th>
+                <th>Payment</th>
+                <th>Discount</th>
+                <th>Total</th>
+                <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="tr in transactions" :key="tr.OrderId" :class="{ 'cancelled-row': tr.Status === 'cancelled' }">
-                <td><span class="id-tag">#{{ tr.OrderId }}</span></td>
+              <tr
+                v-for="tr in transactions"
+                :key="tr.OrderId"
+                :class="{ 'cancelled-row': tr.Status === 'cancelled' }"
+              >
+                <td>
+                  <span class="id-tag">#{{ tr.OrderId }}</span>
+                </td>
                 <td class="muted">{{ formatTime(tr.CreatedAt) }}</td>
                 <td>
-                  <div v-for="it in tr.orderitem" :key="it.OrderItemId" class="h-item-line">
-                    {{ it.Quantity }}x {{ it.product?.ProductName ?? '—' }}
+                  <div
+                    v-for="it in tr.orderitem"
+                    :key="it.OrderItemId"
+                    class="h-item-line"
+                  >
+                    {{ it.Quantity }}x {{ it.product?.ProductName ?? "—" }}
                   </div>
                 </td>
                 <td>
                   <span :class="['pm-badge', tr.PaymentMethod]">
-                    {{ tr.PaymentMethod === 'gcash' ? 'GCash' : 'Cash' }}
+                    {{ tr.PaymentMethod === "gcash" ? "GCash" : "Cash" }}
                   </span>
                 </td>
                 <td>
-                  <span v-if="tr.discount" class="disc-badge">{{ tr.discount.discountname }}</span>
+                  <span v-if="tr.discount" class="disc-badge">{{
+                    tr.discount.discountname
+                  }}</span>
                   <span v-else class="muted">—</span>
                 </td>
-                <td class="total-col">₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}</td>
-                <td><span :class="['st-badge', tr.Status]">{{ tr.Status }}</span></td>
+                <td class="total-col">
+                  ₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}
+                </td>
+                <td>
+                  <span :class="['st-badge', tr.Status]">{{ tr.Status }}</span>
+                </td>
                 <td>
                   <button
                     v-if="tr.Status === 'completed'"
@@ -353,7 +502,7 @@
                     :disabled="cancellingId === tr.OrderId"
                     @click="confirmCancelOrder(tr)"
                   >
-                    {{ cancellingId === tr.OrderId ? '...' : 'Cancel' }}
+                    {{ cancellingId === tr.OrderId ? "..." : "Cancel" }}
                   </button>
                   <span v-else class="muted">—</span>
                 </td>
@@ -365,213 +514,357 @@
     </div>
 
     <!-- ── CANCEL CONFIRM MODAL ── -->
-    <div v-if="showCancelConfirm" class="overlay" @click.self="showCancelConfirm = false">
+    <div
+      v-if="showCancelConfirm"
+      class="overlay"
+      @click.self="showCancelConfirm = false"
+    >
       <div class="confirm-modal">
         <div class="confirm-icon"><XCircle :size="32" /></div>
         <h3>Cancel Order #{{ cancelTarget?.OrderId }}?</h3>
-        <p>This will mark the order as cancelled. This action cannot be undone.</p>
+        <p>
+          This will mark the order as cancelled. This action cannot be undone.
+        </p>
         <div class="confirm-items">
-          <div v-for="it in cancelTarget?.orderitem" :key="it.OrderItemId" class="confirm-item-line">
-            {{ it.Quantity }}x {{ it.product?.ProductName ?? '—' }}
+          <div
+            v-for="it in cancelTarget?.orderitem"
+            :key="it.OrderItemId"
+            class="confirm-item-line"
+          >
+            {{ it.Quantity }}x {{ it.product?.ProductName ?? "—" }}
           </div>
         </div>
-        <div class="confirm-total">Total: ₱{{ (cancelTarget?.FinalAmount ?? 0).toFixed(2) }}</div>
+        <div class="confirm-total">
+          Total: ₱{{ (cancelTarget?.FinalAmount ?? 0).toFixed(2) }}
+        </div>
         <div class="confirm-btns">
-          <button class="conf-no" @click="showCancelConfirm = false">Keep Order</button>
-          <button class="conf-yes" :disabled="cancellingId !== null" @click="doCancelOrder">
-            {{ cancellingId ? 'Cancelling...' : 'Yes, Cancel Order' }}
+          <button class="conf-no" @click="showCancelConfirm = false">
+            Keep Order
+          </button>
+          <button
+            class="conf-yes"
+            :disabled="cancellingId !== null"
+            @click="doCancelOrder"
+          >
+            {{ cancellingId ? "Cancelling..." : "Yes, Cancel Order" }}
           </button>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted } from "vue";
 import {
-  Coffee, History, Search, ShoppingCart, Plus, Minus, Trash2, X,
-  Tag, ChevronDown, CreditCard, Banknote, Smartphone, ArrowLeft,
-  Cookie, Layers, UtensilsCrossed, Sandwich, Leaf, Printer, XCircle
-} from 'lucide-vue-next';
-import { supabase } from '@/supabase';
+  Coffee,
+  History,
+  Search,
+  ShoppingCart,
+  Plus,
+  Minus,
+  Trash2,
+  X,
+  Tag,
+  ChevronDown,
+  CreditCard,
+  Banknote,
+  Smartphone,
+  ArrowLeft,
+  Cookie,
+  Layers,
+  UtensilsCrossed,
+  Sandwich,
+  Leaf,
+  Printer,
+  XCircle,
+} from "lucide-vue-next";
+import { supabase } from "@/supabase";
+defineOptions({ name: "StaffPOS" });
+
+const CACHE_KEY_MENU = "cache_pos_menu";
+const CACHE_KEY_DISCOUNTS = "cache_pos_discounts";
+const CACHE_TTL = 30 * 60 * 1000;
+
+const saveCache = (key, data) => {
+  sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+};
+
+const loadCache = (key) => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data;
+  } catch {
+    return null;
+  }
+};
+
+window.addEventListener("beforeunload", () => {
+  sessionStorage.setItem("page_refreshed", "1");
+});
 
 // ── Size configuration ────────────────────────────────────────────────────────
 const getSizeType = (cat) => {
-  if (!cat) return 'none'
-  const c = cat.toLowerCase()
-  if (c.includes('hot drink') || c.includes('hot coffee')) return 'hot'
-  if (c.includes('iced coffee') || c.includes('iced') || c.includes('non') && c.includes('coffee')) return 'iced'
-  if (c.includes('cream') && c.includes('frap')) return 'iced'
-  if (c.includes('frap')) return 'iced'
-  if (c.includes('smoothie')) return 'iced'
-  return 'none'
-}
+  if (!cat) return "none";
+  const c = cat.toLowerCase();
+  if (c.includes("hot drink") || c.includes("hot coffee")) return "hot";
+  if (
+    c.includes("iced coffee") ||
+    c.includes("iced") ||
+    (c.includes("non") && c.includes("coffee"))
+  )
+    return "iced";
+  if (c.includes("cream") && c.includes("frap")) return "iced";
+  if (c.includes("frap")) return "iced";
+  if (c.includes("smoothie")) return "iced";
+  return "none";
+};
 
 const getSizeLabels = (cat) => {
-  const t = getSizeType(cat)
-  if (t === 'hot') return ['Small', 'Regular']
-  if (t === 'iced') return ['Regular', 'Big']
-  return []
-}
+  const t = getSizeType(cat);
+  if (t === "hot") return ["Small", "Regular"];
+  if (t === "iced") return ["Regular", "Big"];
+  return [];
+};
 
 const buildSizeOptions = (item) => {
-  const t = getSizeType(item.Category)
-  const sizePrices = item.size_prices || {}
-  
-  if (t === 'hot') {
+  const t = getSizeType(item.Category);
+  const sizePrices = item.size_prices || {};
+
+  if (t === "hot") {
     return [
-      { label: 'Small', oz: '8oz', price: sizePrices.Small || item.Price },
-      { label: 'Regular', oz: '12oz', price: sizePrices.Regular || (item.Price + 10) },
-    ]
+      { label: "Small", oz: "8oz", price: sizePrices.Small || item.Price },
+      {
+        label: "Regular",
+        oz: "12oz",
+        price: sizePrices.Regular || item.Price + 10,
+      },
+    ];
   }
-  if (t === 'iced') {
+  if (t === "iced") {
     return [
-      { label: 'Regular', oz: '16oz', price: sizePrices.Regular || item.Price },
-      { label: 'Big', oz: '22oz', price: sizePrices.Big || (item.Price + 20) },
-    ]
+      { label: "Regular", oz: "16oz", price: sizePrices.Regular || item.Price },
+      { label: "Big", oz: "22oz", price: sizePrices.Big || item.Price + 20 },
+    ];
   }
-  return []
-}
+  return [];
+};
 
 const getBasePrice = (item) => {
-  if (getSizeType(item.Category) !== 'none') {
-    const sizePrices = item.size_prices || {}
-    const t = getSizeType(item.Category)
-    if (t === 'hot') return (sizePrices.Small || item.Price)?.toFixed(2) ?? '0.00'
-    if (t === 'iced') return (sizePrices.Regular || item.Price)?.toFixed(2) ?? '0.00'
+  if (getSizeType(item.Category) !== "none") {
+    const sizePrices = item.size_prices || {};
+    const t = getSizeType(item.Category);
+    if (t === "hot")
+      return (sizePrices.Small || item.Price)?.toFixed(2) ?? "0.00";
+    if (t === "iced")
+      return (sizePrices.Regular || item.Price)?.toFixed(2) ?? "0.00";
   }
-  return item.Price?.toFixed(2) ?? '0.00'
-}
+  return item.Price?.toFixed(2) ?? "0.00";
+};
 
 // ── State ─────────────────────────────────────────────────────────────────────
-const menu = ref([]); const discounts = ref([]); const transactions = ref([]);
-const loadingMenu = ref(false); const loadingTransactions = ref(false);
-const cart = ref([]); const selectedDiscount = ref(null);
-const activeCategory = ref('All'); const menuSearch = ref('');
-const showPayment = ref(false); const showReceipt = ref(false); const showHistory = ref(false);
-const paymentMethod = ref('cash'); const cashReceived = ref(0); const saving = ref(false);
-const currentUser = ref(null); const branchRecord = ref(null);
+const menu = ref([]);
+const discounts = ref([]);
+const transactions = ref([]);
+const loadingMenu = ref(false);
+const loadingTransactions = ref(false);
+const cart = ref([]);
+const selectedDiscount = ref(null);
+const activeCategory = ref("All");
+const menuSearch = ref("");
+const showPayment = ref(false);
+const showReceipt = ref(false);
+const showHistory = ref(false);
+const paymentMethod = ref("cash");
+const cashReceived = ref(0);
+const saving = ref(false);
+const currentUser = ref(null);
+const branchRecord = ref(null);
 const employeeRecord = ref(null);
 
 // Size picker
-const showSizePicker = ref(false)
-const sizePickerItem = ref(null)
-const sizeOptions    = ref([])
+const showSizePicker = ref(false);
+const sizePickerItem = ref(null);
+const sizeOptions = ref([]);
 
 // Cancel order
-const showCancelConfirm = ref(false)
-const cancelTarget      = ref(null)
-const cancellingId      = ref(null)
+const showCancelConfirm = ref(false);
+const cancelTarget = ref(null);
+const cancellingId = ref(null);
 
 // ── Computed ──────────────────────────────────────────────────────────────────
-const cashierName   = computed(() => currentUser.value?.username ?? localStorage.getItem('username') ?? 'Staff');
-const branchId      = computed(() => branchRecord.value?.BranchId ?? null);
-const branchAddress = computed(() => branchRecord.value?.Location ?? '');
-const currentDate   = new Date().toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+const cashierName = computed(
+  () =>
+    currentUser.value?.username ?? localStorage.getItem("username") ?? "Staff",
+);
+const branchId = computed(() => branchRecord.value?.BranchId ?? null);
+const branchAddress = computed(() => branchRecord.value?.Location ?? "");
+const currentDate = new Date().toLocaleDateString("en-PH", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
 
-const menuCategories = computed(() => [...new Set(menu.value.map(i => i.Category).filter(Boolean))].sort());
+const menuCategories = computed(() =>
+  [...new Set(menu.value.map((i) => i.Category).filter(Boolean))].sort(),
+);
 
 const filteredMenu = computed(() => {
   let list = menu.value;
-  if (activeCategory.value !== 'All') list = list.filter(i => i.Category === activeCategory.value);
-  if (menuSearch.value) list = list.filter(i => i.ProductName?.toLowerCase().includes(menuSearch.value.toLowerCase()));
+  if (activeCategory.value !== "All")
+    list = list.filter((i) => i.Category === activeCategory.value);
+  if (menuSearch.value)
+    list = list.filter((i) =>
+      i.ProductName?.toLowerCase().includes(menuSearch.value.toLowerCase()),
+    );
   return list;
 });
 
-const cartTotal = computed(() => cart.value.reduce((s, i) => s + i.effectivePrice * i.qty, 0));
+const cartTotal = computed(() =>
+  cart.value.reduce((s, i) => s + i.effectivePrice * i.qty, 0),
+);
 
 const discountAmount = computed(() => {
   if (!selectedDiscount.value || cartTotal.value === 0) return 0;
   const d = selectedDiscount.value;
-  return d.discounttype === 'percentage'
+  return d.discounttype === "percentage"
     ? parseFloat(((cartTotal.value * d.discountvalue) / 100).toFixed(2))
     : Math.min(d.discountvalue, cartTotal.value);
 });
 
-const finalTotal   = computed(() => Math.max(0, cartTotal.value - discountAmount.value));
+const finalTotal = computed(() =>
+  Math.max(0, cartTotal.value - discountAmount.value),
+);
 const changeAmount = computed(() => cashReceived.value - finalTotal.value);
-const totalRevenue = computed(() => transactions.value.filter(t => t.Status !== 'cancelled').reduce((s, t) => s + (t.FinalAmount ?? 0), 0));
-const avgSale      = computed(() => {
-  const completed = transactions.value.filter(t => t.Status !== 'cancelled');
+const totalRevenue = computed(() =>
+  transactions.value
+    .filter((t) => t.Status !== "cancelled")
+    .reduce((s, t) => s + (t.FinalAmount ?? 0), 0),
+);
+const avgSale = computed(() => {
+  const completed = transactions.value.filter((t) => t.Status !== "cancelled");
   return completed.length ? totalRevenue.value / completed.length : 0;
 });
 
 const quickAmounts = computed(() => {
   const t = Math.ceil(finalTotal.value / 50) * 50;
   return [...new Set([t, 100, 200, 500, 1000, 2000])]
-    .filter(v => v !== finalTotal.value)
+    .filter((v) => v !== finalTotal.value)
     .sort((a, b) => a - b)
     .slice(0, 5);
 });
 
 // ── Cart helpers ──────────────────────────────────────────────────────────────
-const makeCartKey  = (item, size) => `${item.ProductId}-${size ?? 'none'}`
-const isInCart     = (id) => cart.value.some(i => i.ProductId === id)
-const getCartTotalQty = (id) => cart.value.filter(i => i.ProductId === id).reduce((s,i) => s + i.qty, 0)
+const makeCartKey = (item, size) => `${item.ProductId}-${size ?? "none"}`;
+const isInCart = (id) => cart.value.some((i) => i.ProductId === id);
+const getCartTotalQty = (id) =>
+  cart.value.filter((i) => i.ProductId === id).reduce((s, i) => s + i.qty, 0);
 
 const handleMenuCardClick = (item) => {
-  const t = getSizeType(item.Category)
-  if (t === 'none') {
-    addToCartDirect(item)
+  const t = getSizeType(item.Category);
+  if (t === "none") {
+    addToCartDirect(item);
   } else {
-    sizePickerItem.value = item
-    sizeOptions.value = buildSizeOptions(item)
-    showSizePicker.value = true
+    sizePickerItem.value = item;
+    sizeOptions.value = buildSizeOptions(item);
+    showSizePicker.value = true;
   }
-}
+};
 
 const addToCartDirect = (item) => {
-  const key = makeCartKey(item, null)
-  const ex = cart.value.find(i => i.cartKey === key)
-  if (ex) { ex.qty++; return }
-  cart.value.push({ ...item, qty: 1, size: null, effectivePrice: item.Price ?? 0, cartKey: key })
-}
+  const key = makeCartKey(item, null);
+  const ex = cart.value.find((i) => i.cartKey === key);
+  if (ex) {
+    ex.qty++;
+    return;
+  }
+  cart.value.push({
+    ...item,
+    qty: 1,
+    size: null,
+    effectivePrice: item.Price ?? 0,
+    cartKey: key,
+  });
+};
 
 const addToCartWithSize = (item, sizeOpt) => {
-  showSizePicker.value = false
-  const key = makeCartKey(item, sizeOpt.label)
-  const ex = cart.value.find(i => i.cartKey === key)
-  if (ex) { ex.qty++; return }
+  showSizePicker.value = false;
+  const key = makeCartKey(item, sizeOpt.label);
+  const ex = cart.value.find((i) => i.cartKey === key);
+  if (ex) {
+    ex.qty++;
+    return;
+  }
   cart.value.push({
-    ...item, qty: 1,
+    ...item,
+    qty: 1,
     size: `${sizeOpt.label} (${sizeOpt.oz})`,
     effectivePrice: sizeOpt.price,
-    cartKey: key
-  })
-}
+    cartKey: key,
+  });
+};
 
-const increaseQty    = (i) => cart.value[i].qty++
-const decreaseQty    = (i) => { if (cart.value[i].qty > 1) cart.value[i].qty--; else removeFromCart(i) }
-const removeFromCart = (i) => cart.value.splice(i, 1)
+const increaseQty = (i) => cart.value[i].qty++;
+const decreaseQty = (i) => {
+  if (cart.value[i].qty > 1) cart.value[i].qty--;
+  else removeFromCart(i);
+};
+const removeFromCart = (i) => cart.value.splice(i, 1);
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 const fetchCurrentUser = async () => {
-  const username   = localStorage.getItem('username');
-  const branchSlug = localStorage.getItem('branch');
+  const username = localStorage.getItem("username");
+  const branchSlug = localStorage.getItem("branch");
   if (!username) return;
 
-  const { data: u } = await supabase.from('users').select('id, username, role, branch').eq('username', username).single();
+  const { data: u } = await supabase
+    .from("users")
+    .select("id, username, role, branch")
+    .eq("username", username)
+    .single();
   if (u) currentUser.value = u;
 
-  if (branchSlug && branchSlug !== 'all') {
-    const { data: bd } = await supabase.from('branch').select('BranchId, BranchName, Location').eq('BranchName', branchSlug).maybeSingle();
-    if (bd) { branchRecord.value = bd; }
-    else {
-      const { data: bl } = await supabase.from('branch').select('BranchId, BranchName, Location').ilike('Location', '%' + branchSlug + '%').maybeSingle();
+  if (branchSlug && branchSlug !== "all") {
+    const { data: bd } = await supabase
+      .from("branch")
+      .select("BranchId, BranchName, Location")
+      .eq("BranchName", branchSlug)
+      .maybeSingle();
+    if (bd) {
+      branchRecord.value = bd;
+    } else {
+      const { data: bl } = await supabase
+        .from("branch")
+        .select("BranchId, BranchName, Location")
+        .ilike("Location", "%" + branchSlug + "%")
+        .maybeSingle();
       if (bl) branchRecord.value = bl;
     }
   }
 
   if (u?.employee_id) {
-    const { data: emp } = await supabase.from('employee').select('EmployeeId').eq('EmployeeId', u.employee_id).maybeSingle();
-    if (emp) { employeeRecord.value = emp; return; }
+    const { data: emp } = await supabase
+      .from("employee")
+      .select("EmployeeId")
+      .eq("EmployeeId", u.employee_id)
+      .maybeSingle();
+    if (emp) {
+      employeeRecord.value = emp;
+      return;
+    }
   }
 
   if (username) {
-    const { data: emp } = await supabase.from('employee')
-      .select('EmployeeId, FirstName, LastName')
+    const { data: emp } = await supabase
+      .from("employee")
+      .select("EmployeeId, FirstName, LastName")
       .or(`FirstName.ilike.%${username}%,LastName.ilike.%${username}%`)
       .maybeSingle();
     if (emp) employeeRecord.value = emp;
@@ -579,41 +872,63 @@ const fetchCurrentUser = async () => {
 };
 
 const fetchMenu = async () => {
+  const cached = loadCache(CACHE_KEY_MENU);
+  if (cached) {
+    menu.value = cached;
+    return;
+  }
   loadingMenu.value = true;
-  
   const { data, error } = await supabase
-    .from('product')
-    .select('ProductId, ProductName, Category, Price, size_prices, image_url')
-    .neq('Status', 'Archived')
-    .order('Category')
-    .order('ProductName');
-
-    
+    .from("product")
+    .select("ProductId, ProductName, Category, Price, size_prices, image_url")
+    .neq("Status", "Archived")
+    .order("Category")
+    .order("ProductName");
   if (error) {
     console.error("Error fetching menu:", error);
-  } else {
-    menu.value = data || [];
+  } else if (data) {
+    menu.value = data;
+    saveCache(CACHE_KEY_MENU, menu.value);
   }
-  
   loadingMenu.value = false;
 };
 
 const fetchDiscounts = async () => {
-  const { data } = await supabase.from('discount').select('discountid, discountname, discounttype, discountvalue').order('discountname');
-  if (data) discounts.value = data;
+  const cached = loadCache(CACHE_KEY_DISCOUNTS);
+  if (cached) {
+    discounts.value = cached;
+    return;
+  }
+  const { data } = await supabase
+    .from("discount")
+    .select("discountid, discountname, discounttype, discountvalue")
+    .order("discountname");
+  if (data) {
+    discounts.value = data;
+    saveCache(CACHE_KEY_DISCOUNTS, discounts.value);
+  }
 };
 
 const fetchTransactions = async () => {
   loadingTransactions.value = true;
-  const today = new Date(); today.setHours(0,0,0,0);
-  const tom   = new Date(today); tom.setDate(tom.getDate()+1);
-  let q = supabase.from('orders').select(`
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tom = new Date(today);
+  tom.setDate(tom.getDate() + 1);
+  let q = supabase
+    .from("orders")
+    .select(
+      `
     OrderId, TotalAmount, DiscountId, DiscountedAmount, FinalAmount,
     cashpaid, changegiven, PaymentMethod, Status, CreatedAt,
     discount ( discountid, discountname, discounttype, discountvalue ),
     orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
-  `).gte('CreatedAt', today.toISOString()).lt('CreatedAt', tom.toISOString()).order('CreatedAt', { ascending: false });
-  
+  `,
+    )
+    .gte("CreatedAt", today.toISOString())
+    .lt("CreatedAt", tom.toISOString())
+    .order("CreatedAt", { ascending: false });
+
   const { data } = await q;
   if (data) transactions.value = data;
   loadingTransactions.value = false;
@@ -627,7 +942,7 @@ const openHistory = async () => {
 // ── Payment ───────────────────────────────────────────────────────────────────
 const openPayment = () => {
   cashReceived.value = 0;
-  paymentMethod.value = 'cash';
+  paymentMethod.value = "cash";
   showReceipt.value = false;
   showPayment.value = true;
 };
@@ -638,13 +953,15 @@ const finishTransaction = async () => {
   try {
     const payload = {
       PaymentMethod: paymentMethod.value,
-      Status: 'completed',
+      Status: "completed",
       TotalAmount: cartTotal.value,
       DiscountId: selectedDiscount.value?.discountid ?? null,
       DiscountedAmount: discountAmount.value,
       FinalAmount: finalTotal.value,
-      cashpaid: paymentMethod.value === 'cash' ? cashReceived.value : finalTotal.value,
-      changegiven: paymentMethod.value === 'cash' ? Math.max(0, changeAmount.value) : 0,
+      cashpaid:
+        paymentMethod.value === "cash" ? cashReceived.value : finalTotal.value,
+      changegiven:
+        paymentMethod.value === "cash" ? Math.max(0, changeAmount.value) : 0,
     };
 
     if (branchId.value) payload.BranchId = branchId.value;
@@ -653,17 +970,21 @@ const finishTransaction = async () => {
       payload.CashierId = employeeRecord.value.EmployeeId;
     }
 
-    const { data: order, error: oErr } = await supabase.from('orders').insert(payload).select().single();
+    const { data: order, error: oErr } = await supabase
+      .from("orders")
+      .insert(payload)
+      .select()
+      .single();
     if (oErr) throw new Error(oErr.message);
 
-const { error: iErr } = await supabase.from('orderitem').insert(
-      cart.value.map(i => ({
-        OrderId:   order.OrderId,
+    const { error: iErr } = await supabase.from("orderitem").insert(
+      cart.value.map((i) => ({
+        OrderId: order.OrderId,
         ProductId: i.ProductId,
-        Quantity:  i.qty,
+        Quantity: i.qty,
         UnitPrice: i.effectivePrice,
-        Subtotal:  i.qty * i.effectivePrice,
-      }))
+        Subtotal: i.qty * i.effectivePrice,
+      })),
     );
     if (iErr) throw new Error(iErr.message);
 
@@ -676,7 +997,7 @@ const { error: iErr } = await supabase.from('orderitem').insert(
     showPayment.value = false;
     showReceipt.value = false;
   } catch (err) {
-    alert('Failed: ' + err.message);
+    alert("Failed: " + err.message);
   } finally {
     saving.value = false;
   }
@@ -684,10 +1005,10 @@ const { error: iErr } = await supabase.from('orderitem').insert(
 
 // ── Print receipt ────────────────────────────────────────────────────────────
 const printReceipt = () => {
-  const el = document.getElementById('print-receipt');
+  const el = document.getElementById("print-receipt");
   if (!el) return;
 
-  const printWin = window.open('', '_blank', 'width=400,height=600');
+  const printWin = window.open("", "_blank", "width=400,height=600");
   printWin.document.write(`
     <html>
       <head>
@@ -719,16 +1040,19 @@ const printReceipt = () => {
 // ── Deduct inventory based on recipes ────────────────────────────────────────
 const deductInventoryForOrder = async (cartItems, branchId) => {
   // Collect all ProductIds sold
-  const productIds = cartItems.map(i => i.ProductId);
+  const productIds = cartItems.map((i) => i.ProductId);
 
   // Fetch all matching recipes in one query
   const { data: recipes, error: recipeErr } = await supabase
-    .from('recipe')
-    .select('finishedproductid, rawproductid, quantityneeded')
-    .in('finishedproductid', productIds);
+    .from("recipe")
+    .select("finishedproductid, rawproductid, quantityneeded")
+    .in("finishedproductid", productIds);
 
   if (recipeErr) {
-    console.error('Failed to fetch recipes for inventory deduction:', recipeErr.message);
+    console.error(
+      "Failed to fetch recipes for inventory deduction:",
+      recipeErr.message,
+    );
     return; // Non-fatal: order is already saved, log the error and continue
   }
 
@@ -739,31 +1063,36 @@ const deductInventoryForOrder = async (cartItems, branchId) => {
   const deductions = {}; // rawproductid → total qty to deduct
 
   for (const item of cartItems) {
-    const itemRecipes = recipes.filter(r => r.finishedproductid === item.ProductId);
+    const itemRecipes = recipes.filter(
+      (r) => r.finishedproductid === item.ProductId,
+    );
     for (const recipe of itemRecipes) {
       const totalUsed = recipe.quantityneeded * item.qty;
-      deductions[recipe.rawproductid] = (deductions[recipe.rawproductid] ?? 0) + totalUsed;
+      deductions[recipe.rawproductid] =
+        (deductions[recipe.rawproductid] ?? 0) + totalUsed;
     }
   }
 
   // Insert one "out" transaction per raw product
-  const transactions = Object.entries(deductions).map(([rawproductid, qty]) => ({
-    rawproductid: parseInt(rawproductid),
-    branchid: branchId ?? null,
-    transactiontype: 'out',
-    quantity: qty,
-    expirationdate: null,
-  }));
+  const transactions = Object.entries(deductions).map(
+    ([rawproductid, qty]) => ({
+      rawproductid: parseInt(rawproductid),
+      branchid: branchId ?? null,
+      transactiontype: "out",
+      quantity: qty,
+      expirationdate: null,
+    }),
+  );
 
   if (transactions.length === 0) return;
 
   const { error: txErr } = await supabase
-    .from('rawproducttransaction')
+    .from("rawproducttransaction")
     .insert(transactions);
 
   if (txErr) {
     // Non-fatal: log it but don't fail the sale
-    console.error('Inventory deduction failed (order saved):', txErr.message);
+    console.error("Inventory deduction failed (order saved):", txErr.message);
   }
 };
 
@@ -778,16 +1107,18 @@ const doCancelOrder = async () => {
   cancellingId.value = cancelTarget.value.OrderId;
   try {
     const { error } = await supabase
-      .from('orders')
-      .update({ Status: 'cancelled' })
-      .eq('OrderId', cancelTarget.value.OrderId);
+      .from("orders")
+      .update({ Status: "cancelled" })
+      .eq("OrderId", cancelTarget.value.OrderId);
     if (error) throw new Error(error.message);
-    const tx = transactions.value.find(t => t.OrderId === cancelTarget.value.OrderId);
-    if (tx) tx.Status = 'cancelled';
+    const tx = transactions.value.find(
+      (t) => t.OrderId === cancelTarget.value.OrderId,
+    );
+    if (tx) tx.Status = "cancelled";
     showCancelConfirm.value = false;
     cancelTarget.value = null;
   } catch (err) {
-    alert('Failed to cancel: ' + err.message);
+    alert("Failed to cancel: " + err.message);
   } finally {
     cancellingId.value = null;
   }
@@ -795,74 +1126,292 @@ const doCancelOrder = async () => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const getCatIcon = (cat) => {
-  if (!cat || cat === 'All') return Layers;
+  if (!cat || cat === "All") return Layers;
   const c = cat.toLowerCase();
-  if (c.includes('hot'))      return Coffee;
-  if (c.includes('iced'))     return Coffee;
-  if (c.includes('non'))      return Coffee;
-  if (c.includes('frap'))     return Coffee;
-  if (c.includes('smoothie')) return Leaf;
-  if (c.includes('sandwich')) return Sandwich;
-  if (c.includes('pastry') || c.includes('rice') || c.includes('pika')) return Cookie;
+  if (c.includes("hot")) return Coffee;
+  if (c.includes("iced")) return Coffee;
+  if (c.includes("non")) return Coffee;
+  if (c.includes("frap")) return Coffee;
+  if (c.includes("smoothie")) return Leaf;
+  if (c.includes("sandwich")) return Sandwich;
+  if (c.includes("pastry") || c.includes("rice") || c.includes("pika"))
+    return Cookie;
   return UtensilsCrossed;
 };
 
 const formatTime = (iso) =>
   iso
-    ? new Date(iso + 'Z').toLocaleTimeString('en-PH', {
-        hour: '2-digit',
-        minute: '2-digit',
+    ? new Date(iso + "Z").toLocaleTimeString("en-PH", {
+        hour: "2-digit",
+        minute: "2-digit",
       })
-    : '—';
+    : "—";
 
 onMounted(async () => {
+  if (sessionStorage.getItem("page_refreshed")) {
+    sessionStorage.removeItem("page_refreshed");
+    [CACHE_KEY_MENU, CACHE_KEY_DISCOUNTS].forEach((k) =>
+      sessionStorage.removeItem(k),
+    );
+  }
   await fetchCurrentUser();
   await Promise.all([fetchMenu(), fetchDiscounts(), fetchTransactions()]);
 });
 </script>
 
 <style scoped>
-.pos-root { display:flex; flex-direction:column; height:100vh; overflow:hidden; background:#f5f0eb; font-family:'Inter',sans-serif; }
+.pos-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: #f5f0eb;
+  font-family: "Inter", sans-serif;
+}
 
 /* TOPBAR */
-.pos-topbar { display:flex; justify-content:space-between; align-items:center; padding:0 24px; height:54px; background:#31201D; color:white; flex-shrink:0; }
-.topbar-left { display:flex; align-items:center; gap:20px; }
-.brand-mark { display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; }
-.topbar-meta { font-size:12px; color:rgba(255,255,255,0.5); display:flex; align-items:center; gap:8px; }
-.meta-branch { color:rgba(255,255,255,0.8); font-weight:600; }
-.meta-sep { opacity:0.3; }
-.history-btn { display:flex; align-items:center; gap:7px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:white; padding:7px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; transition:0.2s; }
-.history-btn:hover { background:rgba(255,255,255,0.2); }
-.history-count { background:#ef4444; color:white; font-size:10px; font-weight:700; padding:1px 6px; border-radius:20px; }
+.pos-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  height: 54px;
+  background: #31201d;
+  color: white;
+  flex-shrink: 0;
+}
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+}
+.topbar-meta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.meta-branch {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+}
+.meta-sep {
+  opacity: 0.3;
+}
+.history-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.2s;
+}
+.history-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.history-count {
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 20px;
+}
 
 /* LAYOUT */
-.pos-layout { display:grid; grid-template-columns:152px 1fr 320px; flex:1; overflow:hidden; }
+.pos-layout {
+  display: grid;
+  grid-template-columns: 152px 1fr 320px;
+  flex: 1;
+  overflow: hidden;
+}
 
 /* CATEGORY SIDEBAR */
-.category-sidebar { background:#2a1b18; padding:16px 8px; display:flex; flex-direction:column; gap:4px; overflow-y:auto; }
-.sidebar-label { font-size:10px; color:rgba(255,255,255,0.28); text-transform:uppercase; letter-spacing:0.12em; margin:0 0 8px 4px; }
-.cat-btn { display:flex; align-items:center; gap:7px; padding:9px 10px; background:transparent; border:none; border-radius:8px; color:rgba(255,255,255,0.5); font-size:12px; font-weight:600; cursor:pointer; text-align:left; font-family:inherit; transition:0.15s; width:100%; }
-.cat-btn:hover { background:rgba(255,255,255,0.08); color:white; }
-.cat-btn.active { background:#C49A6C; color:white; }
+.category-sidebar {
+  background: #2a1b18;
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+.sidebar-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.28);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin: 0 0 8px 4px;
+}
+.cat-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: 0.15s;
+  width: 100%;
+}
+.cat-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+.cat-btn.active {
+  background: #c49a6c;
+  color: white;
+}
 
 /* MENU AREA */
-.menu-area { padding:16px; overflow-y:auto; background:#f5f0eb; display:flex; flex-direction:column; gap:12px; }
-.menu-search { display:flex; align-items:center; gap:9px; background:white; border:1px solid #e8e0d5; border-radius:10px; padding:9px 14px; max-width:320px; }
-.menu-search input { flex:1; border:none; outline:none; font-size:14px; background:transparent; font-family:inherit; }
-.menu-search svg { color:#bbb; }
-.menu-loading,.menu-empty { display:flex; align-items:center; gap:12px; justify-content:center; padding:60px; color:#bbb; font-size:14px; }
-.menu-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; }
-.menu-card { background:white; border:2px solid transparent; border-radius:12px; padding:0; cursor:pointer; font-family:inherit; transition:all 0.15s; overflow:hidden; text-align:left; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
-.menu-card:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,0.1); border-color:#C49A6C; }
-.menu-card.in-cart { border-color:#31201D; background:#fdfaf7; }
-.menu-card-img { background:#f9f4ef; height:120px; display:flex; align-items:center; justify-content:center; position:relative; }
-.menu-card-icon { color:#C49A6C; opacity:0.65; }
-.cart-qty-badge { position:absolute; top:7px; right:7px; background:#31201D; color:white; font-size:11px; font-weight:700; width:21px; height:21px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
-.size-chip { position:absolute; bottom:5px; left:6px; background:rgba(49,32,29,0.75); color:white; font-size:9px; font-weight:700; padding:2px 6px; border-radius:8px; letter-spacing:0.03em; white-space:nowrap; }
-.menu-card-info { padding:8px 10px 10px; }
-.menu-card-name { display:block; font-size:17px; font-weight:700; color:#31201D; line-height:1.3; margin-bottom:2px; }
-.menu-card-cat { display:block; font-size:10px; color:#bbb; margin-bottom:4px; }
-.menu-card-price { display:block; font-size:14px; font-weight:800; color:#31201D; }
+.menu-area {
+  padding: 16px;
+  overflow-y: auto;
+  background: #f5f0eb;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.menu-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: white;
+  border: 1px solid #e8e0d5;
+  border-radius: 10px;
+  padding: 9px 14px;
+  max-width: 320px;
+}
+.menu-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  background: transparent;
+  font-family: inherit;
+}
+.menu-search svg {
+  color: #bbb;
+}
+.menu-loading,
+.menu-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding: 60px;
+  color: #bbb;
+  font-size: 14px;
+}
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
+}
+.menu-card {
+  background: white;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  overflow: hidden;
+  text-align: left;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.menu-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  border-color: #c49a6c;
+}
+.menu-card.in-cart {
+  border-color: #31201d;
+  background: #fdfaf7;
+}
+.menu-card-img {
+  background: #f9f4ef;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.menu-card-icon {
+  color: #c49a6c;
+  opacity: 0.65;
+}
+.cart-qty-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  background: #31201d;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.size-chip {
+  position: absolute;
+  bottom: 5px;
+  left: 6px;
+  background: rgba(49, 32, 29, 0.75);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.menu-card-info {
+  padding: 8px 10px 10px;
+}
+.menu-card-name {
+  display: block;
+  font-size: 17px;
+  font-weight: 700;
+  color: #31201d;
+  line-height: 1.3;
+  margin-bottom: 2px;
+}
+.menu-card-cat {
+  display: block;
+  font-size: 10px;
+  color: #bbb;
+  margin-bottom: 4px;
+}
+.menu-card-price {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  color: #31201d;
+}
 
 .menu-card-photo {
   width: 100%;
@@ -872,155 +1421,935 @@ onMounted(async () => {
 }
 
 /* CART PANEL */
-.cart-panel { background:white; border-left:1px solid #ede8e2; display:flex; flex-direction:column; overflow:hidden; }
-.cart-panel-header { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid #f0ebe4; flex-shrink:0; }
-.cart-panel-header h2 { font-size:15px; font-weight:700; color:#31201D; margin:0; }
-.clear-cart-btn { display:flex; align-items:center; gap:5px; background:#fee2e2; border:none; color:#dc2626; font-size:11px; font-weight:600; padding:4px 9px; border-radius:6px; cursor:pointer; font-family:inherit; }
-.cart-items { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
-.cart-item { background:#fdfaf7; border:1px solid #ede8e2; border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:4px; }
-.ci-info { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.ci-name { font-size:12px; font-weight:700; color:#31201D; flex:1; }
-.ci-size-tag { background:#31201D; color:white; font-size:10px; font-weight:700; padding:2px 7px; border-radius:8px; white-space:nowrap; }
-.ci-price { font-size:11px; color:#bbb; }
-.ci-controls { display:flex; align-items:center; gap:6px; }
-.qty-btn { width:22px; height:22px; border-radius:5px; border:1px solid #e8e0d5; background:white; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#31201D; transition:0.15s; }
-.qty-btn:hover { background:#31201D; color:white; border-color:#31201D; }
-.ci-qty { font-size:13px; font-weight:700; color:#31201D; min-width:18px; text-align:center; }
-.ci-remove { margin-left:auto; background:none; border:none; color:#dc2626; cursor:pointer; padding:3px; }
-.ci-subtotal { font-size:13px; font-weight:800; color:#31201D; text-align:right; }
-.cart-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#ccc; gap:6px; padding:30px 20px; }
-.cart-empty-icon { opacity:0.18; }
-.cart-empty p { font-size:14px; font-weight:600; margin:0; color:#bbb; }
-.cart-empty span { font-size:12px; color:#ddd; }
-.cart-discount { padding:9px 12px; border-top:1px solid #f0ebe4; flex-shrink:0; }
-.discount-lbl { font-size:11px; font-weight:600; color:#888; display:flex; align-items:center; gap:5px; margin-bottom:6px; }
-.sel-wrap { position:relative; }
-.discount-sel { width:100%; appearance:none; padding:7px 28px 7px 10px; border:1px solid #e8e0d5; border-radius:8px; font-size:12px; background:white; outline:none; cursor:pointer; font-family:inherit; }
-.sel-icon { position:absolute; right:8px; top:50%; transform:translateY(-50%); color:#999; pointer-events:none; }
-.cart-totals { padding:9px 12px; border-top:1px solid #f0ebe4; display:flex; flex-direction:column; gap:5px; flex-shrink:0; }
-.ct-row { display:flex; justify-content:space-between; font-size:12px; color:#666; }
-.ct-row.disc-line { color:#16a34a; }
-.ct-row.grand { font-size:16px; font-weight:800; color:#31201D; padding-top:7px; border-top:1px solid #f0ebe4; margin-top:3px; }
-.checkout-btn { margin:9px 12px 12px; display:flex; align-items:center; justify-content:center; gap:9px; background:#31201D; color:white; border:none; padding:13px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.2s; flex-shrink:0; }
-.checkout-btn:hover:not(:disabled) { background:#4a3330; }
-.checkout-btn:disabled { opacity:0.4; cursor:not-allowed; }
+.cart-panel {
+  background: white;
+  border-left: 1px solid #ede8e2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cart-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f0ebe4;
+  flex-shrink: 0;
+}
+.cart-panel-header h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #31201d;
+  margin: 0;
+}
+.clear-cart-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #fee2e2;
+  border: none;
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.cart-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cart-item {
+  background: #fdfaf7;
+  border: 1px solid #ede8e2;
+  border-radius: 9px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ci-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ci-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #31201d;
+  flex: 1;
+}
+.ci-size-tag {
+  background: #31201d;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.ci-price {
+  font-size: 11px;
+  color: #bbb;
+}
+.ci-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.qty-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid #e8e0d5;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #31201d;
+  transition: 0.15s;
+}
+.qty-btn:hover {
+  background: #31201d;
+  color: white;
+  border-color: #31201d;
+}
+.ci-qty {
+  font-size: 13px;
+  font-weight: 700;
+  color: #31201d;
+  min-width: 18px;
+  text-align: center;
+}
+.ci-remove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 3px;
+}
+.ci-subtotal {
+  font-size: 13px;
+  font-weight: 800;
+  color: #31201d;
+  text-align: right;
+}
+.cart-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ccc;
+  gap: 6px;
+  padding: 30px 20px;
+}
+.cart-empty-icon {
+  opacity: 0.18;
+}
+.cart-empty p {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: #bbb;
+}
+.cart-empty span {
+  font-size: 12px;
+  color: #ddd;
+}
+.cart-discount {
+  padding: 9px 12px;
+  border-top: 1px solid #f0ebe4;
+  flex-shrink: 0;
+}
+.discount-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+.sel-wrap {
+  position: relative;
+}
+.discount-sel {
+  width: 100%;
+  appearance: none;
+  padding: 7px 28px 7px 10px;
+  border: 1px solid #e8e0d5;
+  border-radius: 8px;
+  font-size: 12px;
+  background: white;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.sel-icon {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+  pointer-events: none;
+}
+.cart-totals {
+  padding: 9px 12px;
+  border-top: 1px solid #f0ebe4;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.ct-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #666;
+}
+.ct-row.disc-line {
+  color: #16a34a;
+}
+.ct-row.grand {
+  font-size: 16px;
+  font-weight: 800;
+  color: #31201d;
+  padding-top: 7px;
+  border-top: 1px solid #f0ebe4;
+  margin-top: 3px;
+}
+.checkout-btn {
+  margin: 9px 12px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  background: #31201d;
+  color: white;
+  border: none;
+  padding: 13px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.2s;
+  flex-shrink: 0;
+}
+.checkout-btn:hover:not(:disabled) {
+  background: #4a3330;
+}
+.checkout-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 /* OVERLAY */
-.overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; backdrop-filter:blur(4px); }
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
 
 /* SIZE PICKER MODAL */
-.size-modal { background:white; border-radius:20px; width:400px; max-width:95vw; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,0.22); }
-.size-modal-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; }
-.size-modal-header h2 { font-size:19px; font-weight:700; color:#31201D; margin:0 0 3px; }
-.size-modal-header p { font-size:13px; color:#888; margin:0; }
-.size-options { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.size-option-btn { background:#f9f4ef; border:2px solid #e8d5c4; border-radius:14px; padding:20px 16px; cursor:pointer; font-family:inherit; transition:0.2s; text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px; }
-.size-option-btn:hover { border-color:#31201D; background:#fdfaf7; transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,0.08); }
-.so-top { display:flex; flex-direction:column; align-items:center; gap:2px; }
-.so-size { font-size:16px; font-weight:800; color:#31201D; }
-.so-oz { font-size:12px; color:#bbb; font-weight:600; }
-.so-price { font-size:20px; font-weight:800; color:#C49A6C; }
+.size-modal {
+  background: white;
+  border-radius: 20px;
+  width: 400px;
+  max-width: 95vw;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+}
+.size-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+.size-modal-header h2 {
+  font-size: 19px;
+  font-weight: 700;
+  color: #31201d;
+  margin: 0 0 3px;
+}
+.size-modal-header p {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+.size-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.size-option-btn {
+  background: #f9f4ef;
+  border: 2px solid #e8d5c4;
+  border-radius: 14px;
+  padding: 20px 16px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.2s;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.size-option-btn:hover {
+  border-color: #31201d;
+  background: #fdfaf7;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+.so-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.so-size {
+  font-size: 16px;
+  font-weight: 800;
+  color: #31201d;
+}
+.so-oz {
+  font-size: 12px;
+  color: #bbb;
+  font-weight: 600;
+}
+.so-price {
+  font-size: 20px;
+  font-weight: 800;
+  color: #c49a6c;
+}
 
 /* PAYMENT MODAL */
-.payment-modal { background:white; border-radius:20px; width:460px; max-width:95vw; max-height:92vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.22); }
-.payment-view,.receipt-view { padding:26px 30px; }
-.pv-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; }
-.pv-header h2 { font-size:21px; font-weight:700; color:#31201D; margin:0 0 3px; }
-.pv-header p { font-size:13px; color:#888; margin:0; }
-.pv-header strong { color:#31201D; }
-.pv-close { background:none; border:none; color:#ccc; cursor:pointer; padding:4px; }
-.pm-tabs { display:flex; gap:8px; margin-bottom:22px; background:#f5f0eb; padding:4px; border-radius:12px; }
-.pm-tab { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:11px; border:none; border-radius:9px; background:transparent; font-size:14px; font-weight:600; cursor:pointer; color:#888; font-family:inherit; transition:0.2s; }
-.pm-tab.active { background:white; color:#31201D; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
-.cash-fields { display:flex; flex-direction:column; gap:14px; }
-.cash-fields label { font-size:13px; font-weight:600; color:#31201D; }
-.cash-input { width:100%; padding:13px 15px; border:2px solid #e8e0d5; border-radius:11px; font-size:26px; font-weight:700; text-align:right; outline:none; color:#31201D; box-sizing:border-box; font-family:inherit; transition:border-color 0.2s; }
-.cash-input:focus { border-color:#31201D; }
-.quick-amounts { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
-.qa-btn { padding:9px; background:white; border:1px solid #e8e0d5; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.15s; color:#31201D; }
-.qa-btn:hover { border-color:#31201D; background:#fdfaf7; }
-.exact-btn { grid-column:1 / -1; background:#f0f9f0; border-color:#86efac; color:#15803d; display:flex; align-items:center; justify-content:center; gap:6px; font-size:14px; }
-.exact-btn:hover { background:#dcfce7; border-color:#4ade80; }
-.cash-calc { background:#f9f4ef; border-radius:11px; padding:14px; display:flex; flex-direction:column; gap:7px; }
-.cc-row { display:flex; justify-content:space-between; font-size:13px; color:#555; }
-.change-row { font-size:16px; font-weight:800; padding-top:9px; border-top:1px solid #e8e0d5; margin-top:3px; }
-.change-row.sufficient { color:#16a34a; }
-.change-row.insufficient { color:#ef4444; }
-.gcash-badge { background:linear-gradient(135deg,#0064E0 0%,#00A3FF 100%); border-radius:14px; padding:30px; text-align:center; color:white; }
-.gcash-badge svg { opacity:0.9; margin-bottom:10px; }
-.gcash-badge p { font-size:17px; font-weight:700; margin:0 0 5px; }
-.gcash-badge span { font-size:13px; opacity:0.8; }
-.pv-next { width:100%; margin-top:18px; padding:14px; background:#31201D; color:white; border:none; border-radius:11px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; transition:0.2s; }
-.pv-next:hover:not(:disabled) { background:#4a3330; }
-.pv-next:disabled { opacity:0.4; cursor:not-allowed; }
+.payment-modal {
+  background: white;
+  border-radius: 20px;
+  width: 460px;
+  max-width: 95vw;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+}
+.payment-view,
+.receipt-view {
+  padding: 26px 30px;
+}
+.pv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+.pv-header h2 {
+  font-size: 21px;
+  font-weight: 700;
+  color: #31201d;
+  margin: 0 0 3px;
+}
+.pv-header p {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+.pv-header strong {
+  color: #31201d;
+}
+.pv-close {
+  background: none;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  padding: 4px;
+}
+.pm-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 22px;
+  background: #f5f0eb;
+  padding: 4px;
+  border-radius: 12px;
+}
+.pm-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #888;
+  font-family: inherit;
+  transition: 0.2s;
+}
+.pm-tab.active {
+  background: white;
+  color: #31201d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.cash-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cash-fields label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #31201d;
+}
+.cash-input {
+  width: 100%;
+  padding: 13px 15px;
+  border: 2px solid #e8e0d5;
+  border-radius: 11px;
+  font-size: 26px;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+  color: #31201d;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+.cash-input:focus {
+  border-color: #31201d;
+}
+.quick-amounts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.qa-btn {
+  padding: 9px;
+  background: white;
+  border: 1px solid #e8e0d5;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.15s;
+  color: #31201d;
+}
+.qa-btn:hover {
+  border-color: #31201d;
+  background: #fdfaf7;
+}
+.exact-btn {
+  grid-column: 1 / -1;
+  background: #f0f9f0;
+  border-color: #86efac;
+  color: #15803d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.exact-btn:hover {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+.cash-calc {
+  background: #f9f4ef;
+  border-radius: 11px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.cc-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #555;
+}
+.change-row {
+  font-size: 16px;
+  font-weight: 800;
+  padding-top: 9px;
+  border-top: 1px solid #e8e0d5;
+  margin-top: 3px;
+}
+.change-row.sufficient {
+  color: #16a34a;
+}
+.change-row.insufficient {
+  color: #ef4444;
+}
+.gcash-badge {
+  background: linear-gradient(135deg, #0064e0 0%, #00a3ff 100%);
+  border-radius: 14px;
+  padding: 30px;
+  text-align: center;
+  color: white;
+}
+.gcash-badge svg {
+  opacity: 0.9;
+  margin-bottom: 10px;
+}
+.gcash-badge p {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 5px;
+}
+.gcash-badge span {
+  font-size: 13px;
+  opacity: 0.8;
+}
+.pv-next {
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px;
+  background: #31201d;
+  color: white;
+  border: none;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.2s;
+}
+.pv-next:hover:not(:disabled) {
+  background: #4a3330;
+}
+.pv-next:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 /* RECEIPT */
-.receipt-paper { background:#fffcf9; border:1px solid #ede8e2; border-radius:12px; padding:22px; font-family:'Courier New',monospace; }
-.receipt-header { text-align:center; margin-bottom:14px; }
-.r-icon-circle { background:#31201D; color:white; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 9px; }
-.receipt-header h3 { margin:0 0 2px; font-size:15px; }
-.receipt-header p { margin:0; font-size:11px; color:#888; }
-.r-meta { margin-bottom:2px; }
-.r-row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
-.r-divider { border-top:1px dashed #ccc; margin:11px 0; }
-.r-item { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
-.r-total { font-weight:800; font-size:13px; color:#31201D; }
-.r-change { color:#16a34a; font-weight:700; }
-.r-gcash { color:#0064E0; font-weight:700; }
-.r-disc { color:#16a34a; }
-.r-footer { text-align:center; margin-top:12px; font-size:11px; color:#aaa; }
-.receipt-btns { display:flex; gap:9px; margin-top:18px; }
-.rbtn-back { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#f5f0eb; border:none; padding:11px; border-radius:10px; font-weight:600; cursor:pointer; font-family:inherit; font-size:14px; }
-.rbtn-print { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; padding:11px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; transition:0.2s; }
-.rbtn-print:hover { background:#e0f2fe; }
-.rbtn-confirm { flex:2; background:#31201D; color:white; border:none; padding:11px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; transition:0.2s; }
-.rbtn-confirm:hover:not(:disabled) { background:#4a3330; }
-.rbtn-confirm:disabled { opacity:0.5; cursor:not-allowed; }
+.receipt-paper {
+  background: #fffcf9;
+  border: 1px solid #ede8e2;
+  border-radius: 12px;
+  padding: 22px;
+  font-family: "Courier New", monospace;
+}
+.receipt-header {
+  text-align: center;
+  margin-bottom: 14px;
+}
+.r-icon-circle {
+  background: #31201d;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 9px;
+}
+.receipt-header h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+.receipt-header p {
+  margin: 0;
+  font-size: 11px;
+  color: #888;
+}
+.r-meta {
+  margin-bottom: 2px;
+}
+.r-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.r-divider {
+  border-top: 1px dashed #ccc;
+  margin: 11px 0;
+}
+.r-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.r-total {
+  font-weight: 800;
+  font-size: 13px;
+  color: #31201d;
+}
+.r-change {
+  color: #16a34a;
+  font-weight: 700;
+}
+.r-gcash {
+  color: #0064e0;
+  font-weight: 700;
+}
+.r-disc {
+  color: #16a34a;
+}
+.r-footer {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 11px;
+  color: #aaa;
+}
+.receipt-btns {
+  display: flex;
+  gap: 9px;
+  margin-top: 18px;
+}
+.rbtn-back {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #f5f0eb;
+  border: none;
+  padding: 11px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+}
+.rbtn-print {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+  padding: 11px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  transition: 0.2s;
+}
+.rbtn-print:hover {
+  background: #e0f2fe;
+}
+.rbtn-confirm {
+  flex: 2;
+  background: #31201d;
+  color: white;
+  border: none;
+  padding: 11px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  transition: 0.2s;
+}
+.rbtn-confirm:hover:not(:disabled) {
+  background: #4a3330;
+}
+.rbtn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* HISTORY MODAL */
-.history-modal { background:white; border-radius:20px; width:960px; max-width:95vw; max-height:88vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
-.hm-header { display:flex; justify-content:space-between; align-items:flex-start; padding:22px 26px; border-bottom:1px solid #f0ebe4; flex-shrink:0; }
-.hm-header h2 { font-size:19px; font-weight:700; color:#31201D; margin:0 0 3px; }
-.hm-header p { font-size:13px; color:#888; margin:0; }
-.hm-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#f0ebe4; flex-shrink:0; }
-.hms-card { background:white; padding:14px 22px; }
-.hms-label { display:block; font-size:11px; color:#888; margin-bottom:3px; text-transform:uppercase; letter-spacing:0.04em; }
-.hms-val { font-size:20px; font-weight:800; color:#31201D; }
-.hm-empty { padding:50px; text-align:center; color:#bbb; font-size:14px; display:flex; align-items:center; gap:12px; justify-content:center; }
-.hm-table-wrap { overflow-y:auto; flex:1; }
-.hm-table { width:100%; border-collapse:collapse; }
-.hm-table th { text-align:left; padding:10px 15px; background:#fdfaf7; color:#888; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid #f0ebe4; position:sticky; top:0; }
-.hm-table td { padding:11px 15px; border-bottom:1px solid #f9f4ef; font-size:13px; vertical-align:top; }
-.hm-table tr:hover td { background:#fdfaf7; }
-.cancelled-row td { opacity:0.5; text-decoration:line-through; text-decoration-color:#ccc; }
-.cancelled-row .st-badge, .cancelled-row .cancel-order-btn { text-decoration:none; }
-.id-tag { background:#f0ebe4; padding:3px 7px; border-radius:4px; font-family:monospace; font-weight:700; font-size:12px; color:#31201D; }
-.muted { color:#bbb; font-size:12px; }
-.h-item-line { line-height:1.7; }
-.pm-badge { font-size:12px; font-weight:700; padding:2px 8px; border-radius:20px; }
-.pm-badge.cash  { background:#fef9c3; color:#a16207; }
-.pm-badge.gcash { background:#dbeafe; color:#1d4ed8; }
-.disc-badge { font-size:11px; background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:20px; font-weight:600; }
-.total-col { font-weight:800; color:#31201D; }
-.st-badge { font-size:11px; font-weight:600; padding:2px 9px; border-radius:20px; }
-.st-badge.completed { background:#dcfce7; color:#15803d; }
-.st-badge.pending   { background:#fef9c3; color:#a16207; }
-.st-badge.cancelled { background:#fee2e2; color:#dc2626; }
-.cancel-order-btn { background:#fee2e2; border:1px solid #fca5a5; color:#dc2626; font-size:11px; font-weight:700; padding:4px 10px; border-radius:6px; cursor:pointer; font-family:inherit; transition:0.15s; }
-.cancel-order-btn:hover:not(:disabled) { background:#fecaca; border-color:#f87171; }
-.cancel-order-btn:disabled { opacity:0.5; cursor:not-allowed; }
-.confirm-modal { background:white; border-radius:20px; width:380px; max-width:95vw; padding:30px 28px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.22); }
-.confirm-icon { color:#dc2626; display:flex; justify-content:center; margin-bottom:14px; }
-.confirm-modal h3 { font-size:18px; font-weight:700; color:#31201D; margin:0 0 8px; }
-.confirm-modal p { font-size:13px; color:#888; margin:0 0 16px; line-height:1.5; }
-.confirm-items { background:#f9f4ef; border-radius:10px; padding:12px 14px; text-align:left; margin-bottom:10px; }
-.confirm-item-line { font-size:13px; color:#31201D; line-height:1.8; }
-.confirm-total { font-size:15px; font-weight:800; color:#31201D; margin-bottom:20px; }
-.confirm-btns { display:flex; gap:9px; }
-.conf-no { flex:1; background:#f5f0eb; border:none; padding:12px; border-radius:10px; font-weight:600; cursor:pointer; font-family:inherit; font-size:14px; }
-.conf-yes { flex:1; background:#dc2626; color:white; border:none; padding:12px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:14px; transition:0.2s; }
-.conf-yes:hover:not(:disabled) { background:#b91c1c; }
-.conf-yes:disabled { opacity:0.5; cursor:not-allowed; }
-.spin { width:17px; height:17px; border:2px solid #eee; border-top-color:#C49A6C; border-radius:50%; animation:spin 0.7s linear infinite; }
-@keyframes spin { to { transform:rotate(360deg); } }
+.history-modal {
+  background: white;
+  border-radius: 20px;
+  width: 960px;
+  max-width: 95vw;
+  max-height: 88vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+.hm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 22px 26px;
+  border-bottom: 1px solid #f0ebe4;
+  flex-shrink: 0;
+}
+.hm-header h2 {
+  font-size: 19px;
+  font-weight: 700;
+  color: #31201d;
+  margin: 0 0 3px;
+}
+.hm-header p {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
+.hm-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: #f0ebe4;
+  flex-shrink: 0;
+}
+.hms-card {
+  background: white;
+  padding: 14px 22px;
+}
+.hms-label {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.hms-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: #31201d;
+}
+.hm-empty {
+  padding: 50px;
+  text-align: center;
+  color: #bbb;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+.hm-table-wrap {
+  overflow-y: auto;
+  flex: 1;
+}
+.hm-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.hm-table th {
+  text-align: left;
+  padding: 10px 15px;
+  background: #fdfaf7;
+  color: #888;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #f0ebe4;
+  position: sticky;
+  top: 0;
+}
+.hm-table td {
+  padding: 11px 15px;
+  border-bottom: 1px solid #f9f4ef;
+  font-size: 13px;
+  vertical-align: top;
+}
+.hm-table tr:hover td {
+  background: #fdfaf7;
+}
+.cancelled-row td {
+  opacity: 0.5;
+  text-decoration: line-through;
+  text-decoration-color: #ccc;
+}
+.cancelled-row .st-badge,
+.cancelled-row .cancel-order-btn {
+  text-decoration: none;
+}
+.id-tag {
+  background: #f0ebe4;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 12px;
+  color: #31201d;
+}
+.muted {
+  color: #bbb;
+  font-size: 12px;
+}
+.h-item-line {
+  line-height: 1.7;
+}
+.pm-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.pm-badge.cash {
+  background: #fef9c3;
+  color: #a16207;
+}
+.pm-badge.gcash {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.disc-badge {
+  font-size: 11px;
+  background: #dcfce7;
+  color: #15803d;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.total-col {
+  font-weight: 800;
+  color: #31201d;
+}
+.st-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 20px;
+}
+.st-badge.completed {
+  background: #dcfce7;
+  color: #15803d;
+}
+.st-badge.pending {
+  background: #fef9c3;
+  color: #a16207;
+}
+.st-badge.cancelled {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.cancel-order-btn {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.15s;
+}
+.cancel-order-btn:hover:not(:disabled) {
+  background: #fecaca;
+  border-color: #f87171;
+}
+.cancel-order-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.confirm-modal {
+  background: white;
+  border-radius: 20px;
+  width: 380px;
+  max-width: 95vw;
+  padding: 30px 28px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+}
+.confirm-icon {
+  color: #dc2626;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.confirm-modal h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #31201d;
+  margin: 0 0 8px;
+}
+.confirm-modal p {
+  font-size: 13px;
+  color: #888;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.confirm-items {
+  background: #f9f4ef;
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  margin-bottom: 10px;
+}
+.confirm-item-line {
+  font-size: 13px;
+  color: #31201d;
+  line-height: 1.8;
+}
+.confirm-total {
+  font-size: 15px;
+  font-weight: 800;
+  color: #31201d;
+  margin-bottom: 20px;
+}
+.confirm-btns {
+  display: flex;
+  gap: 9px;
+}
+.conf-no {
+  flex: 1;
+  background: #f5f0eb;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+}
+.conf-yes {
+  flex: 1;
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  transition: 0.2s;
+}
+.conf-yes:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.conf-yes:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.spin {
+  width: 17px;
+  height: 17px;
+  border: 2px solid #eee;
+  border-top-color: #c49a6c;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 </style>

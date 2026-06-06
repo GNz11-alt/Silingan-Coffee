@@ -20,6 +20,7 @@
           <div class="brand-text" v-show="!isSidebarCollapsed">
             <h2>Silingan Coffee</h2>
             <p class="user-role">Staff</p>
+            <p class="user-branch">{{ userBranchName || 'All Branches' }}</p>
           </div>
         </div>
 
@@ -38,7 +39,7 @@
           <component :is="SearchIcon" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Search</span>
         </router-link>
-        
+
         <router-link
           to="/staff/dashboard"
           class="nav-item"
@@ -116,7 +117,11 @@
         <button class="nav-item notification-btn" @click="toggleNotifications">
           <component :is="Bell" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Notifications</span>
-          <span class="notification-badge" v-if="unreadCount && !isSidebarCollapsed">{{ unreadCount }}</span>
+          <span
+            class="notification-badge"
+            v-if="unreadCount && !isSidebarCollapsed"
+            >{{ unreadCount }}</span
+          >
         </button>
         <NotificationPanel
           v-if="showNotifPanel"
@@ -133,7 +138,11 @@
     </aside>
 
     <main class="main-content">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <KeepAlive :include="['StaffSchedule', 'StaffPOS']">
+          <component :is="Component" :key="$route.name" />
+        </KeepAlive>
+      </router-view>
     </main>
   </div>
 </template>
@@ -164,10 +173,19 @@ const now = ref(new Date());
 let clockInterval = null;
 
 const currentTime = computed(() =>
-  now.value.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+  now.value.toLocaleTimeString("en-PH", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }),
 );
 const currentDate = computed(() =>
-  now.value.toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+  now.value.toLocaleDateString("en-PH", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }),
 );
 
 const router = useRouter();
@@ -177,7 +195,8 @@ const unreadCount = ref(0);
 const showNotifPanel = ref(false);
 const { fetchNotifications } = useNotifications();
 
-const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
+const { isAdmin, userBranchId, userBranchName, resolveBranch } =
+  useUserBranch();
 
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
@@ -206,11 +225,13 @@ onMounted(async () => {
   clockInterval = setInterval(() => {
     now.value = new Date();
   }, 1000);
- 
+
+  await resolveBranch();
+
   const notifs = await fetchNotifications(null);
   unreadCount.value = notifs.length;
 });
- 
+
 onUnmounted(() => {
   clearInterval(clockInterval);
 });

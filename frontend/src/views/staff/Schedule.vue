@@ -4,7 +4,11 @@
     <div class="header-section">
       <div>
         <h1>My Schedule</h1>
-        <p class="header-subtitle">{{ currentEmployee?.Name || 'Employee' }} • {{ currentEmployee?.Branch || 'Branch' }} • {{ currentEmployee?.Position || 'Cashier' }}</p>
+        <p class="header-subtitle">
+          {{ currentEmployee?.Name || "Employee" }} •
+          {{ currentEmployee?.Branch || "Branch" }} •
+          {{ currentEmployee?.Position || "Cashier" }}
+        </p>
       </div>
       <div class="header-meta">
         <Calendar :size="18" />
@@ -45,7 +49,9 @@
       >
         <MessageSquare :size="16" />
         Change Inquiries
-        <span v-if="pendingInquiryCount" class="tab-badge warning">{{ pendingInquiryCount }}</span>
+        <span v-if="pendingInquiryCount" class="tab-badge warning">{{
+          pendingInquiryCount
+        }}</span>
       </button>
     </div>
 
@@ -53,14 +59,31 @@
     <div v-if="activeTab === 'my-schedule'" class="tab-content">
       <!-- Month Navigator -->
       <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
-        <button class="btn btn-ghost btn-sm" @click="monthOffset -= 1" title="Previous month">
+        <button
+          class="btn btn-ghost btn-sm"
+          @click="monthOffset -= 1"
+          title="Previous month"
+        >
           <ChevronLeft :size="18" />
         </button>
-        <span style="min-width: 200px; text-align: center; font-weight: 600; font-size: 1.1rem">
+        <span
+          style="
+            min-width: 200px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+          "
+        >
           {{ monthYearLabel }}
         </span>
-        <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">Today</button>
-        <button class="btn btn-ghost btn-sm" @click="monthOffset += 1" title="Next month">
+        <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">
+          Today
+        </button>
+        <button
+          class="btn btn-ghost btn-sm"
+          @click="monthOffset += 1"
+          title="Next month"
+        >
           <ChevronRight :size="18" />
         </button>
       </div>
@@ -76,7 +99,11 @@
         <div class="calendar-container">
           <!-- Day Headers -->
           <div class="calendar-header">
-            <div class="calendar-day-header" v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="day">
+            <div
+              class="calendar-day-header"
+              v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
+              :key="day"
+            >
               {{ day }}
             </div>
           </div>
@@ -89,7 +116,7 @@
               class="calendar-day"
               :class="{
                 'is-today': day.isToday,
-                'is-other-month': day.isOtherMonth
+                'is-other-month': day.isOtherMonth,
               }"
             >
               <div class="day-number">
@@ -114,29 +141,40 @@
         </div>
       </div>
 
-        <!-- Upcoming Shifts -->
-        <div class="section">
-          <div class="section-header">
-            <div>
-              <h3>Upcoming Shifts</h3>
-              <p class="section-subtitle">Next 10 scheduled shifts</p>
-            </div>
-          </div>
-          <div v-if="upcomingShifts.length === 0" class="empty-state">
-            <Calendar :size="32" />
-            <p>No upcoming shifts found.</p>
-          </div>
-          <div v-else class="shifts-list">
-            <div v-for="(shift, i) in upcomingShifts" :key="i" class="shift-item">
-              <div class="shift-item-dot" :class="shift.Status === 'Active' ? 'active' : 'inactive'"></div>
-              <div class="shift-item-info">
-                <div class="shift-item-date">{{ formatShiftDate(shift.WorkDate) }}</div>
-                <div class="shift-item-meta">{{ shift.TimeIn }} – {{ shift.TimeOut }} • {{ shift.Branch }}</div>
-              </div>
-              <span class="shift-status-badge" :class="shiftStatusClass(shift.Status)">{{ shift.Status }}</span>
-            </div>
+      <!-- Upcoming Shifts -->
+      <div class="section">
+        <div class="section-header">
+          <div>
+            <h3>Upcoming Shifts</h3>
+            <p class="section-subtitle">Next 10 scheduled shifts</p>
           </div>
         </div>
+        <div v-if="upcomingShifts.length === 0" class="empty-state">
+          <Calendar :size="32" />
+          <p>No upcoming shifts found.</p>
+        </div>
+        <div v-else class="shifts-list">
+          <div v-for="(shift, i) in upcomingShifts" :key="i" class="shift-item">
+            <div
+              class="shift-item-dot"
+              :class="shift.Status === 'Active' ? 'active' : 'inactive'"
+            ></div>
+            <div class="shift-item-info">
+              <div class="shift-item-date">
+                {{ formatShiftDate(shift.WorkDate) }}
+              </div>
+              <div class="shift-item-meta">
+                {{ shift.TimeIn }} – {{ shift.TimeOut }} • {{ shift.Branch }}
+              </div>
+            </div>
+            <span
+              class="shift-status-badge"
+              :class="shiftStatusClass(shift.Status)"
+              >{{ shift.Status }}</span
+            >
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ── TAB: SET AVAILABILITY ─────────────────────────────────── -->
@@ -147,7 +185,9 @@
           <div class="section">
             <div class="section-header">
               <h3>Set Availability</h3>
-              <p class="section-subtitle">Let your manager know when you're available</p>
+              <p class="section-subtitle">
+                Let your manager know when you're available
+              </p>
             </div>
             <form class="availability-form" @submit.prevent>
               <div class="form-group">
@@ -166,9 +206,18 @@
               </div>
               <div class="form-group">
                 <label>Notes <span class="optional">(optional)</span></label>
-                <textarea rows="3" v-model="availForm.Notes" placeholder="Any notes for the manager…"></textarea>
+                <textarea
+                  rows="3"
+                  v-model="availForm.Notes"
+                  placeholder="Any notes for the manager…"
+                ></textarea>
               </div>
-              <button type="button" class="btn-primary w-full" @click="submitAvailability" :disabled="savingAvail">
+              <button
+                type="button"
+                class="btn-primary w-full"
+                @click="submitAvailability"
+                :disabled="savingAvail"
+              >
                 <span v-if="savingAvail">
                   <div class="spinner-small"></div>
                 </span>
@@ -197,21 +246,36 @@
             <div v-if="loadingAvail" class="loading-state">
               <div class="spinner"></div>
             </div>
-            <div v-else-if="filteredAvailability.length === 0" class="empty-state">
+            <div
+              v-else-if="filteredAvailability.length === 0"
+              class="empty-state"
+            >
               <Inbox :size="32" />
               <p>No requests yet.</p>
             </div>
             <div v-else class="requests-list">
-              <div v-for="req in filteredAvailability" :key="req.AvailabilityId" class="request-item">
+              <div
+                v-for="req in filteredAvailability"
+                :key="req.AvailabilityId"
+                class="request-item"
+              >
                 <div class="request-header">
                   <div>
-                    <div class="request-date">{{ formatShiftDate(req.Date) }}</div>
-                    <div class="request-time">{{ req.startTime }} – {{ req.endTime }}</div>
+                    <div class="request-date">
+                      {{ formatShiftDate(req.Date) }}
+                    </div>
+                    <div class="request-time">
+                      {{ req.startTime }} – {{ req.endTime }}
+                    </div>
                   </div>
-                  <span class="status-badge" :class="statusClass(req.Status)">{{ req.Status }}</span>
+                  <span class="status-badge" :class="statusClass(req.Status)">{{
+                    req.Status
+                  }}</span>
                 </div>
                 <p v-if="req.Notes" class="request-notes">{{ req.Notes }}</p>
-                <div class="request-date-small">{{ formatDate(req.CreatedAt) }}</div>
+                <div class="request-date-small">
+                  {{ formatDate(req.CreatedAt) }}
+                </div>
               </div>
             </div>
           </div>
@@ -225,7 +289,9 @@
         <div class="section-header">
           <div>
             <h3>Availability History</h3>
-            <p class="section-subtitle">Your past approved and rejected availability requests</p>
+            <p class="section-subtitle">
+              Your past approved and rejected availability requests
+            </p>
           </div>
         </div>
         <div v-if="loadingAvail" class="loading-state">
@@ -236,16 +302,26 @@
           <p>No resolved requests yet.</p>
         </div>
         <div v-else class="requests-list">
-          <div v-for="req in resolvedAvailability" :key="req.AvailabilityId" class="request-item">
+          <div
+            v-for="req in resolvedAvailability"
+            :key="req.AvailabilityId"
+            class="request-item"
+          >
             <div class="request-header">
               <div>
                 <div class="request-date">{{ formatShiftDate(req.Date) }}</div>
-                <div class="request-time">{{ req.startTime }} – {{ req.endTime }}</div>
+                <div class="request-time">
+                  {{ req.startTime }} – {{ req.endTime }}
+                </div>
               </div>
-              <span class="status-badge" :class="statusClass(req.Status)">{{ displayStatus(req.Status) }}</span>
+              <span class="status-badge" :class="statusClass(req.Status)">{{
+                displayStatus(req.Status)
+              }}</span>
             </div>
             <p v-if="req.Notes" class="request-notes">{{ req.Notes }}</p>
-            <div class="request-date-small">{{ formatDate(req.CreatedAt) }}</div>
+            <div class="request-date-small">
+              {{ formatDate(req.CreatedAt) }}
+            </div>
           </div>
         </div>
       </div>
@@ -264,7 +340,10 @@
             <form class="inquiry-form">
               <div class="form-group">
                 <label>Shift Date to Change</label>
-                <select v-model="inquiryForm.ShiftDate" class="inquiry-date-select">
+                <select
+                  v-model="inquiryForm.ShiftDate"
+                  class="inquiry-date-select"
+                >
                   <option value="" disabled>Select a scheduled date</option>
                   <option v-for="d in scheduledDates" :key="d" :value="d">
                     {{ formatShiftDate(d) }}
@@ -283,17 +362,29 @@
               </div>
               <div class="form-group">
                 <label>Reason</label>
-                <textarea rows="4" v-model="inquiryForm.Reason" placeholder="Explain your request in detail…"></textarea>
+                <textarea
+                  rows="4"
+                  v-model="inquiryForm.Reason"
+                  placeholder="Explain your request in detail…"
+                ></textarea>
               </div>
               <div class="form-group">
-                <label>Preferred Replacement Date <span class="optional">(if applicable)</span></label>
+                <label
+                  >Preferred Replacement Date
+                  <span class="optional">(if applicable)</span></label
+                >
                 <input type="date" v-model="inquiryForm.PreferredDate" />
               </div>
-              <button type="button" class="btn-primary w-full" @click="submitInquiry" :disabled="savingInquiry">
+              <button
+                type="button"
+                class="btn-primary w-full"
+                @click="submitInquiry"
+                :disabled="savingInquiry"
+              >
                 <span v-if="savingInquiry">
                   <div class="spinner-small"></div>
                 </span>
-            <Send v-else :size="16" />
+                <Send v-else :size="16" />
                 Submit Inquiry
               </button>
             </form>
@@ -324,23 +415,35 @@
               <p>No inquiries submitted yet.</p>
             </div>
             <div v-else class="inquiries-list">
-              <div v-for="inq in filteredInquiries" :key="inq.InquiryId" class="inquiry-item">
+              <div
+                v-for="inq in filteredInquiries"
+                :key="inq.InquiryId"
+                class="inquiry-item"
+              >
                 <div class="inquiry-header">
                   <div>
                     <span class="inquiry-type">{{ inq.RequestType }}</span>
-                    <span class="inquiry-date">{{ formatShiftDate(inq.ShiftDate) }}</span>
+                    <span class="inquiry-date">{{
+                      formatShiftDate(inq.ShiftDate)
+                    }}</span>
                   </div>
-                  <span class="status-badge" :class="statusClass(inq.Status)">{{ inq.Status }}</span>
+                  <span class="status-badge" :class="statusClass(inq.Status)">{{
+                    inq.Status
+                  }}</span>
                 </div>
                 <p class="inquiry-reason">{{ inq.Reason }}</p>
                 <div v-if="inq.PreferredDate" class="inquiry-meta">
-                  <span class="preferred-date">Preferred: {{ formatShiftDate(inq.PreferredDate) }}</span>
+                  <span class="preferred-date"
+                    >Preferred: {{ formatShiftDate(inq.PreferredDate) }}</span
+                  >
                 </div>
                 <div v-if="inq.ManagerNote" class="manager-note">
                   <Briefcase :size="14" />
                   <span><strong>Manager:</strong> {{ inq.ManagerNote }}</span>
                 </div>
-                <div class="inquiry-date-small">Submitted {{ formatDate(inq.CreatedAt) }}</div>
+                <div class="inquiry-date-small">
+                  Submitted {{ formatDate(inq.CreatedAt) }}
+                </div>
               </div>
             </div>
           </div>
@@ -363,7 +466,7 @@
 </template>
 
 <script>
-import { supabase } from '@/supabase'
+import { supabase } from "@/supabase";
 import {
   Calendar,
   Clock,
@@ -377,11 +480,40 @@ import {
   MessageSquare,
   CheckCircle,
   AlertCircle,
-  X
-} from 'lucide-vue-next'
+  X,
+} from "lucide-vue-next";
+// Cache constants — add above export default
+const CACHE_KEY_SCHEDULE = "cache_staff_schedule";
+const CACHE_KEY_ALL_SCHEDULES = "cache_staff_all_schedules";
+const CACHE_KEY_AVAILABILITY = "cache_staff_availability";
+const CACHE_KEY_INQUIRIES = "cache_staff_inquiries";
+const CACHE_TTL = 30 * 60 * 1000;
+
+const saveCache = (key, data) => {
+  sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+};
+
+const loadCache = (key) => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data;
+  } catch {
+    return null;
+  }
+};
+
+window.addEventListener("beforeunload", () => {
+  sessionStorage.setItem("page_refreshed", "1");
+});
 
 export default {
-  name: 'StaffSchedule',
+  name: "StaffSchedule",
 
   components: {
     Calendar,
@@ -396,14 +528,14 @@ export default {
     MessageSquare,
     CheckCircle,
     AlertCircle,
-    X
+    X,
   },
 
   props: {},
 
   data() {
     return {
-      activeTab: 'my-schedule',
+      activeTab: "my-schedule",
 
       // Employee info
       employeeId: null,
@@ -412,468 +544,558 @@ export default {
       // Schedule tab
       loadingSchedule: false,
       mySchedules: [],
-      allEmployeeSchedules: [],  // All schedules for the month to show other employees
-      monthOffset: 0,             // 0 = current month, -1 = last month, +1 = next month
-      avatarColors: ['#2D5A7B', '#2D7B4F', '#7B6B2D', '#5A2D7B', '#7B2D5A', '#B8533A'],
+      allEmployeeSchedules: [], // All schedules for the month to show other employees
+      monthOffset: 0, // 0 = current month, -1 = last month, +1 = next month
+      avatarColors: [
+        "#2D5A7B",
+        "#2D7B4F",
+        "#7B6B2D",
+        "#5A2D7B",
+        "#7B2D5A",
+        "#B8533A",
+      ],
 
       // Availability tab
       loadingAvail: false,
       myAvailability: [],
-      availFilter: 'all',
+      availFilter: "all",
       savingAvail: false,
       availForm: {
-        Date: '',
-        TimeIn: '08:00',
-        TimeOut: '17:00',
-        Notes: ''
+        Date: "",
+        TimeIn: "08:00",
+        TimeOut: "17:00",
+        Notes: "",
       },
 
       // Inquiries tab
       loadingInquiries: false,
       myInquiries: [],
-      inquiryFilter: 'all',
+      inquiryFilter: "all",
       savingInquiry: false,
       inquiryForm: {
-        ShiftDate: '',
-        RequestType: 'Shift Swap',
-        Reason: '',
-        PreferredDate: ''
+        ShiftDate: "",
+        RequestType: "Shift Swap",
+        Reason: "",
+        PreferredDate: "",
       },
 
       // Toast
-      toast: { message: '', type: 'success' },
-      toastInstance: null
-    }
+      toast: { message: "", type: "success" },
+      toastInstance: null,
+    };
   },
 
   computed: {
     todayISO() {
-      return new Date().toISOString().slice(0, 10)
+      return new Date().toISOString().slice(0, 10);
     },
 
     todayLabel() {
-      return new Date().toLocaleDateString('en-PH', {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-      })
+      return new Date().toLocaleDateString("en-PH", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
     },
 
     // Current month start
     monthStart() {
-      const now = new Date()
-      return new Date(now.getFullYear(), now.getMonth() + this.monthOffset, 1)
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth() + this.monthOffset, 1);
     },
 
     monthYearLabel() {
-      return this.monthStart.toLocaleDateString('en-PH', {
-        year: 'numeric', month: 'long'
-      })
+      return this.monthStart.toLocaleDateString("en-PH", {
+        year: "numeric",
+        month: "long",
+      });
     },
 
     // Calendar grid: 42 days (6 weeks)
     monthDays() {
-      const days = []
-      const monthStart = this.monthStart
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      const days = [];
+      const monthStart = this.monthStart;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
       // Start from Monday of the week containing the 1st of the month
-      const startDate = new Date(monthStart)
-      const dayOfWeek = startDate.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
-      startDate.setDate(startDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
+      const startDate = new Date(monthStart);
+      const dayOfWeek = startDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      startDate.setDate(
+        startDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1),
+      );
 
       for (let i = 0; i < 42; i++) {
-        const d = new Date(startDate)
-        d.setDate(startDate.getDate() + i)
-        const y = d.getFullYear()
-        const m = String(d.getMonth() + 1).padStart(2, '0')
-        const day = String(d.getDate()).padStart(2, '0')
-        const dateStr = `${y}-${m}-${day}`
-        const isToday = d.getTime() === today.getTime()
-        const isOtherMonth = d.getMonth() !== monthStart.getMonth()
+        const d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        const dateStr = `${y}-${m}-${day}`;
+        const isToday = d.getTime() === today.getTime();
+        const isOtherMonth = d.getMonth() !== monthStart.getMonth();
 
         // Collect all shifts for this day
-        const allShiftsForDay = this.allEmployeeSchedules.filter(s => s.WorkDate === dateStr)
-        const shifts = allShiftsForDay.map(s => {
-          const isMine = s.EmployeeId === this.employeeId
+        const allShiftsForDay = this.allEmployeeSchedules.filter(
+          (s) => s.WorkDate === dateStr,
+        );
+        const shifts = allShiftsForDay.map((s) => {
+          const isMine = s.EmployeeId === this.employeeId;
           return {
             id: s.EmployeeId + dateStr,
             employeeId: s.EmployeeId,
             employeeName: s.Name,
             startTime: s.TimeIn,
             endTime: s.TimeOut,
-            label: isMine ? 'Me' : (s.Name?.split(' ').map(n => n[0]).join('').toUpperCase() || ''),
+            label: isMine
+              ? "Me"
+              : s.Name?.split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase() || "",
             isMine,
-            color: isMine ? '#5d4037' : this.avatarColors[s.EmployeeId % this.avatarColors.length],
+            color: isMine
+              ? "#5d4037"
+              : this.avatarColors[s.EmployeeId % this.avatarColors.length],
             shiftDate: s.WorkDate,
             role: s.Position,
             branch: s.Branch,
-            status: s.Status
-          }
-        })
+            status: s.Status,
+          };
+        });
 
         days.push({
           dateStr,
           dayOfMonth: d.getDate(),
           isToday,
           isOtherMonth,
-          shifts
-        })
+          shifts,
+        });
       }
-      return days
+      return days;
     },
 
     scheduledDates() {
-      const seen = {}
+      const seen = {};
       return this.mySchedules
-        .filter(s => {
-          if (seen[s.WorkDate]) return false
-          seen[s.WorkDate] = true
-          return true
+        .filter((s) => {
+          if (seen[s.WorkDate]) return false;
+          seen[s.WorkDate] = true;
+          return true;
         })
-        .map(s => s.WorkDate)
-        .sort()
+        .map((s) => s.WorkDate)
+        .sort();
     },
 
     upcomingShifts() {
-      const today = this.todayISO
+      const today = this.todayISO;
       return this.mySchedules
-        .filter(s => s.WorkDate >= today)
+        .filter((s) => s.WorkDate >= today)
         .sort((a, b) => a.WorkDate.localeCompare(b.WorkDate))
-        .slice(0, 10)
+        .slice(0, 10);
     },
 
     filteredAvailability() {
-      if (this.availFilter === 'all') return this.myAvailability
-      return this.myAvailability.filter(a => a.Status === this.availFilter)
+      if (this.availFilter === "all") return this.myAvailability;
+      return this.myAvailability.filter((a) => a.Status === this.availFilter);
     },
 
     resolvedAvailability() {
-      return this.myAvailability.filter(a => a.Status === 'Confirmed' || a.Status === 'Cancelled')
+      return this.myAvailability.filter(
+        (a) => a.Status === "Confirmed" || a.Status === "Cancelled",
+      );
     },
 
     filteredInquiries() {
-      if (this.inquiryFilter === 'all') return this.myInquiries
-      return this.myInquiries.filter(i => i.Status === this.inquiryFilter)
+      if (this.inquiryFilter === "all") return this.myInquiries;
+      return this.myInquiries.filter((i) => i.Status === this.inquiryFilter);
     },
 
     pendingAvailabilityCount() {
-      return this.myAvailability.filter(a => a.Status === 'Pending').length
+      return this.myAvailability.filter((a) => a.Status === "Pending").length;
     },
 
     pendingInquiryCount() {
-      return this.myInquiries.filter(i => i.Status === 'Pending' || i.Status === 'Under Review').length
-    }
+      return this.myInquiries.filter(
+        (i) => i.Status === "Pending" || i.Status === "Under Review",
+      ).length;
+    },
   },
 
   async mounted() {
-    const resolved = await this.resolveEmployeeId()
-    if (!resolved) {
-      this.showToast('Unable to identify your employee record. Contact your manager.', 'error')
-      this.loadingSchedule = false
-      return
+    if (sessionStorage.getItem("page_refreshed")) {
+      sessionStorage.removeItem("page_refreshed");
+      [
+        CACHE_KEY_SCHEDULE,
+        CACHE_KEY_ALL_SCHEDULES,
+        CACHE_KEY_AVAILABILITY,
+        CACHE_KEY_INQUIRIES,
+      ].forEach((k) => sessionStorage.removeItem(k));
     }
-    await this.loadEmployee()
+
+    const resolved = await this.resolveEmployeeId();
+    if (!resolved) {
+      this.showToast(
+        "Unable to identify your employee record. Contact your manager.",
+        "error",
+      );
+      this.loadingSchedule = false;
+      return;
+    }
+    await this.loadEmployee();
     await Promise.all([
       this.loadSchedule(),
       this.loadAllSchedules(),
       this.loadAvailability(),
-      this.loadInquiries()
-    ])
+      this.loadInquiries(),
+    ]);
   },
 
   methods: {
     async resolveEmployeeId() {
-      const username = localStorage.getItem('username')
-      const branchShort = localStorage.getItem('branch')
-      if (!branchShort) return false
+      const username = localStorage.getItem("username");
+      const branchShort = localStorage.getItem("branch");
+      if (!branchShort) return false;
 
       try {
         const { data: branchData } = await supabase
-          .from('branch')
-          .select('BranchId')
-          .eq('Location', branchShort)
-          .single()
+          .from("branch")
+          .select("BranchId")
+          .eq("Location", branchShort)
+          .single();
 
-        if (!branchData) return false
+        if (!branchData) return false;
 
         const { data: employees } = await supabase
-          .from('employee')
-          .select('EmployeeId, FirstName, LastName, Email')
-          .eq('BranchAssigned', branchData.BranchId)
-          .eq('Status', 'Active')
+          .from("employee")
+          .select("EmployeeId, FirstName, LastName, Email")
+          .eq("BranchAssigned", branchData.BranchId)
+          .eq("Status", "Active");
 
-        if (!employees || employees.length === 0) return false
+        if (!employees || employees.length === 0) return false;
 
         if (username) {
-          const normalized = username.replace(/_/g, '.').toLowerCase()
-          const byEmail = employees.find(e =>
-            e.Email && e.Email.toLowerCase().startsWith(normalized)
-          )
-          if (byEmail) { this.employeeId = byEmail.EmployeeId; return true }
+          const normalized = username.replace(/_/g, ".").toLowerCase();
+          const byEmail = employees.find(
+            (e) => e.Email && e.Email.toLowerCase().startsWith(normalized),
+          );
+          if (byEmail) {
+            this.employeeId = byEmail.EmployeeId;
+            return true;
+          }
 
-          const parts = username.split(/[_\-. ]+/).filter(p => p.length > 2)
-          const byName = employees.find(e => {
-            const full = `${e.FirstName} ${e.LastName}`.toLowerCase()
-            return parts.some(p => full.includes(p))
-          })
-          if (byName) { this.employeeId = byName.EmployeeId; return true }
+          const parts = username.split(/[_\-. ]+/).filter((p) => p.length > 2);
+          const byName = employees.find((e) => {
+            const full = `${e.FirstName} ${e.LastName}`.toLowerCase();
+            return parts.some((p) => full.includes(p));
+          });
+          if (byName) {
+            this.employeeId = byName.EmployeeId;
+            return true;
+          }
         }
 
-        this.employeeId = employees[0].EmployeeId
-        return true
+        this.employeeId = employees[0].EmployeeId;
+        return true;
       } catch (err) {
-        console.error('resolveEmployeeId:', err)
-        return false
+        console.error("resolveEmployeeId:", err);
+        return false;
       }
     },
 
     async loadEmployee() {
-      if (!this.employeeId) return
+      if (!this.employeeId) return;
       const { data, error } = await supabase
-        .from('employee')
+        .from("employee")
         .select('*, branch("BranchName")')
-        .eq('EmployeeId', this.employeeId)
-        .single()
+        .eq("EmployeeId", this.employeeId)
+        .single();
       if (!error && data) {
         this.currentEmployee = {
           ...data,
-          Branch: data.branch?.BranchName || '—'
-        }
+          Branch: data.branch?.BranchName || "—",
+        };
       }
     },
 
     async loadSchedule() {
-      if (!this.employeeId) return
-      this.loadingSchedule = true
+      if (!this.employeeId) return;
+      const cached = loadCache(CACHE_KEY_SCHEDULE);
+      if (cached) {
+        this.mySchedules = cached;
+        return;
+      }
+      this.loadingSchedule = true;
       try {
         const { data, error } = await supabase
-          .from('schedule')
-          .select('*, branch!inner("BranchName"), employee!inner(EmployeeId, FirstName, LastName)')
-          .eq('EmployeeId', this.employeeId)
-          .neq('Status', 'Cancelled')
-          .neq('Status', 'Archived')
-          .order('ShiftDate', { ascending: false })
-        if (error) throw error
-        this.mySchedules = (data || []).map(s => ({
+          .from("schedule")
+          .select(
+            '*, branch!inner("BranchName"), employee!inner(EmployeeId, FirstName, LastName)',
+          )
+          .eq("EmployeeId", this.employeeId)
+          .neq("Status", "Cancelled")
+          .neq("Status", "Archived")
+          .order("ShiftDate", { ascending: false });
+        if (error) throw error;
+        this.mySchedules = (data || []).map((s) => ({
           EmployeeId: s.EmployeeId,
-          WorkDate: String(s.ShiftDate || '').slice(0, 10),
-          TimeIn: s.StartTime ? s.StartTime.slice(0, 5) : '',
-          TimeOut: s.EndTime ? s.EndTime.slice(0, 5) : '',
-          Branch: s.branch?.BranchName || '',
-          Position: s.Role || '',
-          Status: s.Status || 'Scheduled'
-        }))
+          WorkDate: String(s.ShiftDate || "").slice(0, 10),
+          TimeIn: s.StartTime ? s.StartTime.slice(0, 5) : "",
+          TimeOut: s.EndTime ? s.EndTime.slice(0, 5) : "",
+          Branch: s.branch?.BranchName || "",
+          Position: s.Role || "",
+          Status: s.Status || "Scheduled",
+        }));
+        saveCache(CACHE_KEY_SCHEDULE, this.mySchedules);
       } catch (err) {
-        console.error('loadSchedule:', err)
-        this.showToast('Failed to load schedule.', 'error')
+        console.error("loadSchedule:", err);
+        this.showToast("Failed to load schedule.", "error");
       } finally {
-        this.loadingSchedule = false
+        this.loadingSchedule = false;
       }
     },
 
     async loadAllSchedules() {
-      const branchId = this.currentEmployee?.BranchAssigned
-      if (!branchId) return
+      const branchId = this.currentEmployee?.BranchAssigned;
+      if (!branchId) return;
+      const cached = loadCache(CACHE_KEY_ALL_SCHEDULES);
+      if (cached) {
+        this.allEmployeeSchedules = cached;
+        return;
+      }
       try {
         const { data, error } = await supabase
-          .from('schedule')
-          .select('*, branch!inner("BranchName"), employee!inner(EmployeeId, FirstName, LastName)')
-          .eq('BranchId', branchId)
-          .neq('Status', 'Cancelled')
-          .neq('Status', 'Archived')
-          .order('ShiftDate', { ascending: true })
-        if (error) throw error
-        this.allEmployeeSchedules = (data || []).map(s => ({
+          .from("schedule")
+          .select(
+            '*, branch!inner("BranchName"), employee!inner(EmployeeId, FirstName, LastName)',
+          )
+          .eq("BranchId", branchId)
+          .neq("Status", "Cancelled")
+          .neq("Status", "Archived")
+          .order("ShiftDate", { ascending: true });
+        if (error) throw error;
+        this.allEmployeeSchedules = (data || []).map((s) => ({
           EmployeeId: s.EmployeeId,
-          Name: `${s.employee?.FirstName || ''} ${s.employee?.LastName || ''}`.trim() || 'Employee',
-          WorkDate: String(s.ShiftDate || '').slice(0, 10),
-          TimeIn: s.StartTime ? s.StartTime.slice(0, 5) : '',
-          TimeOut: s.EndTime ? s.EndTime.slice(0, 5) : '',
-          Branch: s.branch?.BranchName || '',
-          Position: s.Role || '',
-          Status: s.Status || 'Scheduled'
-        }))
+          Name:
+            `${s.employee?.FirstName || ""} ${s.employee?.LastName || ""}`.trim() ||
+            "Employee",
+          WorkDate: String(s.ShiftDate || "").slice(0, 10),
+          TimeIn: s.StartTime ? s.StartTime.slice(0, 5) : "",
+          TimeOut: s.EndTime ? s.EndTime.slice(0, 5) : "",
+          Branch: s.branch?.BranchName || "",
+          Position: s.Role || "",
+          Status: s.Status || "Scheduled",
+        }));
+        saveCache(CACHE_KEY_ALL_SCHEDULES, this.allEmployeeSchedules);
       } catch (err) {
-        console.error('loadAllSchedules:', err)
+        console.error("loadAllSchedules:", err);
       }
     },
 
     async loadAvailability() {
-      if (!this.employeeId) return
-      this.loadingAvail = true
+      if (!this.employeeId) return;
+      const cached = loadCache(CACHE_KEY_AVAILABILITY);
+      if (cached) {
+        this.myAvailability = cached;
+        this.loadingAvail = false;
+        return;
+      }
+      this.loadingAvail = true;
       try {
         const { data, error } = await supabase
-          .from('availability')
-          .select('*')
-          .eq('employeeid', this.employeeId)
-          .order('availabledate', { ascending: false })
-        if (error) throw error
-        this.myAvailability = (data || []).map(a => ({
+          .from("availability")
+          .select("*")
+          .eq("employeeid", this.employeeId)
+          .order("availabledate", { ascending: false });
+        if (error) throw error;
+        this.myAvailability = (data || []).map((a) => ({
           AvailabilityId: a.availabilityid,
           Date: a.availabledate,
           startTime: a.starttime?.slice(0, 5),
           endTime: a.endtime?.slice(0, 5),
           Notes: a.notes,
           Status: a.status,
-          CreatedAt: a.createdat
-        }))
+          CreatedAt: a.createdat,
+        }));
+        saveCache(CACHE_KEY_AVAILABILITY, this.myAvailability);
       } catch (err) {
-        console.error('loadAvailability:', err)
+        console.error("loadAvailability:", err);
       } finally {
-        this.loadingAvail = false
+        this.loadingAvail = false;
       }
     },
 
     async loadInquiries() {
-      if (!this.employeeId) return
-      this.loadingInquiries = true
+      if (!this.employeeId) return;
+      const cached = loadCache(CACHE_KEY_INQUIRIES);
+      if (cached) {
+        this.myInquiries = cached;
+        this.loadingInquiries = false;
+        return;
+      }
+      this.loadingInquiries = true;
       try {
         const { data, error } = await supabase
-          .from('changeinquiry')
-          .select('*')
-          .eq('employeeid', this.employeeId)
-          .order('inquiryid', { ascending: false })
-        if (error) throw error
-        this.myInquiries = (data || []).map(c => ({
+          .from("changeinquiry")
+          .select("*")
+          .eq("employeeid", this.employeeId)
+          .order("inquiryid", { ascending: false });
+        if (error) throw error;
+        this.myInquiries = (data || []).map((c) => ({
           InquiryId: c.inquiryid,
-          RequestType: c.requesttype || 'Shift Change',
+          RequestType: c.requesttype || "Shift Change",
           ShiftDate: c.requestdate,
           PreferredDate: c.preferreddate,
           Reason: c.reason,
           Status: c.status,
           ManagerNote: c.managernote,
-          CreatedAt: c.createdat
-        }))
+          CreatedAt: c.createdat,
+        }));
+        saveCache(CACHE_KEY_INQUIRIES, this.myInquiries);
       } catch (err) {
-        console.error('loadInquiries:', err)
+        console.error("loadInquiries:", err);
       } finally {
-        this.loadingInquiries = false
+        this.loadingInquiries = false;
       }
     },
 
     async submitAvailability() {
       if (!this.availForm.Date) {
-        this.showToast('Please select a date.', 'error')
-        return
+        this.showToast("Please select a date.", "error");
+        return;
       }
       if (!this.availForm.TimeIn || !this.availForm.TimeOut) {
-        this.showToast('Please set time in and time out.', 'error')
-        return
+        this.showToast("Please set time in and time out.", "error");
+        return;
       }
-      this.savingAvail = true
+      this.savingAvail = true;
       try {
-        const { error } = await supabase
-          .from('availability')
-          .insert({
-            employeeid: this.employeeId,
-            availabledate: this.availForm.Date,
-            starttime: this.availForm.TimeIn,
-            endtime: this.availForm.TimeOut,
-            notes: this.availForm.Notes,
-            status: 'Pending'
-          })
-        if (error) throw error
-        this.showToast('Availability submitted successfully!', 'success')
-        this.availForm = { Date: '', TimeIn: '08:00', TimeOut: '17:00', Notes: '' }
-        await this.loadAvailability()
+        const { error } = await supabase.from("availability").insert({
+          employeeid: this.employeeId,
+          availabledate: this.availForm.Date,
+          starttime: this.availForm.TimeIn,
+          endtime: this.availForm.TimeOut,
+          notes: this.availForm.Notes,
+          status: "Pending",
+        });
+        if (error) throw error;
+        this.showToast("Availability submitted successfully!", "success");
+        this.availForm = {
+          Date: "",
+          TimeIn: "08:00",
+          TimeOut: "17:00",
+          Notes: "",
+        };
+        sessionStorage.removeItem(CACHE_KEY_AVAILABILITY);
+        await this.loadAvailability();
       } catch (err) {
-        console.error('submitAvailability:', err)
-        this.showToast('Failed to submit availability.', 'error')
+        console.error("submitAvailability:", err);
+        this.showToast("Failed to submit availability.", "error");
       } finally {
-        this.savingAvail = false
+        this.savingAvail = false;
       }
     },
 
     async submitInquiry() {
       if (!this.inquiryForm.ShiftDate) {
-        this.showToast('Please select the shift date.', 'error')
-        return
+        this.showToast("Please select the shift date.", "error");
+        return;
       }
       if (!this.inquiryForm.Reason.trim()) {
-        this.showToast('Please provide a reason.', 'error')
-        return
+        this.showToast("Please provide a reason.", "error");
+        return;
       }
-      this.savingInquiry = true
+      this.savingInquiry = true;
       try {
-        const { error } = await supabase
-          .from('changeinquiry')
-          .insert({
-            employeeid: this.employeeId,
-            requestdate: this.inquiryForm.ShiftDate,
-            requesttype: this.inquiryForm.RequestType,
-            preferreddate: this.inquiryForm.PreferredDate || null,
-            reason: this.inquiryForm.Reason,
-            status: 'Pending'
-          })
-        if (error) throw error
-        this.showToast('Inquiry submitted successfully!', 'success')
-        this.inquiryForm = { ShiftDate: '', RequestType: 'Shift Swap', Reason: '', PreferredDate: '' }
-        await this.loadInquiries()
+        const { error } = await supabase.from("changeinquiry").insert({
+          employeeid: this.employeeId,
+          requestdate: this.inquiryForm.ShiftDate,
+          requesttype: this.inquiryForm.RequestType,
+          preferreddate: this.inquiryForm.PreferredDate || null,
+          reason: this.inquiryForm.Reason,
+          status: "Pending",
+        });
+        if (error) throw error;
+        this.showToast("Inquiry submitted successfully!", "success");
+        this.inquiryForm = {
+          ShiftDate: "",
+          RequestType: "Shift Swap",
+          Reason: "",
+          PreferredDate: "",
+        };
+        sessionStorage.removeItem(CACHE_KEY_INQUIRIES);
+        await this.loadInquiries();
       } catch (err) {
-        console.error('submitInquiry:', err)
-        this.showToast('Failed to submit inquiry.', 'error')
+        console.error("submitInquiry:", err);
+        this.showToast("Failed to submit inquiry.", "error");
       } finally {
-        this.savingInquiry = false
+        this.savingInquiry = false;
       }
     },
 
     formatShiftDate(dateStr) {
-      if (!dateStr) return '—'
-      return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', {
-        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
-      })
+      if (!dateStr) return "—";
+      return new Date(dateStr + "T00:00:00").toLocaleDateString("en-PH", {
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
     },
 
     formatDate(ts) {
-      if (!ts) return '—'
-      return new Date(ts).toLocaleDateString('en-PH', {
-        month: 'short', day: 'numeric', year: 'numeric'
-      })
+      if (!ts) return "—";
+      return new Date(ts).toLocaleDateString("en-PH", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
     },
 
     shiftStatusClass(status) {
       const map = {
-        Active: 'status-active',
-        Inactive: 'status-inactive',
-        Cancelled: 'status-cancelled',
-        Completed: 'status-completed'
-      }
-      return map[status] || 'status-inactive'
+        Active: "status-active",
+        Inactive: "status-inactive",
+        Cancelled: "status-cancelled",
+        Completed: "status-completed",
+      };
+      return map[status] || "status-inactive";
     },
 
     statusClass(status) {
       const map = {
-        Pending: 'status-pending',
-        Confirmed: 'status-approved',
-        Approved: 'status-approved',
-        Cancelled: 'status-rejected',
-        Rejected: 'status-rejected',
-        'Under Review': 'status-review'
-      }
-      return map[status] || 'status-inactive'
+        Pending: "status-pending",
+        Confirmed: "status-approved",
+        Approved: "status-approved",
+        Cancelled: "status-rejected",
+        Rejected: "status-rejected",
+        "Under Review": "status-review",
+      };
+      return map[status] || "status-inactive";
     },
 
     displayStatus(status) {
       const map = {
-        Pending: 'Pending',
-        Confirmed: 'Approved',
-        Cancelled: 'Rejected',
-      }
-      return map[status] || status
+        Pending: "Pending",
+        Confirmed: "Approved",
+        Cancelled: "Rejected",
+      };
+      return map[status] || status;
     },
 
-    showToast(message, type = 'success') {
-      this.toast = { message, type }
+    showToast(message, type = "success") {
+      this.toast = { message, type };
       setTimeout(() => {
-        this.toast.message = ''
-      }, 3500)
+        this.toast.message = "";
+      }, 3500);
     },
 
     hideToast() {
-      this.toast.message = ''
-    }
-  }
-}
+      this.toast.message = "";
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -1049,7 +1271,7 @@ export default {
   border-right: none;
 }
 
-.calendar-day:nth-last-child(-n+7) {
+.calendar-day:nth-last-child(-n + 7) {
   border-bottom: none;
 }
 
@@ -1080,14 +1302,14 @@ export default {
 
 .today-badge {
   display: inline-block;
-  background: #FFF4E5;
-  color: #8B4513;
+  background: #fff4e5;
+  color: #8b4513;
   font-size: 0.65rem;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 3px;
   margin-left: auto;
-  border: 1px solid #F1E6D2;
+  border: 1px solid #f1e6d2;
 }
 
 .day-shifts {

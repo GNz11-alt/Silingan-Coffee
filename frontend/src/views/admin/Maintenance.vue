@@ -76,11 +76,14 @@
             <div class="resource-row">
               <span class="resource-label">Storage Usage</span>
               <span class="resource-value">
-                {{ stats.storage_used_gb }}GB / {{ stats.storage_total_gb }}GB
+                {{ stats.storage_used_gb }}MB / {{ stats.storage_total_gb }}MB
               </span>
             </div>
             <div class="progress-bar-wrap">
-              <div class="progress-bar" :style="{ width: storagePercent + '%' }"></div>
+              <div
+                class="progress-bar"
+                :style="{ width: storagePercent + '%' }"
+              ></div>
             </div>
           </div>
         </div>
@@ -96,7 +99,9 @@
             </div>
             <div class="security-row">
               <span class="security-label">SSL Certificate</span>
-              <span :class="['badge', sslValid ? 'badge-active' : 'badge-inactive']">
+              <span
+                :class="['badge', sslValid ? 'badge-active' : 'badge-inactive']"
+              >
                 {{ sslValid ? "Valid" : "Not Secure" }}
               </span>
             </div>
@@ -117,8 +122,15 @@
             Last optimization was {{ lastOptimization }}.
           </div>
         </div>
-        <button class="btn-optimize" @click="runOptimization" :disabled="optimizing">
-          <span v-if="optimizing" class="spinner-border spinner-border-sm me-1"></span>
+        <button
+          class="btn-optimize"
+          @click="runOptimization"
+          :disabled="optimizing"
+        >
+          <span
+            v-if="optimizing"
+            class="spinner-border spinner-border-sm me-1"
+          ></span>
           <span v-else>Run Now</span>
         </button>
       </div>
@@ -129,7 +141,8 @@
           <h5>Backup History</h5>
         </div>
         <p class="panel-sub">
-          Backups are created from the Backup &amp; Restore module. This panel shows the log.
+          Backups are created from the Backup &amp; Restore module. This panel
+          shows the log.
         </p>
         <div v-if="isLoadingBackups" class="text-center py-4">
           <div class="spinner-border spinner-border-sm text-secondary"></div>
@@ -152,13 +165,22 @@
                 <td>{{ b.size }}</td>
                 <td>{{ b.backedUpBy }}</td>
                 <td>
-                  <span class="badge" :class="b.status === 'Success' ? 'badge-active' : 'badge-inactive'">
+                  <span
+                    class="badge"
+                    :class="
+                      b.status === 'Success' ? 'badge-active' : 'badge-inactive'
+                    "
+                  >
                     {{ b.status }}
                   </span>
                 </td>
               </tr>
               <tr v-if="!backupHistory.length">
-                <td colspan="5" class="text-center text-muted py-4" style="font-size: 13px">
+                <td
+                  colspan="5"
+                  class="text-center text-muted py-4"
+                  style="font-size: 13px"
+                >
                   No backups yet.
                 </td>
               </tr>
@@ -199,13 +221,20 @@
                 <td>{{ u.role }}</td>
                 <td>{{ u.branch ?? "—" }}</td>
                 <td>
-                  <span class="active-badge" :class="lastActiveClass(u.last_active)">
+                  <span
+                    class="active-badge"
+                    :class="lastActiveClass(u.last_active)"
+                  >
                     {{ u.lastActivePretty ?? "Never" }}
                   </span>
                 </td>
               </tr>
               <tr v-if="!userList.length">
-                <td colspan="6" class="text-center text-muted py-4" style="font-size: 13px">
+                <td
+                  colspan="6"
+                  class="text-center text-muted py-4"
+                  style="font-size: 13px"
+                >
                   No users found.
                 </td>
               </tr>
@@ -217,7 +246,14 @@
 
     <Teleport to="body">
       <div v-if="toast.show" class="toast-wrap" :class="toast.type">
-        <i :class="toast.type === 'success' ? 'bi bi-check-circle' : 'bi bi-exclamation-circle'" class="me-2"></i>
+        <i
+          :class="
+            toast.type === 'success'
+              ? 'bi bi-check-circle'
+              : 'bi bi-exclamation-circle'
+          "
+          class="me-2"
+        ></i>
         {{ toast.message }}
       </div>
     </Teleport>
@@ -228,8 +264,13 @@
 import { ref, computed, onMounted } from "vue";
 import { supabase } from "@/supabase.js";
 import {
-  CheckCircle, Clock, Users, Database, HardDrive,
-  Shield, AlertTriangle,
+  CheckCircle,
+  Clock,
+  Users,
+  Database,
+  HardDrive,
+  Shield,
+  AlertTriangle,
 } from "lucide-vue-next";
 
 const branches = ref([]);
@@ -273,14 +314,19 @@ const tasks = ref([]);
 const toast = ref({ show: false, message: "", type: "success" });
 const showToast = (message, type = "success") => {
   toast.value = { show: true, message, type };
-  setTimeout(() => { toast.value.show = false; }, 3000);
+  setTimeout(() => {
+    toast.value.show = false;
+  }, 3000);
 };
 
 const formatDate = (iso) => {
   if (!iso) return "Never";
   return new Date(iso).toLocaleString("en-PH", {
-    month: "short", day: "numeric", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 
@@ -306,15 +352,22 @@ const timeAgo = (iso) => {
 const fetchStats = async () => {
   isLoadingStats.value = true;
   await supabase.rpc("refresh_system_stats");
-  const { data, error } = await supabase.from("system_stats").select("*").eq("id", 1).single();
+  const { data, error } = await supabase
+    .from("system_stats")
+    .select("*")
+    .eq("id", 1)
+    .single();
   isLoadingStats.value = false;
-  if (error) { showToast("Failed to load system stats.", "error"); return; }
+  if (error) {
+    showToast("Failed to load system stats.", "error");
+    return;
+  }
   stats.value = {
     health_label: data.health_label,
     uptime_percent: data.uptime_percent,
     uptime_label: data.uptime_label,
-    storage_used_gb: data.storage_used_gb,
-    storage_total_gb: data.storage_total_gb,
+    storage_used_gb: Math.round(data.storage_used_gb * 1024),
+    storage_total_gb: Math.round(data.storage_total_gb * 1024),
   };
 };
 
@@ -331,19 +384,39 @@ const fetchUsers = async () => {
   isLoadingUsers.value = true;
   const [{ data, error }, { count }, { data: empData }, { data: branchData }] =
     await Promise.all([
-      supabase.from("users").select("id, username, role, branch, last_active").neq("status", "archived").order("last_active", { ascending: false }),
-      supabase.from("users").select("id", { count: "exact", head: true }).gte("last_active", new Date(Date.now() - 15 * 60000).toISOString()),
-      supabase.from("employee").select("Email, FirstName, LastName, Position").neq("Status", "Archived"),
+      supabase
+        .from("users")
+        .select("id, username, role, branch, last_active")
+        .neq("status", "archived")
+        .order("last_active", { ascending: false }),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .gte("last_active", new Date(Date.now() - 15 * 60000).toISOString()),
+      supabase
+        .from("employee")
+        .select("Email, FirstName, LastName, Position")
+        .neq("Status", "Archived"),
       supabase.from("branch").select("BranchId, BranchName"),
     ]);
   isLoadingUsers.value = false;
-  if (error) { showToast("Failed to load users.", "error"); return; }
+  if (error) {
+    showToast("Failed to load users.", "error");
+    return;
+  }
 
-  branches.value = (branchData || []).map((b) => ({ id: String(b.BranchId), name: b.BranchName }));
+  branches.value = (branchData || []).map((b) => ({
+    id: String(b.BranchId),
+    name: b.BranchName,
+  }));
 
   const empMap = {};
   for (const e of empData || []) {
-    const key = `${e.FirstName.toLowerCase()}.${e.LastName.toLowerCase()}`.replace(/\s+/g, "");
+    const key =
+      `${e.FirstName.toLowerCase()}.${e.LastName.toLowerCase()}`.replace(
+        /\s+/g,
+        "",
+      );
     empMap[key] = e;
   }
 
@@ -355,9 +428,10 @@ const fetchUsers = async () => {
     return {
       ...u,
       fullName: emp ? `${emp.FirstName} ${emp.LastName}` : fallbackName,
-      email: emp?.Email || "—",
-      position: emp?.Position || null,
-      branch: branches.value.find((b) => b.id === String(u.branch))?.name || u.branch,
+      email: emp?.Email || (u.role === "admin" ? "admin@gmail.com" : "—"),
+      position: emp?.Position || (u.role === "admin" ? "Admin" : null),
+      branch:
+        branches.value.find((b) => b.id === String(u.branch))?.name || u.branch,
       lastActivePretty: timeAgo(u.last_active),
     };
   });
@@ -367,9 +441,16 @@ const fetchUsers = async () => {
 
 const fetchBackupHistory = async () => {
   isLoadingBackups.value = true;
-  const { data, error } = await supabase.from("backup_logs").select("*").order("created_at", { ascending: false }).limit(20);
+  const { data, error } = await supabase
+    .from("backup_logs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(20);
   isLoadingBackups.value = false;
-  if (error) { showToast("Failed to load backup history.", "error"); return; }
+  if (error) {
+    showToast("Failed to load backup history.", "error");
+    return;
+  }
 
   backupHistory.value = data.map((b) => ({
     id: b.id,
@@ -388,13 +469,23 @@ const fetchBackupHistory = async () => {
 
 const fetchTasks = async () => {
   isLoadingTasks.value = true;
-  const { data, error } = await supabase.from("maintenance_tasks").select("*").order("id");
+  const { data, error } = await supabase
+    .from("maintenance_tasks")
+    .select("*")
+    .order("id");
   isLoadingTasks.value = false;
-  if (error) { showToast("Failed to load tasks.", "error"); return; }
+  if (error) {
+    showToast("Failed to load tasks.", "error");
+    return;
+  }
 
   tasks.value = data.map((t) => ({
-    id: t.id, name: t.name, description: t.description,
-    lastRun: timeAgo(t.last_run_at), running: false, _last_run_at: t.last_run_at,
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    lastRun: timeAgo(t.last_run_at),
+    running: false,
+    _last_run_at: t.last_run_at,
   }));
 
   const optTask = tasks.value.find((t) => t.name === "Optimize Database");
@@ -411,10 +502,20 @@ const runOptimization = async () => {
   optimizing.value = true;
   const now = new Date().toISOString();
   const { error: fnError } = await supabase.rpc("run_vacuum");
-  if (fnError) { optimizing.value = false; showToast("Optimization failed: " + fnError.message, "error"); return; }
-  const { error: dbError } = await supabase.from("maintenance_tasks").update({ last_run_at: now }).eq("name", "Optimize Database");
+  if (fnError) {
+    optimizing.value = false;
+    showToast("Optimization failed: " + fnError.message, "error");
+    return;
+  }
+  const { error: dbError } = await supabase
+    .from("maintenance_tasks")
+    .update({ last_run_at: now })
+    .eq("name", "Optimize Database");
   optimizing.value = false;
-  if (dbError) { showToast("Optimization ran but failed to log.", "error"); return; }
+  if (dbError) {
+    showToast("Optimization ran but failed to log.", "error");
+    return;
+  }
   lastOptimization.value = "Just now";
   showOptimizationAlert.value = false;
   showToast("Query statistics updated successfully.");
@@ -427,7 +528,11 @@ const runTask = async (task) => {
 
   if (task.name === "Optimize Database") {
     const { error: fnError } = await supabase.rpc("run_vacuum");
-    if (fnError) { task.running = false; showToast("Optimization failed: " + fnError.message, "error"); return; }
+    if (fnError) {
+      task.running = false;
+      showToast("Optimization failed: " + fnError.message, "error");
+      return;
+    }
   } else if (task.name === "Clear Cache") {
     try {
       localStorage.clear();
@@ -439,9 +544,15 @@ const runTask = async (task) => {
     }
   }
 
-  const { error } = await supabase.from("maintenance_tasks").update({ last_run_at: now }).eq("id", task.id);
+  const { error } = await supabase
+    .from("maintenance_tasks")
+    .update({ last_run_at: now })
+    .eq("id", task.id);
   task.running = false;
-  if (error) { showToast(`${task.name} failed to log.`, "error"); return; }
+  if (error) {
+    showToast(`${task.name} failed to log.`, "error");
+    return;
+  }
 
   task.lastRun = "Just now";
   task._last_run_at = now;
@@ -502,13 +613,35 @@ onMounted(() => {
   border: 1px solid #e9ecef;
   transition: all 0.2s ease;
 }
-.stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-.stat-icon-wrap { color: #8b4513; flex-shrink: 0; }
-.stat-icon-wrap.green { color: #28a745; }
-.stat-info h3 { font-size: 13px; color: #6c757d; margin-bottom: 6px; font-weight: 500; }
-.stat-value { font-size: 24px; font-weight: 600; color: #212529; margin-bottom: 4px; }
-.stat-value.green { color: #28a745; }
-.stat-sub { font-size: 11px; color: #adb5bd; }
+.stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.stat-icon-wrap {
+  color: #8b4513;
+  flex-shrink: 0;
+}
+.stat-icon-wrap.green {
+  color: #28a745;
+}
+.stat-info h3 {
+  font-size: 13px;
+  color: #6c757d;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #212529;
+  margin-bottom: 4px;
+}
+.stat-value.green {
+  color: #28a745;
+}
+.stat-sub {
+  font-size: 11px;
+  color: #adb5bd;
+}
 
 .tab-bar {
   display: flex;
@@ -529,9 +662,13 @@ onMounted(() => {
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
-.tab-btn:hover { color: #532f15; }
+.tab-btn:hover {
+  color: #532f15;
+}
 .tab-btn.active {
   color: #532f15;
   border-bottom-color: #532f15;
@@ -552,28 +689,103 @@ onMounted(() => {
   border: 1px solid #e9ecef;
   padding: 20px;
 }
-.panel-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-.panel-header h5 { font-size: 15px; font-weight: 700; color: #1a1a1a; margin: 0; }
-.panel-icon { color: #8b4513; }
-.panel-sub { font-size: 13px; color: #6b6b6b; margin-bottom: 16px; }
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.mt-3 { margin-top: 16px; }
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.panel-header h5 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+.panel-icon {
+  color: #8b4513;
+}
+.panel-sub {
+  font-size: 13px;
+  color: #6b6b6b;
+  margin-bottom: 16px;
+}
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.mt-3 {
+  margin-top: 16px;
+}
 
-.resource-list { display: flex; flex-direction: column; gap: 4px; }
-.resource-row { display: flex; justify-content: space-between; align-items: center; }
-.resource-label { font-size: 13px; color: #495057; }
-.resource-value { font-size: 13px; color: #8b4513; font-weight: 600; }
-.progress-bar-wrap { height: 8px; background: #e9ecef; border-radius: 999px; overflow: hidden; margin-top: 6px; }
-.progress-bar { height: 100%; background: #532f15; border-radius: 999px; transition: width 0.5s ease; }
+.resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.resource-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.resource-label {
+  font-size: 13px;
+  color: #495057;
+}
+.resource-value {
+  font-size: 13px;
+  color: #8b4513;
+  font-weight: 600;
+}
+.progress-bar-wrap {
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.progress-bar {
+  height: 100%;
+  background: #532f15;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
 
-.security-list { display: flex; flex-direction: column; gap: 12px; }
-.security-row { display: flex; justify-content: space-between; align-items: center; }
-.security-label { font-size: 13px; color: #495057; }
-.security-val { font-size: 13px; color: #8b4513; font-weight: 500; }
+.security-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.security-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.security-label {
+  font-size: 13px;
+  color: #495057;
+}
+.security-val {
+  font-size: 13px;
+  color: #8b4513;
+  font-weight: 500;
+}
 
-.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.badge-active { background: #d4edda; color: #155724; }
-.badge-inactive { background: #f8d7da; color: #721c24; }
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge-active {
+  background: #d4edda;
+  color: #155724;
+}
+.badge-inactive {
+  background: #f8d7da;
+  color: #721c24;
+}
 
 .alert-panel {
   background: #fff8e7;
@@ -584,9 +796,20 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
 }
-.alert-icon { color: #f57c00; flex-shrink: 0; }
-.alert-title { font-size: 14px; font-weight: 600; color: #f57c00; }
-.alert-sub { font-size: 12px; color: #856404; margin-top: 2px; }
+.alert-icon {
+  color: #f57c00;
+  flex-shrink: 0;
+}
+.alert-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f57c00;
+}
+.alert-sub {
+  font-size: 12px;
+  color: #856404;
+  margin-top: 2px;
+}
 .btn-optimize {
   margin-left: auto;
   flex-shrink: 0;
@@ -602,13 +825,33 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
 }
-.btn-optimize:hover:not(:disabled) { background: #4e342e; }
-.btn-optimize:disabled { opacity: 0.65; cursor: not-allowed; }
+.btn-optimize:hover:not(:disabled) {
+  background: #4e342e;
+}
+.btn-optimize:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 
-.active-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.status-active { background: #d4edda; color: #155724; }
-.status-inactive { background: #fff3cd; color: #856404; }
-.status-never { background: #f8d7da; color: #721c24; }
+.active-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.status-active {
+  background: #d4edda;
+  color: #155724;
+}
+.status-inactive {
+  background: #fff3cd;
+  color: #856404;
+}
+.status-never {
+  background: #f8d7da;
+  color: #721c24;
+}
 
 /* ── Scrollable table wrapper (shared) ─────────────────────── */
 .scrollable-table-wrap {
@@ -645,18 +888,44 @@ onMounted(() => {
   border-bottom: 1px solid #f5f5f5;
   color: #343a40;
 }
-.history-table tr:last-child td { border-bottom: none; }
-.history-table tr:hover td { background: #fafafa; }
+.history-table tr:last-child td {
+  border-bottom: none;
+}
+.history-table tr:hover td {
+  background: #fafafa;
+}
 
 /* column widths */
-.history-table th:nth-child(1), .history-table td:nth-child(1) { width: 15%; }
-.history-table th:nth-child(2), .history-table td:nth-child(2) { width: 22%; }
-.history-table th:nth-child(3), .history-table td:nth-child(3) { width: 15%; }
-.history-table th:nth-child(4), .history-table td:nth-child(4) { width: 10%; }
-.history-table th:nth-child(5), .history-table td:nth-child(5) { width: 12%; }
-.history-table th:nth-child(6), .history-table td:nth-child(6) { width: 14%; }
+.history-table th:nth-child(1),
+.history-table td:nth-child(1) {
+  width: 15%;
+}
+.history-table th:nth-child(2),
+.history-table td:nth-child(2) {
+  width: 22%;
+}
+.history-table th:nth-child(3),
+.history-table td:nth-child(3) {
+  width: 15%;
+}
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) {
+  width: 10%;
+}
+.history-table th:nth-child(5),
+.history-table td:nth-child(5) {
+  width: 12%;
+}
+.history-table th:nth-child(6),
+.history-table td:nth-child(6) {
+  width: 14%;
+}
 
-.tasks-list { display: flex; flex-direction: column; gap: 0; }
+.tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
 .task-row {
   display: flex;
   justify-content: space-between;
@@ -665,11 +934,30 @@ onMounted(() => {
   border-bottom: 1px solid #f0ebe8;
   gap: 16px;
 }
-.task-row:last-child { border-bottom: none; }
-.task-name { font-size: 14px; font-weight: 600; color: #1a1a1a; }
-.task-sub { font-size: 12px; color: #6b6b6b; margin-top: 2px; }
-.task-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.task-last { font-size: 12px; color: #6b6b6b; white-space: nowrap; }
+.task-row:last-child {
+  border-bottom: none;
+}
+.task-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.task-sub {
+  font-size: 12px;
+  color: #6b6b6b;
+  margin-top: 2px;
+}
+.task-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.task-last {
+  font-size: 12px;
+  color: #6b6b6b;
+  white-space: nowrap;
+}
 .btn-run {
   background: #fff;
   border: 1px solid #e9ecef;
@@ -684,8 +972,14 @@ onMounted(() => {
   align-items: center;
   gap: 4px;
 }
-.btn-run:hover:not(:disabled) { background: #fff8f4; border-color: #532f15; }
-.btn-run:disabled { opacity: 0.65; cursor: not-allowed; }
+.btn-run:hover:not(:disabled) {
+  background: #fff8f4;
+  border-color: #532f15;
+}
+.btn-run:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 
 .toast-wrap {
   position: fixed;
@@ -697,22 +991,42 @@ onMounted(() => {
   font-weight: 500;
   display: flex;
   align-items: center;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   z-index: 9999;
   animation: slideUp 0.2s ease;
 }
-.toast-wrap.success { background: #d1e7dd; color: #0a3622; }
-.toast-wrap.error { background: #f8d7da; color: #58151c; }
+.toast-wrap.success {
+  background: #d1e7dd;
+  color: #0a3622;
+}
+.toast-wrap.error {
+  background: #f8d7da;
+  color: #58151c;
+}
 
 @keyframes slideUp {
-  from { transform: translateY(16px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 768px) {
-  .maintenance-page { padding: 16px; }
-  .two-col { grid-template-columns: 1fr; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
-  .tab-bar { overflow-x: auto; }
+  .maintenance-page {
+    padding: 16px;
+  }
+  .two-col {
+    grid-template-columns: 1fr;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .tab-bar {
+    overflow-x: auto;
+  }
 }
 </style>

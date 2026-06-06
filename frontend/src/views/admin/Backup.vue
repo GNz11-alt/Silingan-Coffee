@@ -367,9 +367,6 @@ const buildArchiveId = (i) => `A${String(i + 1).padStart(3, "0")}`;
 
 // ── Unified list ───────────────────────────────────────────
 const allItems = computed(() => {
-  console.log("allItems recomputing...");
-  console.log("archivedInventory in computed:", archivedInventory.value);
-  console.log("archivedMenuItems in computed:", archivedMenuItems.value);
   const items = [];
 
   archivedEmployees.value.forEach((e) => {
@@ -442,7 +439,6 @@ const allItems = computed(() => {
     archiveId: buildArchiveId(idx),
   }));
 });
-console.log("archivedMenuItems at computed eval:", archivedMenuItems.value);
 const totalArchived = computed(() => allItems.value.length);
 
 const filteredItems = computed(() =>
@@ -496,9 +492,6 @@ const fetchArchivedSchedules = async () => {
     )
     .eq("Status", "Archived")
     .order("ShiftDate", { ascending: false });
-
-  console.log("archived schedules:", data, error); // ← add this temporarily
-
   if (data) {
     archivedSchedules.value = data.map((s) => ({
       id: s.ScheduleId,
@@ -526,9 +519,6 @@ const fetchArchivedInventory = async () => {
     .eq("status", "Archived")
     .order("rawproductid", { ascending: true });
 
-  console.log("fetchArchivedInventory data:", data);
-  console.log("fetchArchivedInventory error:", error);
-
   if (data) {
     archivedInventory.value = data.map((i) => ({
       id: i.rawproductid,
@@ -537,7 +527,6 @@ const fetchArchivedInventory = async () => {
       archivedDate: i.archivedDate,
       archivedBy: i.archivedBy || currentUser,
     }));
-    console.log("archivedInventory.value after map:", archivedInventory.value);
   }
 };
 
@@ -596,7 +585,7 @@ const doBackup = async () => {
       { data: liveSchedules },
     ] = await Promise.all([
       supabase
-        .from("inventory")
+        .from("rawproduct")
         .select(
           "InventoryId, Status, UpdatedAt, product(ProductName, Category, Price, BranchId, branch(BranchName))",
         )
@@ -686,19 +675,19 @@ const doBackup = async () => {
 };
 
 const fetchArchivedMenuItems = async () => {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("product")
-    .select(
-      "ProductId, ProductName, Category, Price, Status, ArchivedAt, ArchivedBy, branch(BranchName)",
-    )
+    .select("ProductId, ProductName, Category, Price, Status, ArchivedAt, ArchivedBy")
     .eq("Status", "Archived")
     .order("ProductId", { ascending: true });
+
+  if (error) { showToast("Failed to load archived menu items.", "error"); return; }
 
   if (data) {
     archivedMenuItems.value = data.map((p) => ({
       id: p.ProductId,
       name: p.ProductName ?? "—",
-      details: `${p.Category ?? "—"} · ₱${p.Price ?? 0} · ${p.branch?.BranchName ?? "—"}`,
+      details: `${p.Category ?? "—"} · ₱${p.Price ?? 0}`,
       archivedDate: p.ArchivedAt,
       archivedBy: p.ArchivedBy || currentUser,
     }));
@@ -721,8 +710,18 @@ const doRestore = async () => {
       .from("employee")
       .update({ Status: "Active", ArchivedAt: null, ArchivedBy: null })
       .eq("EmployeeId", item._raw.id);
-    if (error) showToast("Failed to restore employee.", "error");
-    else {
+    if (error) {
+      showToast("Failed to restore employee.", "error");
+    } else {
+      // Also restore the matching user account
+      const firstName = item.name.split(" ")[0].toLowerCase();
+      const lastName = item.name.split(" ").slice(1).join(" ").toLowerCase();
+      const username = `${firstName}.${lastName}`;
+      await supabase
+        .from("users")
+        .update({ status: "active" })
+        .eq("username", username);
+
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedEmployees();
     }
@@ -739,10 +738,11 @@ const doRestore = async () => {
   } else if (item._table === "inventory") {
     const { error } = await supabase
       .from("rawproduct")
-      .update({ status: null, archivedDate: null, archivedBy: null })
+      .update({ status: "Active", archivedDate: null, archivedBy: null })
       .eq("rawproductid", item._raw.id);
     if (error) showToast("Failed to restore product.", "error");
     else {
+      sessionStorage.removeItem("cache_raw_products");
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedInventory();
     }
@@ -763,6 +763,7 @@ const doRestore = async () => {
       .eq("ProductId", item._raw.id);
     if (error) showToast("Failed to restore menu item.", "error");
     else {
+      sessionStorage.removeItem("cache_menu_items");
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedMenuItems();
     }

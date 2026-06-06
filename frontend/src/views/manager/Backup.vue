@@ -574,18 +574,16 @@ const fetchArchivedMenuItems = async () => {
   let query = supabase
     .from("product")
     .select(
-      "ProductId, ProductName, Category, Price, Status, ArchivedAt, ArchivedBy, branch(BranchName)",
+      "ProductId, ProductName, Category, Price, Status, ArchivedAt, ArchivedBy",
     )
     .eq("Status", "Archived")
     .order("ProductId", { ascending: true });
-  if (managerBranchId.value)
-    query = query.eq("BranchId", managerBranchId.value);
   const { data } = await query;
   if (data) {
     archivedMenuItems.value = data.map((p) => ({
       id: p.ProductId,
       name: p.ProductName ?? "—",
-      details: `${p.Category ?? "—"} · ₱${p.Price ?? 0} · ${p.branch?.BranchName ?? "—"}`,
+      details: `${p.Category ?? "—"} · ₱${p.Price ?? 0}`,
       archivedDate: p.ArchivedAt,
       archivedBy: p.ArchivedBy || currentUser,
     }));
@@ -743,10 +741,11 @@ const doRestore = async () => {
   } else if (item._table === "inventory") {
     const { error } = await supabase
       .from("rawproduct")
-      .update({ status: null, archivedDate: null, archivedBy: null })
+      .update({ status: "Active", archivedDate: null, archivedBy: null })
       .eq("rawproductid", item._raw.id);
     if (error) showToast("Failed to restore product.", "error");
     else {
+      sessionStorage.removeItem("cache_raw_products");
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedInventory();
     }
@@ -767,6 +766,7 @@ const doRestore = async () => {
       .eq("ProductId", item._raw.id);
     if (error) showToast("Failed to restore menu item.", "error");
     else {
+      sessionStorage.removeItem("cache_menu_items");
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedMenuItems();
     }

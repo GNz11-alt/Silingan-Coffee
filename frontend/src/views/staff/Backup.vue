@@ -445,21 +445,16 @@ const fetchArchivedSales = async () => {
 };
 
 const fetchArchivedMenuItems = async () => {
-  let query = supabase
+  const { data } = await supabase
     .from("product")
-    .select(
-      "ProductId, ProductName, Category, Price, Status, ArchivedAt, ArchivedBy, branch(BranchName)",
-    )
+    .select("ProductId, ProductName, Category, Price, Status, ArchivedAt, ArchivedBy")
     .eq("Status", "Archived")
     .order("ProductId", { ascending: true });
-  if (managerBranchId.value)
-    query = query.eq("BranchId", managerBranchId.value);
-  const { data } = await query;
   if (data) {
     archivedMenuItems.value = data.map((p) => ({
       id: p.ProductId,
       name: p.ProductName ?? "—",
-      details: `${p.Category ?? "—"} · ₱${p.Price ?? 0} · ${p.branch?.BranchName ?? "—"}`,
+      details: `${p.Category ?? "—"} · ₱${p.Price ?? 0}`,
       archivedDate: p.ArchivedAt,
       archivedBy: p.ArchivedBy || currentUser,
     }));

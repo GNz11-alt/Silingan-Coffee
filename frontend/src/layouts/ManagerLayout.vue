@@ -20,6 +20,7 @@
           <div class="brand-text" v-show="!isSidebarCollapsed">
             <h2>Silingan Coffee</h2>
             <p class="user-role">Manager</p>
+            <p class="user-branch">{{ userBranchName || 'All Branches' }}</p>
           </div>
         </div>
 
@@ -244,6 +245,8 @@ onMounted(async () => {
   clockInterval = setInterval(() => {
     now.value = new Date();
   }, 1000);
+
+  await resolveBranch();
 
   const notifs = await fetchNotifications(null);
   unreadCount.value = notifs.length;
