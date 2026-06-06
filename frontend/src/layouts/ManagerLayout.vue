@@ -9,24 +9,24 @@
           />
         </button>
 
-          <div class="brand-section">
-            <div class="logo-wrapper">
-              <img
-                src="@/assets/images/logo.png"
-                alt="Silingan Coffee"
-                class="logo"
-              />
-            </div>
-            <div class="brand-text" v-show="!isSidebarCollapsed">
-              <h2>Silingan Coffee</h2>
-              <p class="user-role">Administrator</p>
-            </div>
+        <div class="brand-section">
+          <div class="logo-wrapper">
+            <img
+              src="@/assets/images/logo.png"
+              alt="Silingan Coffee"
+              class="logo"
+            />
           </div>
+          <div class="brand-text" v-show="!isSidebarCollapsed">
+            <h2>Silingan Coffee</h2>
+            <p class="user-role">Manager</p>
+          </div>
+        </div>
 
-          <div class="datetime-section" v-show="!isSidebarCollapsed">
-            <p class="datetime-time">{{ currentTime }}</p>
-            <p class="datetime-date">{{ currentDate }}</p>
-          </div>
+        <div class="datetime-section" v-show="!isSidebarCollapsed">
+          <p class="datetime-time">{{ currentTime }}</p>
+          <p class="datetime-date">{{ currentDate }}</p>
+        </div>
       </div>
 
       <nav class="sidebar-nav">
@@ -38,7 +38,7 @@
           <component :is="SearchIcon" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Search</span>
         </router-link>
-        
+
         <router-link
           to="/manager/dashboard"
           class="nav-item"
@@ -64,6 +64,15 @@
         >
           <component :is="BarChart3" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Sales</span>
+        </router-link>
+
+        <router-link
+          to="/manager/employees"
+          class="nav-item"
+          :class="{ active: $route.path === '/manager/employees' }"
+        >
+          <component :is="Users" class="nav-icon" :size="20" />
+          <span v-show="!isSidebarCollapsed">Employees</span>
         </router-link>
 
         <router-link
@@ -125,7 +134,11 @@
         <button class="nav-item notification-btn" @click="toggleNotifications">
           <component :is="Bell" class="nav-icon" :size="20" />
           <span v-show="!isSidebarCollapsed">Notifications</span>
-          <span class="notification-badge" v-if="unreadCount && !isSidebarCollapsed">{{ unreadCount }}</span>
+          <span
+            class="notification-badge"
+            v-if="unreadCount && !isSidebarCollapsed"
+            >{{ unreadCount }}</span
+          >
         </button>
         <NotificationPanel
           v-if="showNotifPanel"
@@ -142,7 +155,11 @@
     </aside>
 
     <main class="main-content">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <KeepAlive include="ManagerSchedule">
+          <component :is="Component" />
+        </KeepAlive>
+      </router-view>
     </main>
   </div>
 </template>
@@ -155,6 +172,7 @@ import {
   Package,
   BarChart3,
   Calendar,
+  Users,
   Coffee,
   FileText,
   Database,
@@ -181,13 +199,23 @@ const now = ref(new Date());
 let clockInterval = null;
 
 const currentTime = computed(() =>
-  now.value.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+  now.value.toLocaleTimeString("en-PH", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }),
 );
 const currentDate = computed(() =>
-  now.value.toLocaleDateString("en-PH", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+  now.value.toLocaleDateString("en-PH", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }),
 );
 
-const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
+const { isAdmin, userBranchId, userBranchName, resolveBranch } =
+  useUserBranch();
 
 const toggleSidebar = () => {
   isSidebarCollapsed.value = !isSidebarCollapsed.value;
@@ -216,11 +244,11 @@ onMounted(async () => {
   clockInterval = setInterval(() => {
     now.value = new Date();
   }, 1000);
- 
+
   const notifs = await fetchNotifications(null);
   unreadCount.value = notifs.length;
 });
- 
+
 onUnmounted(() => {
   clearInterval(clockInterval);
 });

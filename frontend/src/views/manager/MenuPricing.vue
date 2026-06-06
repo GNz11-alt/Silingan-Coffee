@@ -3,7 +3,10 @@
     <header class="module-header">
       <div class="header-main">
         <h1>Menu & Pricing</h1>
-        <p>Manage menu items, pricing, and recipes — changes apply to all branches</p>
+        <p>
+          Manage menu items, pricing, and recipes — changes apply to all
+          branches
+        </p>
       </div>
       <div class="header-actions">
         <button class="recipe-all-btn" @click="openAllRecipes">
@@ -82,8 +85,15 @@
               <h4>{{ item.ProductName }}</h4>
             </div>
             <!-- Show size prices if available -->
-            <div v-if="getSizeType(item.Category) !== 'none' && item.size_prices" class="size-prices">
-              <span v-for="(price, size) in item.size_prices" :key="size" class="size-price-tag">
+            <div
+              v-if="getSizeType(item.Category) !== 'none' && item.size_prices"
+              class="size-prices"
+            >
+              <span
+                v-for="(price, size) in item.size_prices"
+                :key="size"
+                class="size-price-tag"
+              >
                 {{ size }}: ₱{{ price.toFixed(2) }}
               </span>
             </div>
@@ -163,7 +173,11 @@
           <div class="field">
             <label>Category *</label>
             <div class="select-wrap full">
-              <select v-model="form.Category" required @change="onCategoryChange">
+              <select
+                v-model="form.Category"
+                required
+                @change="onCategoryChange"
+              >
                 <option value="">Select category</option>
                 <option v-for="cat in categories" :key="cat" :value="cat">
                   {{ cat }}
@@ -173,27 +187,32 @@
             </div>
           </div>
           <!--upload pics here-->
-                      <div class="field">
-              <label>Product Image</label>
-              <div class="image-upload-area">
-                <img 
-                  v-if="form.image_url" 
-                  :src="form.image_url" 
-                  class="preview-img" 
+          <div class="field">
+            <label>Product Image</label>
+            <div class="image-upload-area">
+              <img
+                v-if="form.image_url"
+                :src="form.image_url"
+                class="preview-img"
+              />
+              <label class="upload-label">
+                <input
+                  type="file"
+                  accept="image/*"
+                  @change="handleImageUpload"
+                  hidden
                 />
-                <label class="upload-label">
-                  <input type="file" accept="image/*" @change="handleImageUpload" hidden />
-                  {{ form.image_url ? 'Change Image' : '+ Upload Image' }}
-                </label>
-              </div>
+                {{ form.image_url ? "Change Image" : "+ Upload Image" }}
+              </label>
             </div>
-          
+          </div>
+
           <!-- Size Prices Section (shown only for categories with sizes) -->
           <div class="field" v-if="getSizeType(form.Category) !== 'none'">
             <label>Size Prices *</label>
             <div class="sizes-container">
-              <div 
-                v-for="size in getSizeLabels(form.Category)" 
+              <div
+                v-for="size in getSizeLabels(form.Category)"
                 :key="size"
                 class="size-price-row"
               >
@@ -486,57 +505,85 @@ import { supabase } from "@/supabase";
 
 const route = useRoute();
 
+// ─── Cache ────────────────────────────────────────────────────────────────────
+const CACHE_KEY_MENU = "cache_menu_items";
+const CACHE_KEY_RAW = "cache_raw_products";
+const CACHE_TTL = 30 * 60 * 1000;
+
+const saveCache = (key, data) => {
+  sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+};
+
+const loadCache = (key) => {
+  const raw = sessionStorage.getItem(key);
+  if (!raw) return null;
+  const parsed = JSON.parse(raw);
+  if (Date.now() - parsed.timestamp > CACHE_TTL) {
+    sessionStorage.removeItem(key);
+    return null;
+  }
+  return parsed.data;
+};
+
 // ─── Size Helper Functions ────────────────────────────────────────────────────
 const getSizeType = (cat) => {
-  if (!cat) return 'none';
+  if (!cat) return "none";
   const c = cat.toLowerCase();
-  if (c.includes('hot drink') || c.includes('hot coffee') || c === 'hot drinks') return 'hot';
-  if (c.includes('iced coffee') || c.includes('iced') || c.includes('frap') || c.includes('frappe') || c.includes('smoothie')) return 'iced';
-  return 'none';
+  if (c.includes("hot drink") || c.includes("hot coffee") || c === "hot drinks")
+    return "hot";
+  if (
+    c.includes("iced coffee") ||
+    c.includes("iced") ||
+    c.includes("frap") ||
+    c.includes("frappe") ||
+    c.includes("smoothie")
+  )
+    return "iced";
+  return "none";
 };
 
 const getSizeLabels = (cat) => {
   const t = getSizeType(cat);
-  if (t === 'hot') return ['Small', 'Regular'];
-  if (t === 'iced') return ['Regular', 'Big'];
+  if (t === "hot") return ["Small", "Regular"];
+  if (t === "iced") return ["Regular", "Big"];
   return [];
 };
 
 // ─── State ────────────────────────────────────────────────────────────────────
-const menuItems   = ref([]);
+const menuItems = ref([]);
 const rawProducts = ref([]);
-const loading     = ref(false);
+const loading = ref(false);
 
-const searchQuery    = ref("");
+const searchQuery = ref("");
 const filterCategory = ref("");
 
 // Product modal
-const showModal  = ref(false);
-const isEditing  = ref(false);
-const editingId  = ref(null);
-const saving     = ref(false);
-const form       = ref({ 
-  ProductName: "", 
-  Category: "", 
+const showModal = ref(false);
+const isEditing = ref(false);
+const editingId = ref(null);
+const saving = ref(false);
+const form = ref({
+  ProductName: "",
+  Category: "",
   Price: null,
   sizePrices: {},
-  image_url: null 
+  image_url: null,
 });
 
 // Recipe modal
 const showRecipeModal = ref(false);
-const loadingRecipe   = ref(false);
-const activeItem      = ref(null);
-const recipeRows      = ref([]);
-const savingRecipe    = ref(false);
+const loadingRecipe = ref(false);
+const activeItem = ref(null);
+const recipeRows = ref([]);
+const savingRecipe = ref(false);
 
 // All recipes modal
-const showAllRecipesModal  = ref(false);
-const allRecipesSummary    = ref([]);
-const loadingAllRecipes    = ref(false);
+const showAllRecipesModal = ref(false);
+const allRecipesSummary = ref([]);
+const loadingAllRecipes = ref(false);
 const activeRecipeCategory = ref("");
-const recipeSearch         = ref("");
-const expandedRecipe       = ref(null);
+const recipeSearch = ref("");
+const expandedRecipe = ref(null);
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const categories = computed(() => {
@@ -572,7 +619,7 @@ const allRecipesByCategory = computed(() =>
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(row);
     return acc;
-  }, {})
+  }, {}),
 );
 
 const filteredRecipePanel = computed(() => {
@@ -584,20 +631,41 @@ const filteredRecipePanel = computed(() => {
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 const fetchRawProducts = async () => {
+  const cached = loadCache(CACHE_KEY_RAW);
+  if (cached) {
+    rawProducts.value = cached;
+    return;
+  }
+
   const { data, error } = await supabase
     .from("rawproduct")
-    .select("rawproductid, name, category, unit, reorderlevel, stockquantity, expirationdate")
+    .select(
+      "rawproductid, name, category, unit, reorderlevel, stockquantity, expirationdate",
+    )
     .order("name");
   if (error) console.error("fetchRawProducts error:", error.message);
-  if (data) rawProducts.value = data;
+  if (data) {
+    rawProducts.value = data;
+    saveCache(CACHE_KEY_RAW, data);
+  }
 };
 
-const fetchMenuItems = async () => {
+const fetchMenuItems = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_MENU);
+    if (cached) {
+      menuItems.value = cached;
+      return;
+    }
+  }
+
   loading.value = true;
 
   const { data: products, error } = await supabase
     .from("product")
-    .select("ProductId, ProductName, ProductType, Category, Price, size_prices, image_url, CreatedAt, Status")
+    .select(
+      "ProductId, ProductName, ProductType, Category, Price, size_prices, image_url, CreatedAt, Status",
+    )
     .neq("Status", "Archived")
     .order("Category")
     .order("ProductName");
@@ -614,25 +682,22 @@ const fetchMenuItems = async () => {
 
   const recipeCounts = {};
   (recipes ?? []).forEach((r) => {
-    recipeCounts[r.finishedproductid] = (recipeCounts[r.finishedproductid] || 0) + 1;
+    recipeCounts[r.finishedproductid] =
+      (recipeCounts[r.finishedproductid] || 0) + 1;
   });
 
-  menuItems.value = (products ?? []).map((p) => ({
-    ...p,
-    _recipeCount: recipeCounts[p.ProductId] || 0,
-    _disabled: false,
-  }));
-
+  menuItems.value = (products ?? []).map((p) => ({ ...p }));
+  saveCache(CACHE_KEY_MENU, menuItems.value); // add this before loading.value = false
   loading.value = false;
 };
 
 // ─── Product CRUD ─────────────────────────────────────────────────────────────
 const onCategoryChange = () => {
   // Reset size prices when category changes
-  if (getSizeType(form.value.Category) !== 'none') {
+  if (getSizeType(form.value.Category) !== "none") {
     const sizeLabels = getSizeLabels(form.value.Category);
     const newSizePrices = {};
-    sizeLabels.forEach(size => {
+    sizeLabels.forEach((size) => {
       newSizePrices[size] = null;
     });
     form.value.sizePrices = newSizePrices;
@@ -644,12 +709,12 @@ const onCategoryChange = () => {
 const openAddModal = () => {
   isEditing.value = false;
   editingId.value = null;
-  form.value = { 
-    ProductName: "", 
-    Category: "", 
+  form.value = {
+    ProductName: "",
+    Category: "",
     Price: null,
-    sizePrices: {}, 
-    image_url: null
+    sizePrices: {},
+    image_url: null,
   };
   showModal.value = true;
 };
@@ -657,26 +722,24 @@ const openAddModal = () => {
 const openEditModal = async (item) => {
   isEditing.value = true;
   editingId.value = item.ProductId;
-  
+
   form.value = {
     ProductName: item.ProductName,
     Category: item.Category ?? "",
     Price: item.Price,
-    sizePrices: item.size_prices || {}
+    sizePrices: item.size_prices || {},
   };
   showModal.value = true;
 };
 
 const uploadImage = async (file) => {
-  const ext = file.name.split('.').pop();
+  const ext = file.name.split(".").pop();
   const path = `products/${Date.now()}.${ext}`;
   const { error } = await supabase.storage
-    .from('product-images')
+    .from("product-images")
     .upload(path, file, { upsert: true });
   if (error) throw error;
-  const { data } = supabase.storage
-    .from('product-images')
-    .getPublicUrl(path);
+  const { data } = supabase.storage.from("product-images").getPublicUrl(path);
   return data.publicUrl;
 };
 
@@ -686,11 +749,13 @@ const handleImageUpload = async (e) => {
   try {
     form.value.image_url = await uploadImage(file);
   } catch (err) {
-    alert('Image upload failed: ' + err.message);
+    alert("Image upload failed: " + err.message);
   }
 };
 
-const closeModal = () => { showModal.value = false; };
+const closeModal = () => {
+  showModal.value = false;
+};
 
 const saveItem = async () => {
   if (!form.value.ProductName) {
@@ -701,7 +766,7 @@ const saveItem = async () => {
     alert("Please select a category.");
     return;
   }
-  
+
   // Validate size prices if category has sizes
   const sizeLabels = getSizeLabels(form.value.Category);
   if (sizeLabels.length > 0) {
@@ -712,18 +777,18 @@ const saveItem = async () => {
       }
     }
   }
-  
+
   saving.value = true;
 
   const payload = {
     ProductName: form.value.ProductName,
     ProductType: "finished",
-    Category:    form.value.Category,
-    Price:       sizeLabels.length > 0 ? null : (form.value.Price ?? null),
+    Category: form.value.Category,
+    Price: sizeLabels.length > 0 ? null : (form.value.Price ?? null),
     size_prices: sizeLabels.length > 0 ? form.value.sizePrices : null,
-    image_url:   form.value.image_url ?? null 
+    image_url: form.value.image_url ?? null,
   };
-  
+
   let error;
   if (isEditing.value) {
     const { error: updateError } = await supabase
@@ -741,14 +806,18 @@ const saveItem = async () => {
   if (error) {
     alert("Failed to save: " + error.message);
   } else {
-    await fetchMenuItems();
+    sessionStorage.removeItem(CACHE_KEY_MENU);
+    await fetchMenuItems(true);
     closeModal();
   }
   saving.value = false;
 };
 
 const deleteItem = async (id) => {
-  if (!confirm("Archive this product? It can be restored from Backup & Restore.")) return;
+  if (
+    !confirm("Archive this product? It can be restored from Backup & Restore.")
+  )
+    return;
 
   const currentUser = localStorage.getItem("username") || "Unknown";
   const now = new Date().toISOString();
@@ -761,7 +830,8 @@ const deleteItem = async (id) => {
   if (error) {
     alert("Failed to archive: " + error.message);
   } else {
-    await fetchMenuItems();
+    sessionStorage.removeItem(CACHE_KEY_MENU);
+    await fetchMenuItems(true);
   }
 };
 
@@ -798,16 +868,16 @@ const closeRecipeModal = () => {
 
 const saveRecipe = async () => {
   if (!activeItem.value) return;
-  
+
   const validRows = recipeRows.value.filter(
-    (r) => r.rawproductid && r.quantityneeded > 0
+    (r) => r.rawproductid && r.quantityneeded > 0,
   );
-  
+
   if (validRows.length === 0) {
     alert("Please add at least one ingredient with a valid quantity.");
     return;
   }
-  
+
   savingRecipe.value = true;
 
   const { error: delError } = await supabase
@@ -829,14 +899,15 @@ const saveRecipe = async () => {
   }));
 
   const { error: insError } = await supabase.from("recipe").insert(inserts);
-  
+
   if (insError) {
     alert("Failed to save recipe: " + insError.message);
   } else {
-    await fetchMenuItems();
+    sessionStorage.removeItem(CACHE_KEY_MENU); 
+    await fetchMenuItems(true); 
     closeRecipeModal();
   }
-  
+
   savingRecipe.value = false;
 };
 
@@ -861,10 +932,14 @@ const openAllRecipes = async () => {
     .from("rawproduct")
     .select("rawproductid, name, unit");
   const rawMap = {};
-  (raws ?? []).forEach((r) => { rawMap[r.rawproductid] = r; });
+  (raws ?? []).forEach((r) => {
+    rawMap[r.rawproductid] = r;
+  });
 
-  const productIds = [...new Set((recipes ?? []).map((r) => r.finishedproductid))];
-  
+  const productIds = [
+    ...new Set((recipes ?? []).map((r) => r.finishedproductid)),
+  ];
+
   if (productIds.length === 0) {
     allRecipesSummary.value = [];
     loadingAllRecipes.value = false;
@@ -952,7 +1027,9 @@ onMounted(async () => {
   color: #31201d;
   transition: 0.2s;
 }
-.recipe-all-btn:hover { border-color: #31201d; }
+.recipe-all-btn:hover {
+  border-color: #31201d;
+}
 .add-btn {
   display: flex;
   align-items: center;
@@ -967,7 +1044,9 @@ onMounted(async () => {
   cursor: pointer;
   transition: 0.2s;
 }
-.add-btn:hover { background: #4a3330; }
+.add-btn:hover {
+  background: #4a3330;
+}
 
 /* FILTERS */
 .filters-bar {
@@ -1002,8 +1081,12 @@ onMounted(async () => {
   left: 10px;
   color: #999;
 }
-.select-wrap { position: relative; }
-.select-wrap.full { max-width: 100%; }
+.select-wrap {
+  position: relative;
+}
+.select-wrap.full {
+  max-width: 100%;
+}
 .filter-sel {
   appearance: none;
   padding: 9px 32px 9px 12px;
@@ -1016,7 +1099,9 @@ onMounted(async () => {
   min-width: 150px;
   transition: border-color 0.2s;
 }
-.filter-sel:focus { border-color: #31201d; }
+.filter-sel:focus {
+  border-color: #31201d;
+}
 .sel-icon {
   position: absolute;
   right: 10px;
@@ -1044,7 +1129,11 @@ onMounted(async () => {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .empty-state {
   text-align: center;
   padding: 60px;
@@ -1053,7 +1142,9 @@ onMounted(async () => {
 }
 
 /* MENU SECTION */
-.menu-section { margin-bottom: 32px; }
+.menu-section {
+  margin-bottom: 32px;
+}
 .section-title {
   font-size: 16px;
   font-weight: 700;
@@ -1094,8 +1185,13 @@ onMounted(async () => {
   flex-direction: column;
   gap: 10px;
 }
-.menu-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
-.item-disabled { opacity: 0.45; filter: grayscale(0.6); }
+.menu-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+.item-disabled {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
 
 .card-image {
   width: 100%;
@@ -1113,7 +1209,9 @@ onMounted(async () => {
   height: 100%;
   object-fit: cover;
 }
-.card-image.placeholder { color: #d4b896; }
+.card-image.placeholder {
+  color: #d4b896;
+}
 .preview-img {
   width: 100%;
   max-height: 160px;
@@ -1132,7 +1230,9 @@ onMounted(async () => {
   color: #31201d;
   transition: 0.2s;
 }
-.upload-label:hover { background: #ede5d8; }
+.upload-label:hover {
+  background: #ede5d8;
+}
 
 .card-top {
   display: flex;
@@ -1154,7 +1254,10 @@ onMounted(async () => {
   gap: 8px;
   margin-bottom: 3px;
 }
-.item-icon { color: #c49a6c; flex-shrink: 0; }
+.item-icon {
+  color: #c49a6c;
+  flex-shrink: 0;
+}
 .name-row h4 {
   margin: 0;
   font-size: 18px;
@@ -1196,13 +1299,19 @@ onMounted(async () => {
   background: #fff9f0;
   color: #c49a6c;
 }
-.recipe-btn.view:hover { background: #fff0dc; }
+.recipe-btn.view:hover {
+  background: #fff0dc;
+}
 .recipe-btn.add {
   border: 1px dashed #ddd;
   background: #fafafa;
   color: #bbb;
 }
-.recipe-btn.add:hover { border-color: #c49a6c; color: #c49a6c; background: #fff9f0; }
+.recipe-btn.add:hover {
+  border-color: #c49a6c;
+  color: #c49a6c;
+  background: #fff9f0;
+}
 
 /* PRICE ROW */
 .price-action-row {
@@ -1213,8 +1322,16 @@ onMounted(async () => {
   padding-top: 12px;
   margin-top: 2px;
 }
-.price { font-size: 18px; font-weight: 800; color: #31201d; }
-.card-actions { display: flex; align-items: center; gap: 6px; }
+.price {
+  font-size: 18px;
+  font-weight: 800;
+  color: #31201d;
+}
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .icon-btn {
   border: 1px solid #eee;
   background: white;
@@ -1227,14 +1344,21 @@ onMounted(async () => {
   justify-content: center;
   transition: 0.2s;
 }
-.icon-btn.edit:hover { border-color: #31201d; color: #31201d; }
-.icon-btn.delete:hover { border-color: #dc2626; color: #dc2626; background: #fee2e2; }
+.icon-btn.edit:hover {
+  border-color: #31201d;
+  color: #31201d;
+}
+.icon-btn.delete:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+  background: #fee2e2;
+}
 
 /* MODAL BASE */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1247,19 +1371,30 @@ onMounted(async () => {
   max-width: 95vw;
   border-radius: 16px;
   padding: 28px 32px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
   max-height: 92vh;
   overflow-y: auto;
 }
-.modal-content.recipe-modal { width: 580px; }
+.modal-content.recipe-modal {
+  width: 580px;
+}
 .modal-hdr {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 24px;
 }
-.modal-hdr h3 { font-size: 18px; font-weight: 700; color: #31201d; margin: 0 0 3px; }
-.modal-hdr p  { font-size: 13px; color: #888; margin: 0; }
+.modal-hdr h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #31201d;
+  margin: 0 0 3px;
+}
+.modal-hdr p {
+  font-size: 13px;
+  color: #888;
+  margin: 0;
+}
 .close-x-btn {
   background: none;
   border: none;
@@ -1270,11 +1405,22 @@ onMounted(async () => {
   transition: 0.2s;
   flex-shrink: 0;
 }
-.close-x-btn:hover { background: #f5f5f5; color: #31201d; }
+.close-x-btn:hover {
+  background: #f5f5f5;
+  color: #31201d;
+}
 
 /* FORM */
-.form-stack { display: flex; flex-direction: column; gap: 16px; }
-.field { display: flex; flex-direction: column; gap: 6px; }
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .field label {
   font-size: 12px;
   font-weight: 700;
@@ -1291,7 +1437,10 @@ onMounted(async () => {
   font-size: 14px;
   transition: 0.2s;
 }
-.field input:focus { border-color: #c49a6c; background: white; }
+.field input:focus {
+  border-color: #c49a6c;
+  background: white;
+}
 .select-wrap.full select {
   width: 100%;
   appearance: none;
@@ -1303,7 +1452,9 @@ onMounted(async () => {
   outline: none;
   cursor: pointer;
 }
-.select-wrap.full select:focus { border-color: #c49a6c; }
+.select-wrap.full select:focus {
+  border-color: #c49a6c;
+}
 .submit-full {
   width: 100%;
   background: #31201d;
@@ -1317,8 +1468,13 @@ onMounted(async () => {
   cursor: pointer;
   transition: 0.2s;
 }
-.submit-full:hover:not(:disabled) { background: #4a3330; }
-.submit-full:disabled { opacity: 0.5; cursor: not-allowed; }
+.submit-full:hover:not(:disabled) {
+  background: #4a3330;
+}
+.submit-full:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* Size Prices Styles */
 .sizes-container {
@@ -1363,7 +1519,9 @@ onMounted(async () => {
 }
 
 /* RECIPE BODY */
-.recipe-body { margin-bottom: 16px; }
+.recipe-body {
+  margin-bottom: 16px;
+}
 .ingredient-header {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 36px;
@@ -1378,7 +1536,11 @@ onMounted(async () => {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.ingredient-list { max-height: 280px; overflow-y: auto; padding: 2px; }
+.ingredient-list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 2px;
+}
 .ingredient-row {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 36px;
@@ -1398,8 +1560,14 @@ onMounted(async () => {
   transition: 0.2s;
   box-sizing: border-box;
 }
-.ingredient-row input:focus { border-color: #c49a6c; background: white; }
-.ingredient-row .select-wrap.full select { height: 40px; padding: 0 28px 0 10px; }
+.ingredient-row input:focus {
+  border-color: #c49a6c;
+  background: white;
+}
+.ingredient-row .select-wrap.full select {
+  height: 40px;
+  padding: 0 28px 0 10px;
+}
 .remove-ing {
   background: none;
   border: none;
@@ -1412,7 +1580,9 @@ onMounted(async () => {
   border-radius: 6px;
   transition: 0.2s;
 }
-.remove-ing:hover { background: #fee2e2; }
+.remove-ing:hover {
+  background: #fee2e2;
+}
 .add-ing-btn {
   margin-top: 10px;
   background: none;
@@ -1430,8 +1600,15 @@ onMounted(async () => {
   gap: 8px;
   transition: 0.2s;
 }
-.add-ing-btn:hover { background: #fff9f0; }
-.empty-recipe { text-align: center; color: #bbb; padding: 20px; font-size: 14px; }
+.add-ing-btn:hover {
+  background: #fff9f0;
+}
+.empty-recipe {
+  text-align: center;
+  color: #bbb;
+  padding: 20px;
+  font-size: 14px;
+}
 .form-actions {
   display: flex;
   gap: 10px;
@@ -1457,8 +1634,13 @@ onMounted(async () => {
   cursor: pointer;
   transition: 0.2s;
 }
-.submit-full-sm:hover:not(:disabled) { background: #4a3330; }
-.submit-full-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.submit-full-sm:hover:not(:disabled) {
+  background: #4a3330;
+}
+.submit-full-sm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ALL RECIPES MODAL */
 .modal-content.all-recipes-modal {
@@ -1475,7 +1657,11 @@ onMounted(async () => {
   border-bottom: 1px solid #f0f0f0;
   margin-bottom: 0;
 }
-.all-recipes-layout { display: flex; flex: 1; overflow: hidden; }
+.all-recipes-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
 
 .recipe-sidebar {
   width: 200px;
@@ -1504,9 +1690,18 @@ onMounted(async () => {
   transition: 0.15s;
   gap: 8px;
 }
-.cat-tab:hover { background: #f5f5f5; color: #31201d; }
-.cat-tab.active { background: #fff9f0; color: #31201d; font-weight: 700; }
-.cat-tab-name { flex: 1; }
+.cat-tab:hover {
+  background: #f5f5f5;
+  color: #31201d;
+}
+.cat-tab.active {
+  background: #fff9f0;
+  color: #31201d;
+  font-weight: 700;
+}
+.cat-tab-name {
+  flex: 1;
+}
 .cat-tab-count {
   font-size: 11px;
   font-weight: 700;
@@ -1517,9 +1712,17 @@ onMounted(async () => {
   min-width: 20px;
   text-align: center;
 }
-.cat-tab.active .cat-tab-count { background: #c49a6c22; color: #c49a6c; }
+.cat-tab.active .cat-tab-count {
+  background: #c49a6c22;
+  color: #c49a6c;
+}
 
-.recipe-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.recipe-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .recipe-search {
   padding: 14px 16px;
   border-bottom: 1px solid #f5f5f5;
@@ -1528,7 +1731,10 @@ onMounted(async () => {
   gap: 8px;
   flex-shrink: 0;
 }
-.recipe-search svg { color: #bbb; flex-shrink: 0; }
+.recipe-search svg {
+  color: #bbb;
+  flex-shrink: 0;
+}
 .recipe-search input {
   flex: 1;
   border: none;
@@ -1537,7 +1743,9 @@ onMounted(async () => {
   background: none;
   color: #31201d;
 }
-.recipe-search input::placeholder { color: #ccc; }
+.recipe-search input::placeholder {
+  color: #ccc;
+}
 .recipe-panel-scroll {
   flex: 1;
   overflow-y: auto;
@@ -1552,10 +1760,17 @@ onMounted(async () => {
   border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
-.recipe-card:hover { border-color: #c49a6c44; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-.recipe-card.expanded { border-color: #c49a6c; }
+.recipe-card:hover {
+  border-color: #c49a6c44;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.recipe-card.expanded {
+  border-color: #c49a6c;
+}
 .recipe-card-header {
   display: flex;
   align-items: center;
@@ -1564,7 +1779,13 @@ onMounted(async () => {
   background: white;
   gap: 10px;
 }
-.recipe-card-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.recipe-card-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
 .recipe-card-name {
   font-size: 13px;
   font-weight: 600;
@@ -1582,11 +1803,29 @@ onMounted(async () => {
   border-radius: 10px;
   flex-shrink: 0;
 }
-.recipe-card.expanded .recipe-ing-pill { background: #c49a6c22; color: #c49a6c; }
-.recipe-card-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.recipe-card-price { font-size: 13px; font-weight: 700; color: #31201d; }
-.expand-icon { color: #bbb; transition: transform 0.2s; }
-.expand-icon.rotated { transform: rotate(180deg); color: #c49a6c; }
+.recipe-card.expanded .recipe-ing-pill {
+  background: #c49a6c22;
+  color: #c49a6c;
+}
+.recipe-card-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.recipe-card-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: #31201d;
+}
+.expand-icon {
+  color: #bbb;
+  transition: transform 0.2s;
+}
+.expand-icon.rotated {
+  transform: rotate(180deg);
+  color: #c49a6c;
+}
 .recipe-card-body {
   padding: 0 14px 12px;
   background: #fdfaf7;
@@ -1603,9 +1842,21 @@ onMounted(async () => {
   border-bottom: 1px solid #f0ebe0;
   font-size: 12px;
 }
-.ing-row:last-child { border-bottom: none; }
-.ing-dot { width: 5px; height: 5px; border-radius: 50%; background: #c49a6c; flex-shrink: 0; }
-.ing-name { flex: 1; color: #444; font-weight: 500; }
+.ing-row:last-child {
+  border-bottom: none;
+}
+.ing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #c49a6c;
+  flex-shrink: 0;
+}
+.ing-name {
+  flex: 1;
+  color: #444;
+  font-weight: 500;
+}
 .ing-qty {
   color: #c49a6c;
   font-weight: 600;
@@ -1617,11 +1868,17 @@ onMounted(async () => {
 }
 
 @media (max-width: 1024px) {
-  .menu-grid { grid-template-columns: repeat(2, 1fr); }
+  .menu-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 @media (max-width: 640px) {
-  .menu-grid { grid-template-columns: 1fr; }
-  .all-recipes-layout { flex-direction: column; }
+  .menu-grid {
+    grid-template-columns: 1fr;
+  }
+  .all-recipes-layout {
+    flex-direction: column;
+  }
   .recipe-sidebar {
     width: 100%;
     flex-direction: row;

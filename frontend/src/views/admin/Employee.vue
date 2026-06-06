@@ -49,13 +49,25 @@
         <option value="On Leave">On Leave</option>
         <option value="Inactive">Inactive</option>
       </select>
-      <select v-model="filterBranch" class="form-select filter-select" :class="{ 'is-invalid': branchLoadError }">
-        <option value="">{{ branchLoadError ? 'Error loading branches' : 'All Branches' }}</option>
+      <select
+        v-model="filterBranch"
+        class="form-select filter-select"
+        :class="{ 'is-invalid': branchLoadError }"
+      >
+        <option value="">
+          {{ branchLoadError ? "Error loading branches" : "All Branches" }}
+        </option>
         <option v-for="b in branches" :key="b.id" :value="b.id">
           {{ b.name }}
         </option>
       </select>
-      <button v-if="branchLoadError" class="btn btn-outline-danger btn-sm" @click="fetchBranches" title="Retry loading branches" type="button">
+      <button
+        v-if="branchLoadError"
+        class="btn btn-outline-danger btn-sm"
+        @click="fetchBranches"
+        title="Retry loading branches"
+        type="button"
+      >
         <i class="bi bi-arrow-clockwise"></i> Retry
       </button>
       <button class="btn btn-outline-secondary btn-sm" @click="clearFilters">
@@ -221,13 +233,29 @@
               <div class="col-6">
                 <label class="form-label-sm">Branch</label>
                 <div class="d-flex gap-1">
-                  <select v-model="form.branchId" class="form-select fc-brand" :class="{ 'is-invalid': branchLoadError }">
-                    <option value="" disabled>{{ branchLoadError ? 'Error loading branches' : 'Select branch' }}</option>
+                  <select
+                    v-model="form.branchId"
+                    class="form-select fc-brand"
+                    :class="{ 'is-invalid': branchLoadError }"
+                  >
+                    <option value="" disabled>
+                      {{
+                        branchLoadError
+                          ? "Error loading branches"
+                          : "Select branch"
+                      }}
+                    </option>
                     <option v-for="b in branches" :key="b.id" :value="b.id">
                       {{ b.name }}
                     </option>
                   </select>
-                  <button v-if="branchLoadError" class="btn btn-outline-danger btn-sm" @click="fetchBranches" type="button" title="Retry loading branches">
+                  <button
+                    v-if="branchLoadError"
+                    class="btn btn-outline-danger btn-sm"
+                    @click="fetchBranches"
+                    type="button"
+                    title="Retry loading branches"
+                  >
                     <i class="bi bi-arrow-clockwise"></i>
                   </button>
                 </div>
@@ -286,7 +314,11 @@
                 </div>
                 <!-- Soft warning: below minimum wage floor -->
                 <div
-                  v-if="!errors.hourlyRate && form.hourlyRate > 0 && form.hourlyRate < 71"
+                  v-if="
+                    !errors.hourlyRate &&
+                    form.hourlyRate > 0 &&
+                    form.hourlyRate < 71
+                  "
                   class="text-warning small mt-1"
                 >
                   <i class="bi bi-exclamation-triangle me-1"></i>
@@ -353,16 +385,26 @@
           <div class="modal-panel-body">
             <p class="mb-0">
               This will archive
-              <strong>{{ deleteTarget?.firstName }} {{ deleteTarget?.lastName }}</strong>.
-              They will no longer appear in the system but their records will be preserved.
+              <strong
+                >{{ deleteTarget?.firstName }}
+                {{ deleteTarget?.lastName }}</strong
+              >. They will no longer appear in the system but their records will
+              be preserved.
             </p>
           </div>
           <div class="modal-panel-footer modal-panel-footer--start">
             <button class="btn btn-ghost" @click="showDeleteConfirm = false">
               Cancel
             </button>
-            <button class="btn btn-delete-brand" @click="deleteEmployee" :disabled="archiving">
-              <span v-if="archiving" class="spinner-border spinner-border-sm me-1"></span>
+            <button
+              class="btn btn-delete-brand"
+              @click="deleteEmployee"
+              :disabled="archiving"
+            >
+              <span
+                v-if="archiving"
+                class="spinner-border spinner-border-sm me-1"
+              ></span>
               Archive Employee
             </button>
           </div>
@@ -394,6 +436,10 @@ import { supabase } from "@/supabase.js";
 
 const route = useRoute();
 
+window.addEventListener("beforeunload", () => {
+  sessionStorage.setItem("page_refreshed", "1");
+});
+
 const isLoading = ref(true);
 const search = ref("");
 const filterDept = ref("");
@@ -408,6 +454,11 @@ const deleteTarget = ref(null);
 const toast = ref({ show: false, message: "", type: "success" });
 const errors = ref({});
 const employees = ref([]);
+const managerBranchId = computed(() => {
+  const role = localStorage.getItem("role");
+  const branch = localStorage.getItem("branch");
+  return role === "admin" ? null : branch;
+});
 
 const branches = ref([]);
 const branchLoadError = ref(false);
@@ -440,17 +491,51 @@ const emptyForm = () => ({
 
 const form = ref(emptyForm());
 
+// ─── Cache ────────────────────────────────────────────────────────────────────
+const CACHE_KEY_EMPLOYEES = "cache_employees";
+const CACHE_KEY_BRANCHES = "cache_branches";
+const CACHE_TTL = 30 * 60 * 1000;
+
+const saveCache = (key, data) => {
+  sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+};
+
+const loadCache = (key) => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data;
+  } catch {
+    return null;
+  }
+};
+
 // Fetch branches from Supabase
 const fetchBranches = async () => {
   branchLoadError.value = false;
+
+  const cached = loadCache(CACHE_KEY_BRANCHES);
+  if (cached) {
+    branches.value = cached;
+    return;
+  }
+
   try {
-    const { data, error } = await supabase.from("branch").select("BranchId, BranchName");
+    let query = supabase.from("branch").select("BranchId, BranchName");
+
+    const { data, error } = await query;
     if (error) throw error;
     if (data) {
       branches.value = data.map((b) => ({
         id: String(b.BranchId),
         name: b.BranchName,
       }));
+      saveCache(CACHE_KEY_BRANCHES, branches.value);
     }
   } catch (err) {
     console.error("[Employee] Failed to load branches:", err);
@@ -459,17 +544,33 @@ const fetchBranches = async () => {
   }
 };
 
-// Fetch employees from Supabase
-const fetchEmployees = async () => {
+// Fetch employees from Supabase (scoped to branch, with retry/error checking)
+const fetchEmployees = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_EMPLOYEES);
+    if (cached) {
+      employees.value = cached;
+      isLoading.value = false;
+      return;
+    }
+  }
+
   isLoading.value = true;
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("employee")
       .select(
         "EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status",
       )
-      .neq("Status", "Archived")
-      .order("EmployeeId", { ascending: true });
+      .neq("Status", "Archived");
+
+    if (managerBranchId.value) {
+      query = query.eq("BranchAssigned", managerBranchId.value);
+    }
+
+    const { data, error } = await query.order("EmployeeId", {
+      ascending: true,
+    });
 
     if (error) throw error;
 
@@ -488,6 +589,7 @@ const fetchEmployees = async () => {
         branchId: String(e.BranchAssigned),
         status: e.Status,
       }));
+      saveCache(CACHE_KEY_EMPLOYEES, employees.value);
     }
   } catch (err) {
     console.error("[Employee] Failed to fetch employees:", err);
@@ -584,8 +686,12 @@ const validate = () => {
     e.email = "Valid email is required.";
 
   // VAL-1: Phone — optional but must be valid PH format if provided
-  if (form.value.phone && !/^(\+63|0)\d{9,10}$/.test(form.value.phone.replace(/\s|-/g, "")))
-    e.phone = "Enter a valid PH number (e.g. +63 917 123 4567 or 0917 123 4567).";
+  if (
+    form.value.phone &&
+    !/^(\+63|0)\d{9,10}$/.test(form.value.phone.replace(/\s|-/g, ""))
+  )
+    e.phone =
+      "Enter a valid PH number (e.g. +63 917 123 4567 or 0917 123 4567).";
 
   // Hourly rate — must be > 0 (warning for <71 is shown inline, not a hard block)
   if (!form.value.hourlyRate || form.value.hourlyRate <= 0)
@@ -652,7 +758,9 @@ const saveEmployee = async () => {
           .maybeSingle();
 
         if (userSelectError) {
-          throw new Error(`Failed to find linked user: ${userSelectError.message}`);
+          throw new Error(
+            `Failed to find linked user: ${userSelectError.message}`,
+          );
         }
 
         if (userRecord) {
@@ -662,12 +770,15 @@ const saveEmployee = async () => {
             .eq("id", userRecord.id);
 
           if (userUpdateError) {
-            throw new Error(`Employee updated, but user branch update failed: ${userUpdateError.message}`);
+            throw new Error(
+              `Employee updated, but user branch update failed: ${userUpdateError.message}`,
+            );
           }
         }
       }
       showToast("Employee updated successfully.", "success");
-      await fetchEmployees();
+      sessionStorage.removeItem(CACHE_KEY_EMPLOYEES);
+      await fetchEmployees(true);
       closeModal();
     } else {
       // Step 0: Pre-check duplicate username to avoid silent collision (ERR-4)
@@ -684,10 +795,14 @@ const saveEmployee = async () => {
         .maybeSingle();
 
       if (checkError) {
-        throw new Error(`Failed to check username availability: ${checkError.message}`);
+        throw new Error(
+          `Failed to check username availability: ${checkError.message}`,
+        );
       }
       if (existingUser) {
-        throw new Error(`An account with the username "${generatedUsername}" already exists.`);
+        throw new Error(
+          `An account with the username "${generatedUsername}" already exists.`,
+        );
       }
 
       // Step 1: Insert employee first to get the EmployeeId back
@@ -698,7 +813,9 @@ const saveEmployee = async () => {
         .single();
 
       if (empError || !empData) {
-        throw new Error(`Failed to add employee: ${empError?.message || "No data returned"}`);
+        throw new Error(
+          `Failed to add employee: ${empError?.message || "No data returned"}`,
+        );
       }
 
       const newEmployeeId = empData.EmployeeId;
@@ -737,17 +854,25 @@ const saveEmployee = async () => {
 
       if (userError) {
         // Rollback: delete the created employee record since user account creation failed (ERR-3)
-        console.error("[Employee] User creation failed, rolling back employee insert...");
+        console.error(
+          "[Employee] User creation failed, rolling back employee insert...",
+        );
         const { error: rollbackError } = await supabase
           .from("employee")
           .delete()
           .eq("EmployeeId", newEmployeeId);
 
         if (rollbackError) {
-          console.error("[Employee] Rollback failed! Orphan employee record left:", newEmployeeId, rollbackError);
+          console.error(
+            "[Employee] Rollback failed! Orphan employee record left:",
+            newEmployeeId,
+            rollbackError,
+          );
         }
 
-        throw new Error(`Employee record created, but user account creation failed: ${userError.message}. Changes rolled back.`);
+        throw new Error(
+          `Employee record created, but user account creation failed: ${userError.message}. Changes rolled back.`,
+        );
       }
 
       const roleDefaultPlaintext = {
@@ -764,7 +889,10 @@ const saveEmployee = async () => {
     }
   } catch (err) {
     console.error("[Employee] Save failed:", err);
-    showToast(err.message || "An unexpected error occurred while saving.", "error");
+    showToast(
+      err.message || "An unexpected error occurred while saving.",
+      "error",
+    );
   } finally {
     saving.value = false;
   }
@@ -800,16 +928,23 @@ const deleteEmployee = async () => {
 
     if (userError) {
       // Employee was archived but user account failed — log and warn
-      console.error("[Employee] Failed to archive linked user:", userError.message);
-      showToast("Employee archived, but user account deactivation failed.", "error");
+      console.error(
+        "[Employee] Failed to archive linked user:",
+        userError.message,
+      );
+      showToast(
+        "Employee archived, but user account deactivation failed.",
+        "error",
+      );
     } else {
       showToast(
         `${deleteTarget.value.firstName} ${deleteTarget.value.lastName} has been archived.`,
-        "success"
+        "success",
       );
     }
 
-    await fetchEmployees();
+    sessionStorage.removeItem(CACHE_KEY_EMPLOYEES);
+    await fetchEmployees(true);
     showDeleteConfirm.value = false;
   } catch (err) {
     console.error("[Employee] Unexpected archive error:", err);
@@ -876,14 +1011,15 @@ const showToast = (message, type = "success") => {
 };
 
 onMounted(async () => {
+  // If user did a hard refresh, a flag was set in beforeunload — clear cache
+  if (sessionStorage.getItem("page_refreshed")) {
+    sessionStorage.removeItem("page_refreshed");
+    sessionStorage.removeItem(CACHE_KEY_EMPLOYEES);
+    sessionStorage.removeItem(CACHE_KEY_BRANCHES);
+  }
+
   await fetchBranches();
   await fetchEmployees();
-  const editId = route.query.edit;
-  if (editId) {
-    // FIX: use mapped 'id' field, not raw DB column 'EmployeeId'
-    const emp = employees.value.find((e) => String(e.id) === editId);
-    if (emp) openEditModal(emp);
-  }
 });
 </script>
 

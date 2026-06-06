@@ -117,6 +117,11 @@ const routes = [
         component: () => import("./views/manager/Sales.vue"),
       },
       {
+        path: "employees",
+        name: "ManagerEmployees",
+        component: () => import("./views/manager/Employee.vue"),
+      },
+      {
         path: "schedule",
         name: "ManagerSchedule",
         component: () => import("./views/manager/Schedule.vue"),
@@ -233,14 +238,17 @@ router.beforeEach((to, from, next) => {
   // Prevent wrong role from accessing other role's pages
   if (isLoggedIn) {
     if (to.path.startsWith("/admin") && role !== "admin") {
+      localStorage.clear();
       next("/login");
       return;
     }
     if (to.path.startsWith("/manager") && role !== "manager") {
+      localStorage.clear();
       next("/login");
       return;
     }
     if (to.path.startsWith("/staff") && role !== "staff") {
+      localStorage.clear();
       next("/login");
       return;
     }

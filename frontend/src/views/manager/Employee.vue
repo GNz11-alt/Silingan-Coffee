@@ -6,7 +6,9 @@
         <h4 class="page-title mb-1">Employee Management</h4>
         <p class="page-sub mb-0">
           Manage hourly employees and availability ·
-           {{ employees.length }} total employees{{ currentBranchName ? ' at ' + currentBranchName : '' }}
+          {{ employees.length }} total employees{{
+            currentBranchName ? " at " + currentBranchName : ""
+          }}
         </p>
       </div>
     </div>
@@ -105,8 +107,13 @@
               <i class="bi bi-person-badge"></i> Role:
               <span
                 class="role-pill"
-                :class="employeeRole(emp.position) === 'Manager' ? 'role-manager' : 'role-staff'"
-              >{{ employeeRole(emp.position) }}</span>
+                :class="
+                  employeeRole(emp.position) === 'Manager'
+                    ? 'role-manager'
+                    : 'role-staff'
+                "
+                >{{ employeeRole(emp.position) }}</span
+              >
             </div>
             <div class="detail-row">
               <i class="bi bi-calendar3"></i> Hired:
@@ -134,9 +141,7 @@
           <div class="modal-panel-header">
             <div>
               <h5 class="mb-0">Edit Employee</h5>
-              <p class="modal-sub mb-0">
-                Update employee information
-              </p>
+              <p class="modal-sub mb-0">Update employee information</p>
             </div>
             <button class="btn-close-panel" @click="closeModal">
               <i class="bi bi-x-lg"></i>
@@ -196,13 +201,29 @@
               <div class="col-6">
                 <label class="form-label-sm">Branch</label>
                 <div class="d-flex gap-1">
-                  <select v-model="form.branchId" class="form-select fc-brand" :class="{ 'is-invalid': branchLoadError }">
-                    <option value="" disabled>{{ branchLoadError ? 'Error loading branches' : 'Select branch' }}</option>
+                  <select
+                    v-model="form.branchId"
+                    class="form-select fc-brand"
+                    :class="{ 'is-invalid': branchLoadError }"
+                  >
+                    <option value="" disabled>
+                      {{
+                        branchLoadError
+                          ? "Error loading branches"
+                          : "Select branch"
+                      }}
+                    </option>
                     <option v-for="b in branches" :key="b.id" :value="b.id">
                       {{ b.name }}
                     </option>
                   </select>
-                  <button v-if="branchLoadError" class="btn btn-outline-danger btn-sm" @click="fetchBranches" type="button" title="Retry loading branches">
+                  <button
+                    v-if="branchLoadError"
+                    class="btn btn-outline-danger btn-sm"
+                    @click="fetchBranches"
+                    type="button"
+                    title="Retry loading branches"
+                  >
                     <i class="bi bi-arrow-clockwise"></i>
                   </button>
                 </div>
@@ -261,7 +282,11 @@
                 </div>
                 <!-- Soft warning: below minimum wage floor -->
                 <div
-                  v-if="!errors.hourlyRate && form.hourlyRate > 0 && form.hourlyRate < 71"
+                  v-if="
+                    !errors.hourlyRate &&
+                    form.hourlyRate > 0 &&
+                    form.hourlyRate < 71
+                  "
                   class="text-warning small mt-1"
                 >
                   <i class="bi bi-exclamation-triangle me-1"></i>
@@ -328,16 +353,26 @@
           <div class="modal-panel-body">
             <p class="mb-0">
               This will archive
-              <strong>{{ deleteTarget?.firstName }} {{ deleteTarget?.lastName }}</strong>.
-              They will no longer appear in the system but their records will be preserved.
+              <strong
+                >{{ deleteTarget?.firstName }}
+                {{ deleteTarget?.lastName }}</strong
+              >. They will no longer appear in the system but their records will
+              be preserved.
             </p>
           </div>
           <div class="modal-panel-footer modal-panel-footer--start">
             <button class="btn btn-ghost" @click="showDeleteConfirm = false">
               Cancel
             </button>
-            <button class="btn btn-delete-brand" @click="deleteEmployee" :disabled="archiving">
-              <span v-if="archiving" class="spinner-border spinner-border-sm me-1"></span>
+            <button
+              class="btn btn-delete-brand"
+              @click="deleteEmployee"
+              :disabled="archiving"
+            >
+              <span
+                v-if="archiving"
+                class="spinner-border spinner-border-sm me-1"
+              ></span>
               Archive Employee
             </button>
           </div>
@@ -367,7 +402,11 @@ import { ref, computed, onMounted } from "vue";
 import { supabase } from "@/supabase.js";
 import { useUserBranch } from "@/composables/useUserBranch.js";
 
-const isLoading = ref(true);
+window.addEventListener("beforeunload", () => {
+  sessionStorage.setItem("page_refreshed", "1");
+});
+
+const isLoading = ref(false);
 const search = ref("");
 const filterDept = ref("");
 const filterStatus = ref("");
@@ -382,7 +421,8 @@ const employees = ref([]);
 
 const branches = ref([]);
 const branchLoadError = ref(false);
-const { isAdmin, userBranchId, userBranchName, resolveBranch } = useUserBranch();
+const { isAdmin, userBranchId, userBranchName, resolveBranch } =
+  useUserBranch();
 const managerBranchId = ref(null);
 const currentBranchName = ref("");
 // Today's date in YYYY-MM-DD for the hire date max attribute
@@ -417,18 +457,52 @@ const emptyForm = () => ({
 
 const form = ref(emptyForm());
 
+// ─── Cache ────────────────────────────────────────────────────────────────────
+const CACHE_KEY_EMPLOYEES = "cache_mgr_employees";
+const CACHE_KEY_BRANCHES = "cache_mgr_branches";
+const CACHE_TTL = 30 * 60 * 1000;
+
+const saveCache = (key, data) => {
+  sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+};
+
+const loadCache = (key) => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data;
+  } catch {
+    return null;
+  }
+};
+
 // Fetch branches from Supabase (scoped to manager's branch SEC-4)
 const fetchBranches = async () => {
   branchLoadError.value = false;
+
+  const cached = loadCache(CACHE_KEY_BRANCHES);
+  if (cached) {
+    branches.value = cached;
+    return;
+  }
+
   try {
     let query = supabase.from("branch").select("BranchId, BranchName");
-    if (managerBranchId.value) {
+    if (managerBranchId.value)
       query = query.eq("BranchId", managerBranchId.value);
-    }
     const { data, error } = await query;
     if (error) throw error;
     if (data) {
-      branches.value = data.map((b) => ({ id: String(b.BranchId), name: b.BranchName }));
+      branches.value = data.map((b) => ({
+        id: String(b.BranchId),
+        name: b.BranchName,
+      }));
+      saveCache(CACHE_KEY_BRANCHES, branches.value);
     }
   } catch (err) {
     console.error("[Employee] Failed to load branches:", err);
@@ -438,7 +512,16 @@ const fetchBranches = async () => {
 };
 
 // Fetch employees from Supabase (scoped to branch, with retry/error checking)
-const fetchEmployees = async () => {
+const fetchEmployees = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_EMPLOYEES);
+    if (cached) {
+      employees.value = cached;
+      isLoading.value = false;
+      return;
+    }
+  }
+
   isLoading.value = true;
   try {
     let query = supabase
@@ -452,7 +535,9 @@ const fetchEmployees = async () => {
       query = query.eq("BranchAssigned", managerBranchId.value);
     }
 
-    const { data, error } = await query.order("EmployeeId", { ascending: true });
+    const { data, error } = await query.order("EmployeeId", {
+      ascending: true,
+    });
 
     if (error) throw error;
 
@@ -471,6 +556,7 @@ const fetchEmployees = async () => {
         branchId: String(e.BranchAssigned),
         status: e.Status,
       }));
+      saveCache(CACHE_KEY_EMPLOYEES, employees.value);
     }
   } catch (err) {
     console.error("[Employee] Failed to fetch employees:", err);
@@ -539,7 +625,7 @@ const closeModal = () => {
 
 const validate = () => {
   const e = {};
-  
+
   if (!form.value.firstName.trim() || !form.value.lastName.trim())
     e.name = "Full name is required.";
   if (!form.value.position) e.position = "Position is required.";
@@ -547,21 +633,25 @@ const validate = () => {
   if (!form.value.branchId) e.branch = "Branch is required.";
   if (!form.value.email || !/\S+@\S+\.\S+/.test(form.value.email))
     e.email = "Valid email is required.";
-  
+
   // VAL-1: Phone validation
-  if (form.value.phone && !/^(\+63|0)\d{9,10}$/.test(form.value.phone.replace(/\s|-/g, "")))
-    e.phone = "Enter a valid PH number (e.g. +63 917 123 4567 or 0917 123 4567).";
-    
+  if (
+    form.value.phone &&
+    !/^(\+63|0)\d{9,10}$/.test(form.value.phone.replace(/\s|-/g, ""))
+  )
+    e.phone =
+      "Enter a valid PH number (e.g. +63 917 123 4567 or 0917 123 4567).";
+
   if (!form.value.hourlyRate || form.value.hourlyRate <= 0)
     e.hourlyRate = "Hourly rate must be greater than 0.";
-    
+
   // VAL-2: Future hire dates guard
   if (!form.value.dateHired) {
     e.dateHired = "Hire date is required.";
   } else if (form.value.dateHired > todayISO) {
     e.dateHired = "Hire date cannot be in the future.";
   }
-  
+
   errors.value = e;
   return Object.keys(e).length === 0;
 };
@@ -596,7 +686,9 @@ const saveEmployee = async () => {
     }
 
     // Update corresponding user record if branch changed
-    const originalEmployee = employees.value.find(e => e.id === form.value.id);
+    const originalEmployee = employees.value.find(
+      (e) => e.id === form.value.id,
+    );
     if (originalEmployee && originalEmployee.branchId !== form.value.branchId) {
       const { data: userRecord, error: userSelectError } = await supabase
         .from("users")
@@ -605,7 +697,9 @@ const saveEmployee = async () => {
         .maybeSingle();
 
       if (userSelectError) {
-        throw new Error(`Failed to check user account: ${userSelectError.message}`);
+        throw new Error(
+          `Failed to check user account: ${userSelectError.message}`,
+        );
       }
 
       if (userRecord) {
@@ -613,19 +707,25 @@ const saveEmployee = async () => {
           .from("users")
           .update({ branch: form.value.branchId })
           .eq("id", userRecord.id);
-          
+
         if (userUpdateError) {
-          throw new Error(`Employee updated, but user branch update failed: ${userUpdateError.message}`);
+          throw new Error(
+            `Employee updated, but user branch update failed: ${userUpdateError.message}`,
+          );
         }
       }
     }
 
     showToast("Employee updated successfully.", "success");
-    await fetchEmployees();
+    sessionStorage.removeItem(CACHE_KEY_EMPLOYEES);
+    await fetchEmployees(true);
     closeModal();
   } catch (err) {
     console.error("[Employee] Save failed:", err);
-    showToast(err.message || "An unexpected error occurred while saving.", "error");
+    showToast(
+      err.message || "An unexpected error occurred while saving.",
+      "error",
+    );
   } finally {
     saving.value = false;
   }
@@ -641,7 +741,7 @@ const deleteEmployee = async () => {
   try {
     const currentUser = localStorage.getItem("username") || "Unknown";
     const now = new Date().toISOString();
-    
+
     // Archive employee
     const { error } = await supabase
       .from("employee")
@@ -660,7 +760,9 @@ const deleteEmployee = async () => {
       .maybeSingle();
 
     if (userSelectError) {
-      throw new Error(`Failed to locate user account: ${userSelectError.message}`);
+      throw new Error(
+        `Failed to locate user account: ${userSelectError.message}`,
+      );
     }
 
     if (userRecord) {
@@ -668,22 +770,38 @@ const deleteEmployee = async () => {
         .from("users")
         .update({ status: "archived" })
         .eq("id", userRecord.id);
-        
+
       if (userError) {
-        console.error("[Employee] Failed to archive linked user account:", userError.message);
-        showToast("Employee archived, but user account deactivation failed.", "error");
+        console.error(
+          "[Employee] Failed to archive linked user account:",
+          userError.message,
+        );
+        showToast(
+          "Employee archived, but user account deactivation failed.",
+          "error",
+        );
       } else {
-        showToast(`${deleteTarget.value.firstName} ${deleteTarget.value.lastName} has been archived.`, "success");
+        showToast(
+          `${deleteTarget.value.firstName} ${deleteTarget.value.lastName} has been archived.`,
+          "success",
+        );
       }
     } else {
-      showToast(`${deleteTarget.value.firstName} ${deleteTarget.value.lastName} has been archived.`, "success");
+      showToast(
+        `${deleteTarget.value.firstName} ${deleteTarget.value.lastName} has been archived.`,
+        "success",
+      );
     }
 
-    await fetchEmployees();
+    sessionStorage.removeItem(CACHE_KEY_EMPLOYEES);
+    await fetchEmployees(true);
     showDeleteConfirm.value = false;
   } catch (err) {
     console.error("[Employee] Archive failed:", err);
-    showToast(err.message || "An unexpected error occurred during archive.", "error");
+    showToast(
+      err.message || "An unexpected error occurred during archive.",
+      "error",
+    );
   } finally {
     archiving.value = false;
   }
@@ -745,12 +863,39 @@ const showToast = (message, type = "success") => {
 };
 
 onMounted(async () => {
+  // Check cache first before anything else
+  const cachedEmployees = sessionStorage.getItem("cache_mgr_employees");
+  const cachedBranches = sessionStorage.getItem("cache_mgr_branches");
+  
+  if (cachedEmployees && cachedBranches) {
+    // Load from cache instantly, no spinner
+    employees.value = JSON.parse(cachedEmployees).data;
+    branches.value = JSON.parse(cachedBranches).data;
+    isLoading.value = false;
+  }
+
   await resolveBranch();
   managerBranchId.value = userBranchId.value;
   currentBranchName.value = userBranchName.value;
-  await fetchBranches();
-  await fetchEmployees();
+
+  if (sessionStorage.getItem("page_refreshed")) {
+    sessionStorage.removeItem("page_refreshed");
+    sessionStorage.removeItem("cache_mgr_employees");
+    sessionStorage.removeItem("cache_mgr_branches");
+    employees.value = [];
+    isLoading.value = true;
+    await fetchBranches();
+    await fetchEmployees();
+    return;
+  }
+
+  // Only fetch if cache wasn't available
+  if (!cachedEmployees || !cachedBranches) {
+    await fetchBranches();
+    await fetchEmployees();
+  }
 });
+
 </script>
 
 <style scoped>

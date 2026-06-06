@@ -129,27 +129,27 @@
                   <span class="avail-role">{{ avail.role }}</span>
                 </div>
                 <div class="avail-meta">
-                    <i class="bi bi-calendar3"></i>
-                    {{ formatDate(avail.availableDate) }} &nbsp;<i
-                      class="bi bi-clock"
-                    ></i>
-                    {{ avail.startTime }} – {{ avail.endTime }}
-                    <span v-if="avail.branchId" class="avail-branch"
-                      >&nbsp;· {{ branchName(avail.branchId) }}</span
-                    >
-                  </div>
-                  <div v-if="avail.notes" class="avail-notes">
-                    {{ avail.notes }}
-                  </div>
+                  <i class="bi bi-calendar3"></i>
+                  {{ formatDate(avail.availableDate) }} &nbsp;<i
+                    class="bi bi-clock"
+                  ></i>
+                  {{ avail.startTime }} – {{ avail.endTime }}
+                  <span v-if="avail.branchId" class="avail-branch"
+                    >&nbsp;· {{ branchName(avail.branchId) }}</span
+                  >
+                </div>
+                <div v-if="avail.notes" class="avail-notes">
+                  {{ avail.notes }}
                 </div>
               </div>
-              <div class="avail-right">
-                <span
-                  v-if="avail.status === 'Confirmed'"
-                  class="badge-status badge-active"
-                  >approved</span
-                >
-                <span v-else class="badge-status badge-inactive">rejected</span>
+            </div>
+            <div class="avail-right">
+              <span
+                v-if="avail.status === 'Confirmed'"
+                class="badge-status badge-active"
+                >approved</span
+              >
+              <span v-else class="badge-status badge-inactive">rejected</span>
             </div>
           </div>
         </div>
@@ -338,7 +338,10 @@
               class="legend-item"
               :title="emp.name"
             >
-              <span class="legend-swatch" :style="{ background: avatarColor(emp.id) }"></span>
+              <span
+                class="legend-swatch"
+                :style="{ background: avatarColor(emp.id) }"
+              ></span>
               {{ emp.name }}
             </span>
           </div>
@@ -364,32 +367,48 @@
                 <div class="shift-detail-employee">
                   <div
                     class="emp-avatar lg"
-                    :style="{ background: avatarColor(showShiftDetail.employeeId) }"
+                    :style="{
+                      background: avatarColor(showShiftDetail.employeeId),
+                    }"
                   >
                     {{ showShiftDetail.initials }}
                   </div>
                   <div>
-                    <div class="shift-detail-name">{{ showShiftDetail.employeeName }}</div>
-                    <div class="shift-detail-role">{{ showShiftDetail.role }}</div>
+                    <div class="shift-detail-name">
+                      {{ showShiftDetail.employeeName }}
+                    </div>
+                    <div class="shift-detail-role">
+                      {{ showShiftDetail.role }}
+                    </div>
                   </div>
                 </div>
                 <div class="shift-detail-info">
                   <div class="shift-detail-row">
                     <span class="label">Date:</span>
-                    <span class="value">{{ formatDate(showShiftDetail.shiftDate) }}</span>
+                    <span class="value">{{
+                      formatDate(showShiftDetail.shiftDate)
+                    }}</span>
                   </div>
                   <div class="shift-detail-row">
                     <span class="label">Time:</span>
-                    <span class="value">{{ showShiftDetail.startTime }} – {{ showShiftDetail.endTime }}</span>
+                    <span class="value"
+                      >{{ showShiftDetail.startTime }} –
+                      {{ showShiftDetail.endTime }}</span
+                    >
                   </div>
                   <div class="shift-detail-row">
                     <span class="label">Branch:</span>
-                    <span class="value">{{ branchName(showShiftDetail.branchId) }}</span>
+                    <span class="value">{{
+                      branchName(showShiftDetail.branchId)
+                    }}</span>
                   </div>
                   <div class="shift-detail-row">
                     <span class="label">Status:</span>
                     <span class="value">
-                      <span class="badge-status" :class="schedStatusClass(showShiftDetail.status)">
+                      <span
+                        class="badge-status"
+                        :class="schedStatusClass(showShiftDetail.status)"
+                      >
                         {{ showShiftDetail.status }}
                       </span>
                     </span>
@@ -418,14 +437,19 @@
                   <span class="avail-role">{{ inq.role }}</span>
                 </div>
                 <div class="avail-meta">
-                  <strong>{{ inq.requestType || 'Shift Change' }}</strong> for
+                  <strong>{{ inq.requestType || "Shift Change" }}</strong> for
                   <strong>{{ formatDate(inq.requestDate) }}</strong>
                 </div>
                 <div v-if="inq.preferredDate" class="avail-meta">
-                  Preferred: <strong>{{ formatDate(inq.preferredDate) }}</strong>
+                  Preferred:
+                  <strong>{{ formatDate(inq.preferredDate) }}</strong>
                 </div>
                 <div class="avail-notes">{{ inq.reason }}</div>
-                <div v-if="inq.managerNote" class="avail-notes manager-note" style="margin-top: 4px;">
+                <div
+                  v-if="inq.managerNote"
+                  class="avail-notes manager-note"
+                  style="margin-top: 4px"
+                >
                   <strong>Manager:</strong> {{ inq.managerNote }}
                 </div>
               </div>
@@ -494,7 +518,11 @@
                   @change="onEmployeeSelected"
                 >
                   <option value="" disabled>
-                    {{ employeesLoading ? 'Loading employees…' : 'Select employee' }}
+                    {{
+                      employeesLoading
+                        ? "Loading employees…"
+                        : "Select employee"
+                    }}
                   </option>
                   <option v-for="e in employeeList" :key="e.id" :value="e.id">
                     {{ e.name }}
@@ -607,7 +635,10 @@
         <div class="modal-panel modal-panel--sm">
           <div class="modal-panel-header">
             <h5 class="mb-0">Schedule Conflict</h5>
-            <button class="btn-close-panel" @click="showConflictConfirm = false">
+            <button
+              class="btn-close-panel"
+              @click="showConflictConfirm = false"
+            >
               <i class="bi bi-x-lg"></i>
             </button>
           </div>
@@ -615,7 +646,11 @@
             <p v-if="conflictInfo">
               This employee already has a shift on
               <strong>{{ formatDate(form.shiftDate) }}</strong> from
-              <strong>{{ conflictInfo.existingStart }}–{{ conflictInfo.existingEnd }}</strong>
+              <strong
+                >{{ conflictInfo.existingStart }}–{{
+                  conflictInfo.existingEnd
+                }}</strong
+              >
               ({{ conflictInfo.existingRole }}).
             </p>
             <p class="mb-0">Save anyway and allow double-booking?</p>
@@ -684,6 +719,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: "ManagerSchedule" });
 import { ref, computed, onMounted, watch, onUnmounted } from "vue";
 import { supabase } from "@/supabase.js";
 import { useUserBranch } from "@/composables/useUserBranch.js";
@@ -734,6 +770,39 @@ const employeeList = ref([]);
 const availability = ref([]);
 const schedules = ref([]);
 const changeInquiries = ref([]);
+// Cache constants
+const CACHE_KEY_SCHEDULES = "cache_mgr_schedules";
+const CACHE_KEY_AVAILABILITY = "cache_mgr_availability";
+const CACHE_KEY_BRANCHES = "cache_mgr_branches";
+const CACHE_KEY_EMPLOYEES = "cache_mgr_employees";
+const CACHE_KEY_INQUIRIES = "cache_mgr_inquiries";
+const CACHE_TTL = 30 * 60 * 1000;
+
+const saveCache = (key, data) => {
+  sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+};
+
+const loadCache = (key) => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    console.log(`[Cache] loadCache(${key}):`, raw ? "found" : "missing");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      sessionStorage.removeItem(key);
+      console.log(`[Cache] ${key} expired`);
+      return null;
+    }
+    console.log(`[Cache] ${key} hit, items:`, parsed.data?.length);
+    return parsed.data;
+  } catch {
+    return null;
+  }
+};
+
+window.addEventListener("beforeunload", () => {
+  sessionStorage.setItem("page_refreshed", "1");
+});
 
 const roles = [
   "Barista",
@@ -799,11 +868,17 @@ const schedulesByDate = computed(() =>
 
 const schedEmployees = computed(() => {
   const seen = new Set();
-  return schedules.value.filter((s) => {
-    if (seen.has(s.employeeId)) return false;
-    seen.add(s.employeeId);
-    return true;
-  }).map((s) => ({ id: s.employeeId, name: s.employeeName, initials: s.initials }));
+  return schedules.value
+    .filter((s) => {
+      if (seen.has(s.employeeId)) return false;
+      seen.add(s.employeeId);
+      return true;
+    })
+    .map((s) => ({
+      id: s.employeeId,
+      name: s.employeeName,
+      initials: s.initials,
+    }));
 });
 
 const monthStart = computed(() => getMonthStart(monthOffset.value));
@@ -849,9 +924,16 @@ const monthDays = computed(() => {
 });
 
 const fetchBranches = async () => {
+  const cached = loadCache(CACHE_KEY_BRANCHES);
+  if (cached) {
+    branches.value = cached;
+    return;
+  }
   const { data } = await supabase.from("branch").select("BranchId, BranchName");
-  if (data)
+  if (data) {
     branches.value = data.map((b) => ({ id: b.BranchId, name: b.BranchName }));
+    saveCache(CACHE_KEY_BRANCHES, branches.value);
+  }
 };
 
 const updateInquiryStatus = async (inq, status) => {
@@ -867,7 +949,10 @@ const updateInquiryStatus = async (inq, status) => {
   }
 
   if (status === "Approved") {
-    if (inq.requestType === "Day Off Request" || inq.requestType === "Emergency Leave") {
+    if (
+      inq.requestType === "Day Off Request" ||
+      inq.requestType === "Emergency Leave"
+    ) {
       const { error: schedErr } = await supabase
         .from("schedule")
         .update({ Status: "Cancelled" })
@@ -881,8 +966,7 @@ const updateInquiryStatus = async (inq, status) => {
         .update({ ShiftDate: inq.preferredDate })
         .eq("EmployeeId", inq.employeeId)
         .eq("ShiftDate", inq.requestDate);
-      if (schedErr)
-        console.error("[Schedule] Failed to swap shift:", schedErr);
+      if (schedErr) console.error("[Schedule] Failed to swap shift:", schedErr);
     }
   }
 
@@ -894,6 +978,12 @@ const updateInquiryStatus = async (inq, status) => {
 };
 
 const fetchEmployees = async () => {
+  const cached = loadCache(CACHE_KEY_EMPLOYEES);
+  if (cached) {
+    employeeList.value = cached;
+    employeesLoading.value = false;
+    return;
+  }
   employeesLoading.value = true;
   const { data, error } = await supabase
     .from("employee")
@@ -901,7 +991,6 @@ const fetchEmployees = async () => {
     .eq("BranchAssigned", managerBranchId.value)
     .eq("Status", "Active")
     .order("FirstName");
-
   if (error) {
     console.error("[Schedule] fetchEmployees failed:", error);
     employeeList.value = [];
@@ -912,11 +1001,19 @@ const fetchEmployees = async () => {
       branchAssigned: e.BranchAssigned,
       position: e.Position,
     }));
+    saveCache(CACHE_KEY_EMPLOYEES, employeeList.value);
   }
   employeesLoading.value = false;
 };
 
-const fetchAvailability = async () => {
+const fetchAvailability = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_AVAILABILITY);
+    if (cached) {
+      availability.value = cached;
+      return;
+    }
+  }
   const { data: branchEmps } = await supabase
     .from("employee")
     .select("EmployeeId, FirstName, LastName, Position, BranchAssigned")
@@ -969,10 +1066,18 @@ const fetchAvailability = async () => {
         status: a.status || "Pending",
       };
     });
+    saveCache(CACHE_KEY_AVAILABILITY, availability.value);
   }
 };
 
-const fetchChangeInquiries = async () => {
+const fetchChangeInquiries = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_INQUIRIES);
+    if (cached) {
+      changeInquiries.value = cached;
+      return;
+    }
+  }
   const { data: branchEmps } = await supabase
     .from("employee")
     .select("EmployeeId, FirstName, LastName, Position")
@@ -1028,10 +1133,18 @@ const fetchChangeInquiries = async () => {
         managerNote: c.managernote,
       };
     });
+    saveCache(CACHE_KEY_INQUIRIES, changeInquiries.value);
   }
 };
 
-const fetchSchedules = async () => {
+const fetchSchedules = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_SCHEDULES);
+    if (cached) {
+      schedules.value = cached;
+      return;
+    }
+  }
   const { data } = await supabase
     .from("schedule")
     .select(
@@ -1043,6 +1156,7 @@ const fetchSchedules = async () => {
     .order("ScheduleId", { ascending: false });
 
   if (data) {
+    console.log("[Cache] saving schedules, count:", data.length);
     schedules.value = data.map((s) => ({
       id: s.ScheduleId,
       employeeId: s.EmployeeId,
@@ -1060,6 +1174,7 @@ const fetchSchedules = async () => {
       branchId: s.BranchId,
       status: s.Status,
     }));
+    saveCache(CACHE_KEY_SCHEDULES, schedules.value);
   }
 };
 
@@ -1073,9 +1188,9 @@ const onEmployeeSelected = () => {
 const switchTab = (key) => {
   if (activeTab.value !== key) fadingIds.value = new Set();
   activeTab.value = key;
-  if (key === "change") fetchChangeInquiries();
-  if (key === "availability") fetchAvailability();
-  if (key === "schedule") fetchSchedules();
+  if (key === "change") fetchChangeInquiries(true);
+  if (key === "availability") fetchAvailability(true);
+  if (key === "schedule") fetchSchedules(true);
 };
 
 const openCreateModal = () => {
@@ -1126,7 +1241,13 @@ const validate = () => {
   return Object.keys(e).length === 0;
 };
 
-const checkRoleCap = async (date, role, startTime, endTime, excludeId = null) => {
+const checkRoleCap = async (
+  date,
+  role,
+  startTime,
+  endTime,
+  excludeId = null,
+) => {
   const { data } = await supabase
     .from("schedule")
     .select("ScheduleId, StartTime, EndTime")
@@ -1231,7 +1352,7 @@ const saveSchedule = async (overrideConflict = false) => {
       showToast("Schedule created.", "success");
       await fetchSchedules();
     }
-
+    sessionStorage.removeItem(CACHE_KEY_SCHEDULES);
     showConflictConfirm.value = false;
     conflictInfo.value = null;
     closeModal();
@@ -1264,6 +1385,7 @@ const deleteSchedule = async () => {
 
   if (error) showToast("Failed to archive schedule.", "error");
   else {
+    sessionStorage.removeItem(CACHE_KEY_SCHEDULES);
     showToast("Schedule archived.", "success");
     await fetchSchedules();
   }
@@ -1320,7 +1442,8 @@ const updateAvailStatus = async (avail, status) => {
         .eq("EmployeeId", avail.employeeId)
         .maybeSingle();
 
-      const roleToUse = avail.role !== "—" ? avail.role : emp?.Position || "Staff";
+      const roleToUse =
+        avail.role !== "—" ? avail.role : emp?.Position || "Staff";
       const roleCount = await checkRoleCap(
         avail.availableDate,
         roleToUse,
@@ -1347,7 +1470,7 @@ const updateAvailStatus = async (avail, status) => {
       ]);
 
       if (schedErr) throw schedErr;
-
+      sessionStorage.removeItem(CACHE_KEY_AVAILABILITY);
       await fetchSchedules();
       showToast("Availability approved and schedule created.", "success");
     } else {
@@ -1431,8 +1554,22 @@ onUnmounted(() => {
 });
 
 onMounted(async () => {
+  if (sessionStorage.getItem("page_refreshed")) {
+    sessionStorage.removeItem("page_refreshed");
+    [
+      CACHE_KEY_SCHEDULES,
+      CACHE_KEY_AVAILABILITY,
+      CACHE_KEY_BRANCHES,
+      CACHE_KEY_EMPLOYEES,
+      CACHE_KEY_INQUIRIES,
+    ].forEach((k) => sessionStorage.removeItem(k));
+  }
+
   await resolveBranch();
-  managerBranchId.value = userBranchId.value;
+  managerBranchId.value = userBranchId.value
+    ? Number(userBranchId.value)
+    : null;
+
   if (!managerBranchId.value) {
     showToast("Unable to determine your branch. Contact admin.", "error");
     isLoading.value = false;
