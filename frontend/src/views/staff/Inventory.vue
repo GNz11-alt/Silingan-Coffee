@@ -724,6 +724,11 @@ import BatchRestockModal from "@/components/BatchRestockModal.vue";
 import StockReduceModal  from "@/components/StockReduceModal.vue";
 import PrintReorderForm  from "@/components/PrintReorderForm.vue";
 
+import {
+  normaliseNeeded, checkStockForProduct, buildFEFODeductionRows,
+  suggestRecipeUnit, formatQtyDisplay,
+} from "@/composables/inventoryUtils.js";
+
 const route = useRoute();
 
 // ── STATE ────────────────────────────────────────────────────────────────────
