@@ -750,6 +750,11 @@ import BatchRestockModal from "@/components/BatchRestockModal.vue";
 import StockReduceModal  from "@/components/StockReduceModal.vue";
 import PrintReorderForm  from "@/components/PrintReorderForm.vue";
 
+import {
+  convertUnit, canConvert, normaliseNeeded, checkStockForProduct,
+  suggestRecipeUnit, formatQtyDisplay,
+} from "@/composables/inventoryUtils.js";
+
 const route = useRoute();
 
 // ── STATE ────────────────────────────────────────────────────────────────────
