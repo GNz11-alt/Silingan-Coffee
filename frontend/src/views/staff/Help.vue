@@ -215,9 +215,9 @@ const faqs = ref([
   {
     id: 4,
     open: false,
-    question: "How do I add and manage employees?",
+    question: "How do I add and manage staff?",
     answer:
-      'Go to Employees from the sidebar (Admin only). Click "Add Employee" and fill in the employee details including name, position, department, branch, and hourly rate. You can also edit or archive existing employees.',
+      'Go to Staff from the sidebar (Admin only). Click "Add Staff" and fill in the staff details including name, position, department, branch, and hourly rate. You can also edit or archive existing staff.',
   },
   {
     id: 5,
@@ -309,7 +309,7 @@ const quickTopics = [
     faqId: 3,
   },
   {
-    title: "Employee Management",
+    title: "Staff Management",
     sub: "Adding and managing staff",
     icon: Users,
     faqId: 4,

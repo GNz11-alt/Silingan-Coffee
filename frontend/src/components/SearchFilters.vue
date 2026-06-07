@@ -10,8 +10,8 @@
             </div>
 
             <div class="filter-body">
-              <!-- Branch scope -->
-              <div class="filter-section">
+              <!-- Branch scope — only for admin -->
+              <div v-if="role === 'admin'" class="filter-section">
                 <label class="filter-label">Branch</label>
                 <div class="filter-options">
                   <label
@@ -35,7 +35,7 @@
                 <label class="filter-label">Type</label>
                 <div class="filter-options">
                   <label
-                    v-for="t in typeOptions"
+                    v-for="t in visibleTypeOptions"
                     :key="t.value"
                     class="filter-checkbox"
                   >
@@ -90,8 +90,8 @@
                 </div>
               </div>
 
-              <!-- Department scope -->
-              <div class="filter-section">
+              <!-- Department scope — hidden for staff -->
+              <div v-if="role !== 'staff'" class="filter-section">
                 <label class="filter-label">Department</label>
                 <div class="filter-options">
                   <label
@@ -146,11 +146,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { useBranches } from '@/composables/useBranches.js'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
+  role: { type: String, default: 'admin' }, // 'admin' | 'manager' | 'staff'
   scopes: { type: Object, default: () => ({
     branches: [], categories: [], statuses: [], departments: [],
     dateRange: { from: null, to: null }, types: [],
@@ -161,12 +162,20 @@ const emit = defineEmits(['close', 'apply'])
 
 const { branches } = useBranches()
 
-const typeOptions = [
+const ALL_TYPE_OPTIONS = [
   { value: 'product', label: 'Products' },
-  { value: 'employee', label: 'Employees' },
+  { value: 'employee', label: 'Staff' },
   { value: 'sale', label: 'Sales' },
   { value: 'rawmaterial', label: 'Raw Materials' },
 ]
+
+// Scope type options by role
+const visibleTypeOptions = computed(() => {
+  if (props.role === 'staff') return ALL_TYPE_OPTIONS.filter(t => ['product', 'rawmaterial'].includes(t.value))
+  return ALL_TYPE_OPTIONS
+})
+
+const typeOptions = visibleTypeOptions
 
 const categoryOptions = ['Beverages', 'Pastries', 'Food']
 const statusOptions = ['In Stock', 'Low Stock', 'Out of Stock', 'Active', 'On Leave', 'Inactive']

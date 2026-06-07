@@ -3,14 +3,14 @@
     <!-- ── PAGE HEADER ─────────────────────────────────────── -->
     <div class="d-flex align-items-start justify-content-between mb-4">
       <div>
-        <h4 class="page-title mb-1">Employee Management</h4>
+        <h4 class="page-title mb-1">Staff Management</h4>
         <p class="page-sub mb-0">
-          Manage hourly employees and availability ·
-          {{ employees.length }} total employees across all branches
+          Manage hourly staff and availability ·
+          {{ employees.length }} total staff across all branches
         </p>
       </div>
       <button class="btn btn-brown" @click="openAddModal">
-        <i class="bi bi-plus-lg me-1"></i> Add Employee
+        <i class="bi bi-plus-lg me-1"></i> Add Staff
       </button>
     </div>
 
@@ -36,7 +36,7 @@
           v-model="search"
           type="text"
           class="form-control search-input"
-          placeholder="Search employees..."
+          placeholder="Search staff..."
         />
       </div>
       <select v-model="filterDept" class="form-select filter-select">
@@ -78,7 +78,7 @@
     <!-- Loading state -->
     <div v-if="isLoading" class="text-center py-5">
       <div class="spinner-border text-secondary" role="status"></div>
-      <p class="mt-2 text-muted">Loading employees...</p>
+      <p class="mt-2 text-muted">Loading staff...</p>
     </div>
 
     <!-- ── EMPLOYEE CARDS GRID ─────────────────────────────── -->
@@ -155,7 +155,7 @@
     <!-- Empty state -->
     <div v-else class="empty-state text-center py-5">
       <i class="bi bi-people fs-1 text-muted"></i>
-      <p class="mt-3 text-muted">No employees match your filters.</p>
+      <p class="mt-3 text-muted">No staff match your filters.</p>
     </div>
 
     <!-- ── ADD / EDIT MODAL ────────────────────────────────── -->
@@ -165,13 +165,13 @@
           <div class="modal-panel-header">
             <div>
               <h5 class="mb-0">
-                {{ isEditing ? "Edit Employee" : "Add New Employee" }}
+                {{ isEditing ? "Edit Staff" : "Add New Staff" }}
               </h5>
               <p class="modal-sub mb-0">
                 {{
                   isEditing
-                    ? "Update employee information"
-                    : "Add a new hourly employee to the system"
+                    ? "Update staff information"
+                    : "Add a new hourly staff to the system"
                 }}
               </p>
             </div>
@@ -270,7 +270,7 @@
                   v-model="form.email"
                   type="email"
                   class="form-control fc-brand"
-                  placeholder="employee@silingancoffee.ph"
+                  placeholder="staff@silingancoffee.ph"
                 />
                 <div v-if="errors.email" class="text-danger small mt-1">
                   {{ errors.email }}
@@ -361,7 +361,7 @@
                 v-if="saving"
                 class="spinner-border spinner-border-sm me-1"
               ></span>
-              {{ isEditing ? "Save Changes" : "Add Employee" }}
+              {{ isEditing ? "Save Changes" : "Add Staff" }}
             </button>
           </div>
         </div>
@@ -377,7 +377,7 @@
       >
         <div class="modal-panel modal-panel--sm">
           <div class="modal-panel-header">
-            <h5 class="mb-0">Archive Employee?</h5>
+            <h5 class="mb-0">Archive Staff?</h5>
             <button class="btn-close-panel" @click="showDeleteConfirm = false">
               <i class="bi bi-x-lg"></i>
             </button>
@@ -405,7 +405,7 @@
                 v-if="archiving"
                 class="spinner-border spinner-border-sm me-1"
               ></span>
-              Archive Employee
+              Archive Staff
             </button>
           </div>
         </div>
@@ -622,7 +622,7 @@ const stats = computed(() => {
   ).length;
   return [
     {
-      label: "Total Employees",
+      label: "Total Staff",
       value: employees.value.length,
       sub: "All branches",
       icon: "bi bi-people",
@@ -735,7 +735,7 @@ const saveEmployee = async () => {
         .eq("EmployeeId", form.value.id);
 
       if (error) {
-        throw new Error(`Failed to update employee details: ${error.message}`);
+        throw new Error(`Failed to update staff details: ${error.message}`);
       }
 
       // Update corresponding user record if branch changed
@@ -771,12 +771,12 @@ const saveEmployee = async () => {
 
           if (userUpdateError) {
             throw new Error(
-              `Employee updated, but user branch update failed: ${userUpdateError.message}`,
+              `Staff updated, but user branch update failed: ${userUpdateError.message}`,
             );
           }
         }
       }
-      showToast("Employee updated successfully.", "success");
+      showToast("Staff updated successfully.", "success");
       sessionStorage.removeItem(CACHE_KEY_EMPLOYEES);
       await fetchEmployees(true);
       closeModal();
@@ -814,7 +814,7 @@ const saveEmployee = async () => {
 
       if (empError || !empData) {
         throw new Error(
-          `Failed to add employee: ${empError?.message || "No data returned"}`,
+          `Failed to add staff: ${empError?.message || "No data returned"}`,
         );
       }
 
@@ -871,7 +871,7 @@ const saveEmployee = async () => {
         }
 
         throw new Error(
-          `Employee record created, but user account creation failed: ${userError.message}. Changes rolled back.`,
+          `Staff record created, but user account creation failed: ${userError.message}. Changes rolled back.`,
         );
       }
 
@@ -881,7 +881,7 @@ const saveEmployee = async () => {
         staff: "Staff@1234",
       };
       showToast(
-        `Employee added. Login: ${generatedUsername} / Default password: ${roleDefaultPlaintext[userRole]}`,
+        `Staff added. Login: ${generatedUsername} / Default password: ${roleDefaultPlaintext[userRole]}`,
         "success",
       );
       await fetchEmployees();
@@ -916,7 +916,7 @@ const deleteEmployee = async () => {
       .eq("EmployeeId", deleteTarget.value.id);
 
     if (error) {
-      showToast(`Failed to archive employee: ${error.message}`, "error");
+      showToast(`Failed to archive staff: ${error.message}`, "error");
       return;
     }
 
@@ -933,7 +933,7 @@ const deleteEmployee = async () => {
         userError.message,
       );
       showToast(
-        "Employee archived, but user account deactivation failed.",
+        "Staff archived, but user account deactivation failed.",
         "error",
       );
     } else {

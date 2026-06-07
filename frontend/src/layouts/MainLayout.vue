@@ -33,14 +33,9 @@
           <span v-show="!isSidebarCollapsed">Sales</span>
         </router-link>
         
-        <router-link to="/admin/employees" class="nav-item" :class="{ active: $route.path === '/admin/employees' }">
+        <router-link to="/admin/shift-management" class="nav-item" :class="{ active: $route.path === '/admin/shift-management' }">
           <component :is="Users" class="nav-icon" :size="20" />
-          <span v-show="!isSidebarCollapsed">Employees</span>
-        </router-link>
-        
-        <router-link to="/admin/schedule" class="nav-item" :class="{ active: $route.path === '/admin/schedule' }">
-          <component :is="Calendar" class="nav-icon" :size="20" />
-          <span v-show="!isSidebarCollapsed">Schedule</span>
+          <span v-show="!isSidebarCollapsed">Shift Management</span>
         </router-link>
         
         <router-link to="/admin/menu-pricing" class="nav-item" :class="{ active: $route.path === '/admin/menu-pricing' }">

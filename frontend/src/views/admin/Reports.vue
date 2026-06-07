@@ -104,6 +104,13 @@
       >
         <i class="bi bi-file-earmark-plus me-1"></i> Generate Reports
       </button>
+      <button
+        class="tab-btn"
+        :class="{ active: mainTab === 'predictions' }"
+        @click="mainTab = 'predictions'"
+      >
+        <i class="bi bi-graph-up-arrow me-1"></i> Predictions
+      </button>
     </div>
 
     <!-- ════════════════════════════════════════════════════════
@@ -863,6 +870,135 @@
       </div>
     </Teleport>
 
+    <!-- ════════════════════════════════════════════════════════
+         TAB 4 — PREDICTIONS
+    ═════════════════════════════════════════════════════════ -->
+    <div v-show="mainTab === 'predictions'">
+      <div class="row g-4">
+        <div class="col-12 col-md-6">
+          <div class="pred-card" @click="selectPrediction('sales')" :class="{ active: predictionType === 'sales' }">
+            <div class="pred-card-icon"><i class="bi bi-currency-dollar"></i></div>
+            <div class="pred-card-title">Sales Prediction</div>
+            <div class="pred-card-desc">Forecast revenue for the upcoming period based on historical sales data, seasonal trends, and growth patterns.</div>
+            <button
+              class="btn btn-predict mt-3"
+              :disabled="predictionLoading"
+              @click.stop="generatePrediction('sales')"
+            >
+              <span v-if="predictionLoading && predictionType === 'sales'" class="spinner-border spinner-border-sm me-2"></span>
+              <i v-else class="bi bi-magic me-1"></i>
+              {{ predictionLoading && predictionType === 'sales' ? 'Generating...' : 'Generate Prediction' }}
+            </button>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="pred-card" @click="selectPrediction('demand')" :class="{ active: predictionType === 'demand' }">
+            <div class="pred-card-icon"><i class="bi bi-box-seam"></i></div>
+            <div class="pred-card-title">Demand Forecasting</div>
+            <div class="pred-card-desc">Predict product demand to optimize inventory levels, reduce waste, and ensure popular items are always in stock.</div>
+            <button
+              class="btn btn-predict mt-3"
+              :disabled="predictionLoading"
+              @click.stop="generatePrediction('demand')"
+            >
+              <span v-if="predictionLoading && predictionType === 'demand'" class="spinner-border spinner-border-sm me-2"></span>
+              <i v-else class="bi bi-magic me-1"></i>
+              {{ predictionLoading && predictionType === 'demand' ? 'Generating...' : 'Generate Prediction' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prediction Result -->
+      <div v-if="predictionResult" class="mt-4">
+        <!-- Sales Prediction Result -->
+        <div v-if="predictionResult.type === 'sales'" class="pred-result-card">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Sales Prediction Results</h5>
+            <small class="text-muted">Generated {{ new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) }}</small>
+          </div>
+          <div class="row g-3 mb-4">
+            <div class="col-4" v-for="stat in predictionResult.stats" :key="stat.label">
+              <div class="pred-stat">
+                <div class="pred-stat-label">{{ stat.label }}</div>
+                <div class="pred-stat-value">{{ stat.value }}</div>
+                <div class="pred-stat-change" :class="stat.up ? 'up' : 'down'">
+                  <i class="bi" :class="stat.up ? 'bi-arrow-up-right' : 'bi-arrow-down-right'"></i>
+                  {{ stat.change }} vs last period
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="pred-chart-placeholder">
+            <div class="pred-bar-chart-container">
+              <div
+                v-for="(d, i) in predictionResult.chartData"
+                :key="i"
+                class="pred-bar-group"
+              >
+                <div class="pred-bar-pair">
+                  <div
+                    class="pred-bar predicted"
+                    :style="{ height: d.predictedPct + '%' }"
+                    :title="'Predicted: ' + d.predicted"
+                  >
+                    <span class="pred-bar-label">₱{{ shortNum(d.predicted) }}</span>
+                  </div>
+                  <div
+                    v-if="d.actual"
+                    class="pred-bar actual"
+                    :style="{ height: d.actualPct + '%' }"
+                    :title="'Actual: ' + d.actual"
+                  >
+                    <span class="pred-bar-label">₱{{ shortNum(d.actual) }}</span>
+                  </div>
+                </div>
+                <div class="pred-bar-xlabel">{{ d.period }}</div>
+              </div>
+            </div>
+            <div class="pred-chart-legend">
+              <span class="legend-dot predicted"></span> Predicted
+              <span class="legend-dot actual ms-3"></span> Actual
+            </div>
+          </div>
+        </div>
+
+        <!-- Demand Forecasting Result -->
+        <div v-if="predictionResult.type === 'demand'" class="pred-result-card">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Demand Forecast Results</h5>
+            <small class="text-muted">Generated {{ new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) }}</small>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Forecasted Demand</th>
+                  <th>Current Stock</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, i) in predictionResult.forecast" :key="i">
+                  <td><strong>{{ item.product }}</strong></td>
+                  <td>{{ item.category }}</td>
+                  <td>{{ item.forecasted }}</td>
+                  <td>{{ item.currentStock }}</td>
+                  <td>
+                    <span class="badge" :class="item.status === 'Order' ? 'badge-danger' : item.status === 'Watch' ? 'badge-warning' : 'badge-success'">
+                      {{ item.status }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── TOAST ──────────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="toast.show" class="toast-wrap" :class="toast.type">
@@ -1034,6 +1170,11 @@ export default {
 
       toast: { show: false, message: "", type: "success" },
 
+      // Predictions
+      predictionType: null,
+      predictionLoading: false,
+      predictionResult: null,
+
       // Static config
       subTabs: [
         { key: "sales", label: "Sales" },
@@ -1070,7 +1211,7 @@ export default {
           { value: "inventory-summary", label: "Inventory Summary Report" },
         ],
         schedule: [
-          { value: "employee-schedule", label: "Employee Schedule Report" },
+          { value: "employee-schedule", label: "Staff Schedule Report" },
         ],
         consolidated: [
           {
@@ -1148,7 +1289,7 @@ export default {
         },
         {
           key: "employee-sched",
-          name: "Employee Schedule Report",
+          name: "Staff Schedule Report",
           desc: "Staff shift assignments and schedule summary",
           icon: "bi bi-person-lines-fill",
           color: "purple",
@@ -1802,105 +1943,7 @@ export default {
             "Admin",
         };
 
-        // 3. Capture chart canvases for PDF
-        let chartImages = [];
-        if (this.genForm.format === "pdf") {
-          const salesTypes = ['sales-pipeline', 'sales-performance', 'sales-forecast', 'sales-summary', 'consolidated-report'];
-          const isSalesType = salesTypes.includes(this.genForm.type);
-
-          if (isSalesType) {
-            const CHART_W = 480;
-            const BAR_H = 24;
-            const BAR_GAP = 6;
-            const LABEL_W = 110;
-
-            // Top Products Horizontal Bar
-            const top = this.topProductsData || [];
-            const maxRev = Math.max(...top.map((p) => Number(p.revenue)), 1);
-            const barSvg = top.length
-              ? `<svg xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${top.length * (BAR_H + BAR_GAP) + 30}" viewBox="0 0 ${CHART_W} ${top.length * (BAR_H + BAR_GAP) + 30}">
-                  <style>.t{fill:#374151;font:11px sans-serif}.l{fill:#6b7280;font:10px sans-serif}</style>
-                  ${top
-                    .map((p, i) => {
-                      const y = i * (BAR_H + BAR_GAP);
-                      const w = Math.max(
-                        (Number(p.revenue) / maxRev) * (CHART_W - LABEL_W - 60),
-                        2,
-                      );
-                      const color = PALETTE[i % PALETTE.length];
-                      return (
-                        `<text x="0" y="${y + BAR_H / 2 + 4}" class="t" text-anchor="end">${(p.product_name || "").length > 14 ? (p.product_name || "").slice(0, 14) + "…" : p.product_name || ""}</text>` +
-                        `<rect x="${LABEL_W + 4}" y="${y + 2}" width="${w}" height="${BAR_H - 4}" rx="3" fill="${color}"/>` +
-                        `<text x="${LABEL_W + 8 + w}" y="${y + BAR_H / 2 + 4}" class="l">₱${Number(p.revenue).toLocaleString()}</text>`
-                      );
-                    })
-                    .join("")}
-                  <text x="0" y="${top.length * (BAR_H + BAR_GAP) + 20}" class="l">Revenue (₱)</text>
-                </svg>`
-              : "";
-            if (barSvg)
-              chartImages.push({
-                svg: barSvg,
-                width: CHART_W,
-                title: "Top Selling Products",
-                desc: "Highest-grossing products by revenue.",
-              });
-
-            // Sales by Category Pie
-            const cats = this.revCategoryData || [];
-            const total = cats.reduce((s, c) => s + Number(c.revenue), 0) || 1;
-            const PIE_W = 320,
-              PIE_H = 200,
-              CX = 140,
-              CY = 100,
-              R = 80;
-            let angle = -Math.PI / 2;
-            const slices = cats.map((c, i) => {
-              const val = (Number(c.revenue) / total) * 2 * Math.PI;
-              const a1 = angle,
-                a2 = angle + val;
-              const x1 = CX + R * Math.cos(a1),
-                y1 = CY + R * Math.sin(a1);
-              const x2 = CX + R * Math.cos(a2),
-                y2 = CY + R * Math.sin(a2);
-              const large = val > Math.PI ? 1 : 0;
-              const color = PALETTE[i % PALETTE.length];
-              const path = `M${CX},${CY} L${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} Z`;
-              angle = a2;
-              return {
-                path,
-                color,
-                label: c.category || "—",
-                pct: ((Number(c.revenue) / total) * 100).toFixed(1),
-              };
-            });
-            const pieSvg = cats.length
-              ? `<svg xmlns="http://www.w3.org/2000/svg" width="${PIE_W + 160}" height="${PIE_H + 20}" viewBox="0 0 ${PIE_W + 160} ${PIE_H + 20}">
-                  <style>.t{fill:#374151;font:11px sans-serif}.p{fill:#6b7280;font:10px sans-serif}</style>
-                  ${slices.map((s) => `<path d="${s.path}" fill="${s.color}" stroke="#fff" stroke-width="2"/>`).join("")}
-                  ${slices
-                    .map((s, i) => {
-                      const ly = 20 + i * 22;
-                      return (
-                        `<rect x="${PIE_W + 10}" y="${ly}" width="12" height="12" rx="2" fill="${s.color}"/>` +
-                        `<text x="${PIE_W + 28}" y="${ly + 10}" class="t">${s.label}</text>` +
-                        `<text x="${PIE_W + 28}" y="${ly + 21}" class="p">${s.pct}%</text>`
-                      );
-                    })
-                    .join("")}
-                </svg>`
-              : "";
-            if (pieSvg)
-              chartImages.push({
-                svg: pieSvg,
-                width: PIE_W + 160,
-                title: "Sales by Category",
-                desc: "Proportion of sales by product category.",
-              });
-          }
-        }
-
-        // 4. Export — triggers browser download
+        // 3. Export — triggers browser download
         let fileBuffer = null;
         let contentType = "";
         if (this.genForm.format === "pdf") {
@@ -1908,8 +1951,6 @@ export default {
             this.genForm.type,
             rawRows || rows,
             meta,
-            chartImages,
-            this.topProductsData,
           );
           contentType = "application/pdf";
         }
@@ -2127,6 +2168,87 @@ export default {
       } else {
         this.showToast("No file available for this report.", "error");
       }
+    },
+
+    // ── Predictions ──────────────────────────────────────
+    selectPrediction(type) {
+      this.predictionType = type;
+    },
+
+    shortNum(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+      if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+      return n.toString();
+    },
+
+    generatePrediction(type) {
+      this.predictionType = type;
+      this.predictionLoading = true;
+      this.predictionResult = null;
+
+      setTimeout(() => {
+        this.predictionResult = this.getMockPredictionData(type);
+        this.predictionLoading = false;
+      }, 1800);
+    },
+
+    getMockPredictionData(type) {
+      if (type === "sales") {
+        const periods = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        let chartData = periods.map((p) => {
+          const predicted = 8000 + Math.round(Math.random() * 7000);
+          const actual = Math.round(predicted * (0.85 + Math.random() * 0.3));
+          return { period: p, predicted, actual };
+        });
+        const maxVal = Math.max(...chartData.flatMap(d => [d.predicted, d.actual])) * 1.15;
+        chartData = chartData.map(d => ({
+          ...d,
+          predictedPct: (d.predicted / maxVal) * 100,
+          actualPct: (d.actual / maxVal) * 100,
+        }));
+        const totalPredicted = chartData.reduce((s, d) => s + d.predicted, 0);
+        const totalActual = chartData.reduce((s, d) => s + d.actual, 0);
+        return {
+          type: "sales",
+          stats: [
+            { label: "Predicted Revenue", value: "₱" + totalPredicted.toLocaleString(), change: "+12.5%", up: true },
+            { label: "Actual Revenue", value: "₱" + totalActual.toLocaleString(), change: "+8.3%", up: true },
+            { label: "Accuracy Rate", value: Math.round((totalActual / totalPredicted) * 100) + "%", change: "+2.1%", up: true },
+          ],
+          chartData,
+        };
+      }
+
+      if (type === "demand") {
+        const products = [
+          { name: "Barako Coffee", cat: "Beverages", base: 180 },
+          { name: "Spanish Latte", cat: "Beverages", base: 150 },
+          { name: "Matcha Latte", cat: "Beverages", base: 100 },
+          { name: "Chicken Pie", cat: "Pastries", base: 80 },
+          { name: "Empanada", cat: "Pastries", base: 60 },
+          { name: "Cheesecake Slice", cat: "Desserts", base: 40 },
+          { name: "Butter Croissant", cat: "Pastries", base: 55 },
+          { name: "Iced Caramel Macchiato", cat: "Beverages", base: 120 },
+          { name: "Carbonara", cat: "Meals", base: 45 },
+          { name: "Pancit Canton", cat: "Meals", base: 50 },
+        ];
+        const forecast = products.map((p) => {
+          const forecasted = p.base + Math.round(Math.random() * 60 - 15);
+          const currentStock = Math.round(forecasted * (0.2 + Math.random() * 0.6));
+          const ratio = currentStock / forecasted;
+          const status = ratio < 0.3 ? "Order" : ratio < 0.6 ? "Watch" : "Sufficient";
+          return {
+            product: p.name,
+            category: p.cat,
+            forecasted: forecasted + " units",
+            currentStock: currentStock + " units",
+            status,
+          };
+        });
+        return { type: "demand", forecast };
+      }
+
+      return null;
     },
 
     showToast(message, type = "success") {
@@ -3130,5 +3252,197 @@ export default {
   padding: 3rem 1rem;
   border: 2px dashed var(--border);
   border-radius: 8px;
+}
+
+/* Predictions */
+.pred-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.pred-card:hover {
+  border-color: #5d4037;
+  box-shadow: 0 4px 16px rgba(93, 64, 55, 0.12);
+}
+.pred-card.active {
+  border-color: #5d4037;
+  background: #f5f0ed;
+}
+.pred-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #efe6df;
+  color: #5d4037;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.pred-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 0.4rem;
+}
+.pred-card-desc {
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+.btn-predict {
+  background: #5d4037;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1.15rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: background 0.18s;
+  cursor: pointer;
+}
+.btn-predict:hover:not(:disabled) {
+  background: #4a322a;
+}
+.btn-predict:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.pred-result-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+.pred-stat {
+  text-align: center;
+  padding: 1rem;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.pred-stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+.pred-stat-value {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #1a1a1a;
+}
+.pred-stat-change {
+  font-size: 0.7rem;
+  margin-top: 0.2rem;
+}
+.pred-stat-change.up { color: #16a34a; }
+.pred-stat-change.down { color: #7b1d1d; }
+.pred-chart-placeholder {
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+}
+.pred-bar-chart-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 8px;
+  height: 340px;
+  padding: 0 6px;
+}
+.pred-bar-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 6px;
+}
+.pred-bar-pair {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+.pred-bar {
+  width: 52px;
+  border-radius: 6px 6px 0 0;
+  position: relative;
+  transition: height 0.4s ease;
+  min-height: 4px;
+}
+.pred-bar.predicted {
+  background: linear-gradient(to top, #7b1d1d, #a83232);
+}
+.pred-bar.actual {
+  background: linear-gradient(to top, #2d6a4f, #50b86c);
+}
+.pred-bar-label {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  white-space: nowrap;
+}
+.pred-bar-xlabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #374151;
+  text-align: center;
+}
+.pred-chart-legend {
+  text-align: center;
+  margin-top: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+}
+.legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+.legend-dot.predicted { background: #7b1d1d; }
+.legend-dot.actual { background: #2d6a4f; }
+.badge-danger {
+  background: #f5ede8;
+  color: #7b1d1d;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.badge-warning {
+  background: #fef9c3;
+  color: #b45309;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.badge-success {
+  background: #dcfce7;
+  color: #16a34a;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 </style>

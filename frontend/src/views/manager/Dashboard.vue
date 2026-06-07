@@ -362,7 +362,7 @@ const quickActions = [
   {
     icon: Calendar,
     text: "Manage Schedule",
-    onClick: () => router.push("/manager/schedule"),
+    onClick: () => router.push("/manager/shift-management"),
   },
   {
     icon: FileText,

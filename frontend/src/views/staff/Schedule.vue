@@ -5,7 +5,7 @@
       <div>
         <h1>My Schedule</h1>
         <p class="header-subtitle">
-          {{ currentEmployee?.Name || "Employee" }} •
+          {{ currentEmployee?.Name || "Staff" }} •
           {{ currentEmployee?.Branch || "Branch" }} •
           {{ currentEmployee?.Position || "Cashier" }}
         </p>
@@ -16,178 +16,34 @@
       </div>
     </div>
 
-    <!-- Tab Navigation -->
-    <div class="tabs-bar">
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'my-schedule' }"
-        @click="activeTab = 'my-schedule'"
-      >
-        <Calendar :size="16" />
-        My Schedule
-      </button>
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'availability' }"
-        @click="activeTab = 'availability'"
-      >
-        <Clock :size="16" />
-        Set Availability
-      </button>
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'history' }"
-        @click="activeTab = 'history'"
-      >
-        <Clock :size="16" />
-        History
-      </button>
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'inquiries' }"
-        @click="activeTab = 'inquiries'"
-      >
-        <MessageSquare :size="16" />
-        Change Inquiries
-        <span v-if="pendingInquiryCount" class="tab-badge warning">{{
-          pendingInquiryCount
-        }}</span>
-      </button>
-    </div>
+    <div class="split-layout">
 
-    <!-- ── TAB: MY SCHEDULE ─────────────────────────────────────── -->
-    <div v-if="activeTab === 'my-schedule'" class="tab-content">
-      <!-- Month Navigator -->
-      <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
-        <button
-          class="btn btn-ghost btn-sm"
-          @click="monthOffset -= 1"
-          title="Previous month"
-        >
-          <ChevronLeft :size="18" />
-        </button>
-        <span
-          style="
-            min-width: 200px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 1.1rem;
-          "
-        >
-          {{ monthYearLabel }}
-        </span>
-        <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">
-          Today
-        </button>
-        <button
-          class="btn btn-ghost btn-sm"
-          @click="monthOffset += 1"
-          title="Next month"
-        >
-          <ChevronRight :size="18" />
-        </button>
-      </div>
+      <!-- ══════════════════════════════════════════
+           LEFT PANEL
+      ═══════════════════════════════════════════ -->
+      <div class="left-panel">
 
-      <!-- Loading State -->
-      <div v-if="loadingSchedule" class="loading-state">
-        <div class="spinner"></div>
-        <p>Loading your schedule…</p>
-      </div>
-
-      <div v-else>
-        <!-- Calendar Grid -->
-        <div class="calendar-container">
-          <!-- Day Headers -->
-          <div class="calendar-header">
-            <div
-              class="calendar-day-header"
-              v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
-              :key="day"
-            >
-              {{ day }}
-            </div>
-          </div>
-
-          <!-- Calendar Grid -->
-          <div class="calendar-grid">
-            <div
-              v-for="day in monthDays"
-              :key="day.dateStr"
-              class="calendar-day"
-              :class="{
-                'is-today': day.isToday,
-                'is-other-month': day.isOtherMonth,
-              }"
-            >
-              <div class="day-number">
-                {{ day.dayOfMonth }}
-                <span v-if="day.isToday" class="today-badge">Today</span>
-              </div>
-
-              <div class="day-shifts">
-                <div
-                  v-for="shift in day.shifts"
-                  :key="shift.id"
-                  class="shift-badge"
-                  :class="{ 'shift-badge--mine': shift.isMine }"
-                  :style="{ background: shift.color }"
-                >
-                  <div class="shift-badge-time">{{ shift.startTime }}</div>
-                  <div class="shift-badge-name">{{ shift.label }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <!-- left-tab strip -->
+        <div class="left-tab-bar mb-3">
+          <button
+            v-for="tab in leftTabs"
+            :key="tab.key"
+            class="left-tab-btn"
+            :class="{ active: activeTab === tab.key }"
+            @click="activeTab = tab.key"
+          >
+            {{ tab.label }}
+            <span v-if="tab.key === 'inquiries' && pendingInquiryCount" class="tab-badge">{{ pendingInquiryCount }}</span>
+          </button>
         </div>
-      </div>
 
-      <!-- Upcoming Shifts -->
-      <div class="section">
-        <div class="section-header">
-          <div>
-            <h3>Upcoming Shifts</h3>
-            <p class="section-subtitle">Next 10 scheduled shifts</p>
-          </div>
-        </div>
-        <div v-if="upcomingShifts.length === 0" class="empty-state">
-          <Calendar :size="32" />
-          <p>No upcoming shifts found.</p>
-        </div>
-        <div v-else class="shifts-list">
-          <div v-for="(shift, i) in upcomingShifts" :key="i" class="shift-item">
-            <div
-              class="shift-item-dot"
-              :class="shift.Status === 'Active' ? 'active' : 'inactive'"
-            ></div>
-            <div class="shift-item-info">
-              <div class="shift-item-date">
-                {{ formatShiftDate(shift.WorkDate) }}
-              </div>
-              <div class="shift-item-meta">
-                {{ shift.TimeIn }} – {{ shift.TimeOut }} • {{ shift.Branch }}
-              </div>
-            </div>
-            <span
-              class="shift-status-badge"
-              :class="shiftStatusClass(shift.Status)"
-              >{{ shift.Status }}</span
-            >
-          </div>
-        </div>
-      </div>
-    </div>
+        <div class="left-scroll-area">
 
-    <!-- ── TAB: SET AVAILABILITY ─────────────────────────────────── -->
-    <div v-if="activeTab === 'availability'" class="tab-content">
-      <div class="two-column-layout">
-        <!-- Left: Submit form -->
-        <div class="column">
-          <div class="section">
-            <div class="section-header">
-              <h3>Set Availability</h3>
-              <p class="section-subtitle">
-                Let your manager know when you're available
-              </p>
+          <!-- ── SET AVAILABILITY ───────────────── -->
+          <div v-if="activeTab === 'availability'" ref="availFormSection">
+            <div class="left-section-title mb-2">Set Availability</div>
+            <div class="section-subtitle mb-3" style="font-size:0.78rem;color:#6b7280;">
+              Let your manager know when you're available
             </div>
             <form class="availability-form" @submit.prevent>
               <div class="form-group">
@@ -196,18 +52,18 @@
               </div>
               <div class="form-row">
                 <div class="form-group">
-                  <label>Available Time In</label>
+                  <label>Time In</label>
                   <input type="time" v-model="availForm.TimeIn" />
                 </div>
                 <div class="form-group">
-                  <label>Available Time Out</label>
+                  <label>Time Out</label>
                   <input type="time" v-model="availForm.TimeOut" />
                 </div>
               </div>
               <div class="form-group">
                 <label>Notes <span class="optional">(optional)</span></label>
                 <textarea
-                  rows="3"
+                  rows="2"
                   v-model="availForm.Notes"
                   placeholder="Any notes for the manager…"
                 ></textarea>
@@ -225,18 +81,12 @@
                 Submit Availability
               </button>
             </form>
-          </div>
-        </div>
 
-        <!-- Right: My Availability History -->
-        <div class="column">
-          <div class="section">
-            <div class="section-header">
-              <div>
-                <h3>My Availability Requests</h3>
-                <p class="section-subtitle">Your submitted availability</p>
-              </div>
-              <select v-model="availFilter" class="filter-select">
+            <hr class="my-3" />
+
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="left-section-title">My Requests</span>
+              <select v-model="availFilter" class="filter-select" style="font-size:0.76rem;width:auto">
                 <option value="all">All</option>
                 <option value="Pending">Pending</option>
                 <option value="Confirmed">Approved</option>
@@ -246,104 +96,79 @@
             <div v-if="loadingAvail" class="loading-state">
               <div class="spinner"></div>
             </div>
-            <div
-              v-else-if="filteredAvailability.length === 0"
-              class="empty-state"
-            >
-              <Inbox :size="32" />
+            <div v-else-if="filteredAvailability.length === 0" class="empty-left">
+              <i class="bi bi-inbox"></i>
               <p>No requests yet.</p>
             </div>
-            <div v-else class="requests-list">
+            <div v-else style="display:flex;flex-direction:column;gap:0.5rem;">
               <div
                 v-for="req in filteredAvailability"
                 :key="req.AvailabilityId"
-                class="request-item"
+                style="background:#fafafa;border:1px solid #f0ebe8;border-radius:8px;padding:0.65rem 0.75rem;"
               >
-                <div class="request-header">
+                <div class="d-flex justify-content-between align-items-start mb-1">
                   <div>
-                    <div class="request-date">
+                    <div style="font-size:0.82rem;font-weight:600;color:#1a1a1a;">
                       {{ formatShiftDate(req.Date) }}
                     </div>
-                    <div class="request-time">
+                    <div style="font-size:0.75rem;color:#6b7280;">
                       {{ req.startTime }} – {{ req.endTime }}
                     </div>
                   </div>
-                  <span class="status-badge" :class="statusClass(req.Status)">{{
-                    req.Status
-                  }}</span>
+                  <span class="status-badge" :class="statusClass(req.Status)" style="font-size:0.72rem;">{{ req.Status }}</span>
                 </div>
-                <p v-if="req.Notes" class="request-notes">{{ req.Notes }}</p>
-                <div class="request-date-small">
-                  {{ formatDate(req.CreatedAt) }}
-                </div>
+                <p v-if="req.Notes" style="font-size:0.78rem;color:#4b5563;margin:0 0 0.25rem;">{{ req.Notes }}</p>
+                <div style="font-size:0.7rem;color:#9ca3af;">{{ formatDate(req.CreatedAt) }}</div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- ── TAB: HISTORY ─────────────────────────────────────────── -->
-    <div v-if="activeTab === 'history'" class="tab-content">
-      <div class="section">
-        <div class="section-header">
-          <div>
-            <h3>Availability History</h3>
-            <p class="section-subtitle">
+          <!-- ── HISTORY ─────────────────────────── -->
+          <div v-if="activeTab === 'history'">
+            <div class="left-section-title mb-2">Availability History</div>
+            <div class="section-subtitle mb-3" style="font-size:0.78rem;color:#6b7280;">
               Your past approved and rejected availability requests
-            </p>
-          </div>
-        </div>
-        <div v-if="loadingAvail" class="loading-state">
-          <div class="spinner"></div>
-        </div>
-        <div v-else-if="resolvedAvailability.length === 0" class="empty-state">
-          <Inbox :size="32" />
-          <p>No resolved requests yet.</p>
-        </div>
-        <div v-else class="requests-list">
-          <div
-            v-for="req in resolvedAvailability"
-            :key="req.AvailabilityId"
-            class="request-item"
-          >
-            <div class="request-header">
-              <div>
-                <div class="request-date">{{ formatShiftDate(req.Date) }}</div>
-                <div class="request-time">
-                  {{ req.startTime }} – {{ req.endTime }}
+            </div>
+            <div v-if="loadingAvail" class="loading-state">
+              <div class="spinner"></div>
+            </div>
+            <div v-else-if="resolvedAvailability.length === 0" class="empty-left">
+              <i class="bi bi-inbox"></i>
+              <p>No resolved requests yet.</p>
+            </div>
+            <div v-else style="display:flex;flex-direction:column;gap:0.5rem;">
+              <div
+                v-for="req in resolvedAvailability"
+                :key="req.AvailabilityId"
+                style="background:#fafafa;border:1px solid #f0ebe8;border-radius:8px;padding:0.65rem 0.75rem;"
+              >
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                  <div>
+                    <div style="font-size:0.82rem;font-weight:600;color:#1a1a1a;">
+                      {{ formatShiftDate(req.Date) }}
+                    </div>
+                    <div style="font-size:0.75rem;color:#6b7280;">
+                      {{ req.startTime }} – {{ req.endTime }}
+                    </div>
+                  </div>
+                  <span class="status-badge" :class="statusClass(req.Status)" style="font-size:0.72rem;">{{ displayStatus(req.Status) }}</span>
                 </div>
+                <p v-if="req.Notes" style="font-size:0.78rem;color:#4b5563;margin:0 0 0.25rem;">{{ req.Notes }}</p>
+                <div style="font-size:0.7rem;color:#9ca3af;">{{ formatDate(req.CreatedAt) }}</div>
               </div>
-              <span class="status-badge" :class="statusClass(req.Status)">{{
-                displayStatus(req.Status)
-              }}</span>
-            </div>
-            <p v-if="req.Notes" class="request-notes">{{ req.Notes }}</p>
-            <div class="request-date-small">
-              {{ formatDate(req.CreatedAt) }}
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- ── TAB: CHANGE INQUIRIES ────────────────────────────────── -->
-    <div v-if="activeTab === 'inquiries'" class="tab-content">
-      <div class="two-column-layout">
-        <!-- Submit new inquiry -->
-        <div class="column">
-          <div class="section">
-            <div class="section-header">
-              <h3>New Change Inquiry</h3>
-              <p class="section-subtitle">Request a shift change</p>
+          <!-- ── CHANGE INQUIRIES ────────────────── -->
+          <div v-if="activeTab === 'inquiries'" ref="inquiryFormSection">
+            <div class="left-section-title mb-2">New Change Inquiry</div>
+            <div class="section-subtitle mb-3" style="font-size:0.78rem;color:#6b7280;">
+              Request a shift change
             </div>
             <form class="inquiry-form">
               <div class="form-group">
                 <label>Shift Date to Change</label>
-                <select
-                  v-model="inquiryForm.ShiftDate"
-                  class="inquiry-date-select"
-                >
+                <select v-model="inquiryForm.ShiftDate" class="inquiry-date-select">
                   <option value="" disabled>Select a scheduled date</option>
                   <option v-for="d in scheduledDates" :key="d" :value="d">
                     {{ formatShiftDate(d) }}
@@ -363,16 +188,13 @@
               <div class="form-group">
                 <label>Reason</label>
                 <textarea
-                  rows="4"
+                  rows="3"
                   v-model="inquiryForm.Reason"
                   placeholder="Explain your request in detail…"
                 ></textarea>
               </div>
               <div class="form-group">
-                <label
-                  >Preferred Replacement Date
-                  <span class="optional">(if applicable)</span></label
-                >
+                <label>Preferred Replacement Date <span class="optional">(if applicable)</span></label>
                 <input type="date" v-model="inquiryForm.PreferredDate" />
               </div>
               <button
@@ -388,18 +210,12 @@
                 Submit Inquiry
               </button>
             </form>
-          </div>
-        </div>
 
-        <!-- My inquiries -->
-        <div class="column">
-          <div class="section">
-            <div class="section-header">
-              <div>
-                <h3>My Inquiries</h3>
-                <p class="section-subtitle">Your submitted requests</p>
-              </div>
-              <select v-model="inquiryFilter" class="filter-select">
+            <hr class="my-3" />
+
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="left-section-title">My Inquiries</span>
+              <select v-model="inquiryFilter" class="filter-select" style="font-size:0.76rem;width:auto">
                 <option value="all">All</option>
                 <option value="Pending">Pending</option>
                 <option value="Approved">Approved</option>
@@ -410,46 +226,150 @@
             <div v-if="loadingInquiries" class="loading-state">
               <div class="spinner"></div>
             </div>
-            <div v-else-if="filteredInquiries.length === 0" class="empty-state">
-              <MessageSquare :size="32" />
+            <div v-else-if="filteredInquiries.length === 0" class="empty-left">
+              <i class="bi bi-inbox"></i>
               <p>No inquiries submitted yet.</p>
             </div>
-            <div v-else class="inquiries-list">
+            <div v-else style="display:flex;flex-direction:column;gap:0.5rem;">
               <div
                 v-for="inq in filteredInquiries"
                 :key="inq.InquiryId"
-                class="inquiry-item"
+                style="background:#fafafa;border:1px solid #f0ebe8;border-radius:8px;padding:0.65rem 0.75rem;"
               >
-                <div class="inquiry-header">
+                <div class="d-flex justify-content-between align-items-start mb-1">
                   <div>
-                    <span class="inquiry-type">{{ inq.RequestType }}</span>
-                    <span class="inquiry-date">{{
-                      formatShiftDate(inq.ShiftDate)
-                    }}</span>
+                    <span style="font-size:0.82rem;font-weight:600;color:#1a1a1a;">{{ inq.RequestType }}</span>
+                    <span style="font-size:0.75rem;color:#6b7280;margin-left:0.4rem;">{{ formatShiftDate(inq.ShiftDate) }}</span>
                   </div>
-                  <span class="status-badge" :class="statusClass(inq.Status)">{{
-                    inq.Status
-                  }}</span>
+                  <span class="status-badge" :class="statusClass(inq.Status)" style="font-size:0.72rem;">{{ inq.Status }}</span>
                 </div>
-                <p class="inquiry-reason">{{ inq.Reason }}</p>
-                <div v-if="inq.PreferredDate" class="inquiry-meta">
-                  <span class="preferred-date"
-                    >Preferred: {{ formatShiftDate(inq.PreferredDate) }}</span
-                  >
+                <p style="font-size:0.78rem;color:#4b5563;margin:0 0 0.25rem;">{{ inq.Reason }}</p>
+                <div v-if="inq.PreferredDate" style="font-size:0.75rem;color:#6b7280;margin-bottom:0.25rem;">
+                  Preferred: {{ formatShiftDate(inq.PreferredDate) }}
                 </div>
-                <div v-if="inq.ManagerNote" class="manager-note">
-                  <Briefcase :size="14" />
+                <div v-if="inq.ManagerNote" class="manager-note" style="padding:0.5rem;font-size:0.75rem;margin-top:0.25rem;">
+                  <Briefcase :size="12" />
                   <span><strong>Manager:</strong> {{ inq.ManagerNote }}</span>
                 </div>
-                <div class="inquiry-date-small">
-                  Submitted {{ formatDate(inq.CreatedAt) }}
+                <div style="font-size:0.7rem;color:#9ca3af;">Submitted {{ formatDate(inq.CreatedAt) }}</div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- end left-scroll-area -->
+      </div><!-- end left-panel -->
+
+      <!-- ══════════════════════════════════════════
+           RIGHT PANEL — My Schedule
+      ═══════════════════════════════════════════ -->
+      <div class="right-panel">
+
+        <!-- Month Navigator -->
+        <div class="d-flex justify-content-center align-items-center gap-3 mb-4">
+          <button class="btn btn-ghost btn-sm" @click="monthOffset -= 1" title="Previous month">
+            <ChevronLeft :size="18" />
+          </button>
+          <span
+            style="min-width:200px;text-align:center;font-weight:600;font-size:1.1rem;"
+          >
+            {{ monthYearLabel }}
+          </span>
+          <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">
+            Today
+          </button>
+          <button class="btn btn-ghost btn-sm" @click="monthOffset += 1" title="Next month">
+            <ChevronRight :size="18" />
+          </button>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="loadingSchedule" class="loading-state">
+          <div class="spinner"></div>
+          <p>Loading your schedule…</p>
+        </div>
+
+        <div v-else>
+          <!-- Calendar Grid -->
+          <div class="calendar-container">
+            <div class="calendar-header">
+              <div
+                class="calendar-day-header"
+                v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
+                :key="day"
+              >
+                {{ day }}
+              </div>
+            </div>
+
+            <div class="calendar-grid">
+              <div
+                v-for="day in monthDays"
+                :key="day.dateStr"
+                class="calendar-day"
+                :class="{
+                  'is-today': day.isToday,
+                  'is-other-month': day.isOtherMonth,
+                  'clickable-day': true,
+                }"
+                @click.stop="openAvailForm(day.dateStr)"
+              >
+                <div class="day-number">
+                  {{ day.dayOfMonth }}
+                  <span v-if="day.isToday" class="today-badge">Today</span>
+                </div>
+                <div class="day-shifts">
+                  <div
+                    v-for="shift in day.shifts"
+                    :key="shift.id"
+                    class="shift-badge"
+                    :class="{ 'shift-badge--mine': shift.isMine }"
+                    :style="{ background: shift.color }"
+                    @click.stop="selectedShift = shift"
+                    title="View shift details"
+                  >
+                    <div class="shift-badge-time">{{ shift.startTime }}</div>
+                    <div class="shift-badge-name">{{ shift.label }}</div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+
+        <!-- Upcoming Shifts -->
+        <div class="section mt-4">
+          <div class="section-header">
+            <div>
+              <h3>Upcoming Shifts</h3>
+              <p class="section-subtitle">Next 10 scheduled shifts</p>
+            </div>
+          </div>
+          <div v-if="upcomingShifts.length === 0" class="empty-state">
+            <Calendar :size="32" />
+            <p>No upcoming shifts found.</p>
+          </div>
+          <div v-else class="shifts-list">
+            <div v-for="(shift, i) in upcomingShifts" :key="i" class="shift-item">
+              <div
+                class="shift-item-dot"
+                :class="shift.Status === 'Active' ? 'active' : 'inactive'"
+              ></div>
+              <div class="shift-item-info">
+                <div class="shift-item-date">
+                  {{ formatShiftDate(shift.WorkDate) }}
+                </div>
+                <div class="shift-item-meta">
+                  {{ shift.TimeIn }} – {{ shift.TimeOut }} • {{ shift.Branch }}
+                </div>
+              </div>
+              <span class="shift-status-badge" :class="shiftStatusClass(shift.Status)">{{ shift.Status }}</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end right-panel -->
+
+    </div><!-- end split-layout -->
 
     <!-- Toast Notification -->
     <div class="toast-container" :class="{ show: toast.message }">
@@ -462,6 +382,57 @@
         </button>
       </div>
     </div>
+
+    <!-- ── SHIFT DETAIL MODAL ─────────────────────────────── -->
+    <Teleport to="body">
+      <div v-if="selectedShift" class="modal-backdrop">
+        <div style="position:absolute;inset:0;z-index:0;" @click="selectedShift = null"></div>
+        <div class="modal-dialog" style="max-width:380px;position:relative;z-index:1;" @click.stop>
+          <div class="modal-header">
+            <h3>Shift Details</h3>
+            <button class="modal-close" @click="selectedShift = null">
+              <X :size="18" />
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="shift-detail-grid">
+              <div class="shift-detail-item">
+                <span class="shift-detail-label">Date</span>
+                <span class="shift-detail-value">{{ formatShiftDate(selectedShift.shiftDate) }}</span>
+              </div>
+              <div class="shift-detail-item">
+                <span class="shift-detail-label">Time In</span>
+                <span class="shift-detail-value">{{ selectedShift.startTime }}</span>
+              </div>
+              <div class="shift-detail-item">
+                <span class="shift-detail-label">Time Out</span>
+                <span class="shift-detail-value">{{ selectedShift.endTime }}</span>
+              </div>
+              <div class="shift-detail-item">
+                <span class="shift-detail-label">Role</span>
+                <span class="shift-detail-value">{{ selectedShift.role || '—' }}</span>
+              </div>
+              <div class="shift-detail-item">
+                <span class="shift-detail-label">Branch</span>
+                <span class="shift-detail-value">{{ selectedShift.branch || '—' }}</span>
+              </div>
+              <div class="shift-detail-item">
+                <span class="shift-detail-label">Status</span>
+                <span class="shift-detail-value">
+                  <span class="status-badge" :class="statusClass(selectedShift.status)">
+                    {{ selectedShift.status }}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-ghost" @click="requestChangeForShift(selectedShift)">Request Change</button>
+            <button class="btn-primary" @click="selectedShift = null">Close</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -469,7 +440,6 @@
 import { supabase } from "@/supabase";
 import {
   Calendar,
-  Clock,
   MapPin,
   Briefcase,
   Moon,
@@ -517,7 +487,6 @@ export default {
 
   components: {
     Calendar,
-    Clock,
     MapPin,
     Briefcase,
     Moon,
@@ -535,7 +504,12 @@ export default {
 
   data() {
     return {
-      activeTab: "my-schedule",
+      activeTab: "availability",
+      leftTabs: [
+        { key: "availability", label: "Set Availability" },
+        { key: "history",      label: "History" },
+        { key: "inquiries",    label: "Change Inquiries" },
+      ],
 
       // Employee info
       employeeId: null,
@@ -578,6 +552,9 @@ export default {
         Reason: "",
         PreferredDate: "",
       },
+
+      // Shift detail modal
+      selectedShift: null,
 
       // Toast
       toast: { message: "", type: "success" },
@@ -737,7 +714,7 @@ export default {
     const resolved = await this.resolveEmployeeId();
     if (!resolved) {
       this.showToast(
-        "Unable to identify your employee record. Contact your manager.",
+        "Unable to identify your staff record. Contact your manager.",
         "error",
       );
       this.loadingSchedule = false;
@@ -879,7 +856,7 @@ export default {
           EmployeeId: s.EmployeeId,
           Name:
             `${s.employee?.FirstName || ""} ${s.employee?.LastName || ""}`.trim() ||
-            "Employee",
+            "Staff",
           WorkDate: String(s.ShiftDate || "").slice(0, 10),
           TimeIn: s.StartTime ? s.StartTime.slice(0, 5) : "",
           TimeOut: s.EndTime ? s.EndTime.slice(0, 5) : "",
@@ -1084,6 +1061,27 @@ export default {
       return map[status] || status;
     },
 
+    openAvailForm(dateStr) {
+      this.availForm.Date = dateStr;
+      this.activeTab = "availability";
+      this.$nextTick(() => {
+        const el = this.$refs.availFormSection;
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        this.showToast("Fill in your availability details and submit.", "success");
+      });
+    },
+
+    requestChangeForShift(shift) {
+      this.inquiryForm.ShiftDate = shift.shiftDate;
+      this.selectedShift = null;
+      this.activeTab = "inquiries";
+      this.$nextTick(() => {
+        const el = this.$refs.inquiryFormSection;
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        this.showToast("Fill in the change request form and submit.", "success");
+      });
+    },
+
     showToast(message, type = "success") {
       this.toast = { message, type };
       setTimeout(() => {
@@ -1277,6 +1275,9 @@ export default {
 
 .calendar-day:hover {
   background: #f9fafb;
+}
+.clickable-day {
+  cursor: pointer;
 }
 
 .calendar-day.is-today {
@@ -1787,103 +1788,7 @@ export default {
   background: #f3f4f6;
 }
 
-/* ── Modal ─────────────────────────────────────────────────── */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  animation: fadeIn 0.15s ease;
-}
 
-.modal-dialog {
-  background: white;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 520px;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  z-index: 1;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-  animation: slideUp 0.25s ease;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.modal-header h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.modal-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: #6b7280;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.modal-close:hover {
-  background: #f3f4f6;
-  color: #1f2937;
-}
-
-.modal-body {
-  padding: 1.5rem;
-}
-
-.modal-subtitle {
-  color: #6b7280;
-  font-size: 0.9rem;
-  margin: 0 0 1.5rem 0;
-}
-
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1rem 1.5rem;
-  border-top: 1px solid #e5e7eb;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
 
 /* ── Toast ────────────────────────────────────────────────────── */
 .toast-container {
@@ -2014,4 +1919,259 @@ export default {
     font-size: 0.85rem;
   }
 }
+
+/* ── SPLIT LAYOUT ───────────────────────────────────────── */
+.split-layout {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+  min-height: calc(100vh - 140px);
+}
+
+.left-panel {
+  width: 35%;
+  min-width: 280px;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 140px);
+}
+
+.left-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.75rem 0.75rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+
+.left-tab-btn {
+  background: none;
+  border: none;
+  border-radius: 6px 6px 0 0;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.left-tab-btn:hover { color: #5d4037; }
+.left-tab-btn.active {
+  color: #5d4037;
+  border-bottom-color: #5d4037;
+}
+
+.left-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem;
+}
+
+.left-section-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.right-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.empty-left {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #9ca3af;
+}
+.empty-left i { font-size: 1.8rem; display: block; margin-bottom: 0.5rem; }
+.empty-left p { font-size: 0.8rem; margin: 0; }
+
+@media (max-width: 900px) {
+  .split-layout {
+    flex-direction: column;
+  }
+  .left-panel {
+    width: 100%;
+    max-width: 100%;
+    position: static;
+    max-height: 50vh;
+  }
+}
+</style>
+
+<!-- Global styles for teleported modals — scoped doesn't reach body-level elements -->
+<style>
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-dialog {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  z-index: 1001;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: modalSlideUp 0.25s ease;
+}
+
+@keyframes modalSlideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.modal-dialog .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-dialog .modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.modal-dialog .modal-body {
+  padding: 1.5rem;
+}
+
+.modal-dialog .modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.modal-dialog .modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer !important;
+  padding: 0.4rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  pointer-events: auto !important;
+}
+.modal-dialog .modal-close:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.modal-dialog .btn-ghost {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #1f2937;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transition: background 0.2s;
+}
+.modal-dialog .btn-ghost:hover {
+  background: #f0ebe8;
+}
+
+.modal-dialog .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: #5d4037;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transition: all 0.2s;
+}
+.modal-dialog .btn-primary:hover:not(:disabled) {
+  background: #4e342e;
+}
+.modal-dialog .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed !important;
+}
+
+.modal-dialog .shift-detail-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.modal-dialog .shift-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f0ebe8;
+}
+.modal-dialog .shift-detail-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.modal-dialog .shift-detail-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+.modal-dialog .shift-detail-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.modal-dialog .status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.modal-dialog .status-badge.status-pending  { background: #fef3c7; color: #92400e; }
+.modal-dialog .status-badge.status-approved { background: #d1fae5; color: #065f46; }
+.modal-dialog .status-badge.status-rejected { background: #fee2e2; color: #7f1d1d; }
+.modal-dialog .status-badge.status-review   { background: #dbeafe; color: #0c4a6e; }
 </style>

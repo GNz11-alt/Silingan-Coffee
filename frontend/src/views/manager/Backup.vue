@@ -51,7 +51,7 @@
           <component :is="Users" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">
-          <h3>Employees</h3>
+          <h3>Staff</h3>
           <p class="stat-value">{{ archivedEmployees.length }}</p>
           <span class="stat-trend positive">Staff records</span>
         </div>
@@ -116,7 +116,7 @@
               <select v-model="filterType" class="type-select">
                 <option value="">All Types</option>
                 <option value="Inventory">Inventory</option>
-                <option value="Employee">Employee</option>
+                <option value="Employee">Staff</option>
                 <option value="Sale">Sale</option>
                 <option value="Schedule">Schedule</option>
                 <option value="Menu">Menu</option>
@@ -277,7 +277,7 @@
           </div>
           <p class="mt-3 mb-1 small">
             This will download a full JSON snapshot of all
-            <strong>live and archived</strong> records (inventory, employees,
+            <strong>live and archived</strong> records (inventory, staff,
             sales, and schedules) to your device.
           </p>
           <p class="text-muted" style="font-size: 12px">
@@ -376,7 +376,7 @@ const allItems = computed(() => {
       name: `${e.firstName} ${e.lastName}`,
       details:
         [e.position, e.department].filter(Boolean).join(" - ") ||
-        "Archived employee",
+        "Archived staff",
       archivedDate: e.archivedAt || e.dateHired,
       archivedBy: e.archivedBy || currentUser,
       _raw: { id: e.id },
@@ -723,7 +723,7 @@ const doRestore = async () => {
       .from("employee")
       .update({ Status: "Active", ArchivedAt: null, ArchivedBy: null })
       .eq("EmployeeId", item._raw.id);
-    if (error) showToast("Failed to restore employee.", "error");
+    if (error) showToast("Failed to restore staff.", "error");
     else {
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedEmployees();

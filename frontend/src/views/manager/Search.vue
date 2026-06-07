@@ -149,14 +149,14 @@ const { isAdmin, userBranchId, userBranchName, resolveBranch } =
   useUserBranch();
 const router = useRouter();
 
-const { allItems, isLoading: dataLoading, error: searchError } = useSearchData(userBranchId.value);
+const { allItems, isLoading: dataLoading, error: searchError } = useSearchData(userBranchId);
 
 const search = useSearch(allItems);
 
 const ROUTE_MAP = {
   product: { path: "/manager/menu-pricing" },
   rawmaterial: { path: "/manager/inventory" },
-  employee: { path: "/manager/employees" },
+  employee: { path: "/manager/shift-management" },
   sale: { path: "/manager/sales" },
 };
 

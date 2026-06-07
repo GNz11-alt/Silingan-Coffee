@@ -131,7 +131,7 @@
             </div>
           </div>
           <div class="system-features">
-            <p>Features: Inventory, Sales, Scheduling, Reports, Employee Management, and more.</p>
+            <p>Features: Inventory, Sales, Scheduling, Reports, Staff Management, and more.</p>
           </div>
         </div>
       </div>

@@ -44,14 +44,17 @@ const routes = [
         component: () => import("./views/admin/Inventory.vue"),
       },
       {
+        path: "shift-management",
+        name: "AdminShiftManagement",
+        component: () => import("./views/admin/ShiftManagement.vue"),
+      },
+      {
         path: "employees",
-        name: "AdminEmployees",
-        component: () => import("./views/admin/Employee.vue"),
+        redirect: "/admin/shift-management",
       },
       {
         path: "schedule",
-        name: "AdminSchedule",
-        component: () => import("./views/admin/Schedule.vue"),
+        redirect: "/admin/shift-management",
       },
       {
         path: "sales",
@@ -117,14 +120,17 @@ const routes = [
         component: () => import("./views/manager/Sales.vue"),
       },
       {
+        path: "shift-management",
+        name: "ManagerShiftManagement",
+        component: () => import("./views/manager/ShiftManagement.vue"),
+      },
+      {
         path: "employees",
-        name: "ManagerEmployees",
-        component: () => import("./views/manager/Employee.vue"),
+        redirect: "/manager/shift-management",
       },
       {
         path: "schedule",
-        name: "ManagerSchedule",
-        component: () => import("./views/manager/Schedule.vue"),
+        redirect: "/manager/shift-management",
       },
       {
         path: "menu-pricing",

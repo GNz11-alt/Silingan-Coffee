@@ -240,7 +240,7 @@ const closeOnOutsideClick = (e) => {
 const ROUTE_MAP = {
   product: { path: "/admin/menu-pricing" },
   rawmaterial: { path: "/admin/inventory" },
-  employee: { path: "/admin/employees" },
+  employee: { path: "/admin/shift-management" },
   sale: { path: "/admin/sales" },
 };
 

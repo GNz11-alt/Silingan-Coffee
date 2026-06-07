@@ -4,7 +4,7 @@
     <div class="d-flex align-items-start justify-content-between mb-4">
       <div>
         <h4 class="page-title mb-1">Schedule Management</h4>
-        <p class="page-sub mb-0">Manage employee availability and schedules</p>
+        <p class="page-sub mb-0">Manage staff availability and schedules</p>
       </div>
       <button
         class="btn btn-primary-brand"
@@ -43,7 +43,7 @@
     <template v-else>
       <!-- ── TAB 1: AVAILABILITY ─────────────────────────────── -->
       <div v-if="activeTab === 'availability'">
-        <div class="section-title mb-3">Employee Availability</div>
+        <div class="section-title mb-3">Staff Availability</div>
         <div v-if="pendingOrFading.length" class="avail-list">
           <TransitionGroup name="fade-slide">
             <div
@@ -176,7 +176,7 @@
             type="text"
             class="form-control fc-brand"
             style="width: 200px"
-            placeholder="Search employee…"
+            placeholder="Search staff…"
           />
           <input
             v-if="schedViewMode === 'table'"
@@ -220,7 +220,7 @@
           <table class="sched-table">
             <thead>
               <tr>
-                <th>Employee</th>
+                <th>Staff</th>
                 <th>Role</th>
                 <th>Shift Date</th>
                 <th>Time</th>
@@ -348,7 +348,7 @@
             </div>
           </div>
           <div v-if="schedEmployees.length" class="employee-legend">
-            <span class="legend-label">Employees:</span>
+            <span class="legend-label">Staff:</span>
             <span
               v-for="emp in schedEmployees"
               :key="emp.id"
@@ -444,7 +444,7 @@
                 {{
                   isEditing
                     ? "Update this shift"
-                    : "Create a new schedule for an employee"
+                    : "Create a new schedule for a staff"
                 }}
               </p>
             </div>
@@ -455,7 +455,7 @@
           <div class="modal-panel-body">
             <div class="row g-3">
               <div class="col-12">
-                <label class="form-label-sm">Employee</label>
+                <label class="form-label-sm">Staff</label>
                 <select
                   v-model="form.employeeId"
                   class="form-select fc-brand"
@@ -465,8 +465,8 @@
                   <option value="" disabled>
                     {{
                       employeesLoading
-                        ? "Loading employees…"
-                        : "Select employee"
+                    ? "Loading staff…"
+                    : "Select staff"
                     }}
                   </option>
                   <option v-for="e in employeeList" :key="e.id" :value="e.id">
@@ -581,7 +581,7 @@
           </div>
           <div class="modal-panel-body">
             <p v-if="conflictInfo">
-              This employee already has a shift on
+              This staff already has a shift on
               <strong>{{ formatDate(form.shiftDate) }}</strong> from
               <strong
                 >{{ conflictInfo.existingStart }}–{{
@@ -1158,11 +1158,11 @@ const switchTab = (key) => {
 
 const openCreateModal = () => {
   if (employeesLoading.value) {
-    showToast("Employee list is still loading. Please wait.", "error");
+    showToast("Staff list is still loading. Please wait.", "error");
     return;
   }
   if (!employeeList.value.length) {
-    showToast("No active employees available to schedule.", "error");
+    showToast("No active staff available to schedule.", "error");
     return;
   }
   form.value = emptyForm();
@@ -1184,7 +1184,7 @@ const closeModal = () => {
 
 const validate = () => {
   const e = {};
-  if (!form.value.employeeId) e.employeeId = "Employee is required.";
+  if (!form.value.employeeId) e.employeeId = "Staff is required.";
   if (!form.value.role) e.role = "Role is required.";
   if (!form.value.shiftDate) e.shiftDate = "Shift date is required.";
   if (!form.value.startTime) e.startTime = "Start time is required.";
@@ -1286,7 +1286,7 @@ const saveSchedule = async (overrideConflict = false) => {
     );
     if (roleCount >= 2) {
       throw new Error(
-        `Role "${form.value.role}" already has ${roleCount} employees scheduled for this shift (max 2 per role).`,
+        `Role "${form.value.role}" already has ${roleCount} staff scheduled for this shift (max 2 per role).`,
       );
     }
 
@@ -1401,7 +1401,7 @@ const updateAvailStatus = async (avail, status) => {
             )
           ) {
             throw new Error(
-              `Employee already has a shift from ${normalizeTime(existing.StartTime)}–${normalizeTime(existing.EndTime)} (${existing.Role}) on this date.`,
+              `Staff already has a shift from ${normalizeTime(existing.StartTime)}–${normalizeTime(existing.EndTime)} (${existing.Role}) on this date.`,
             );
           }
         }
@@ -1423,7 +1423,7 @@ const updateAvailStatus = async (avail, status) => {
       );
       if (roleCount >= 2) {
         throw new Error(
-          `Role "${roleToUse}" already has ${roleCount} employees scheduled for this shift (max 2 per role).`,
+          `Role "${roleToUse}" already has ${roleCount} staff scheduled for this shift (max 2 per role).`,
         );
       }
 

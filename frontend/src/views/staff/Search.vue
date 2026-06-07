@@ -121,6 +121,7 @@
     <SearchFilters
       :is-open="showFilters"
       :scopes="search.scopes.value"
+      role="staff"
       @close="showFilters = false"
       @apply="onApplyFilters"
     />
@@ -148,7 +149,7 @@ const { isAdmin, userBranchId, userBranchName, resolveBranch } =
   useUserBranch();
 const router = useRouter();
 
-const { allItems, isLoading: dataLoading, error: searchError } = useSearchData(userBranchId.value);
+const { allItems, isLoading: dataLoading, error: searchError } = useSearchData(userBranchId.value, ['product', 'rawmaterial']);
 
 const search = useSearch(allItems);
 

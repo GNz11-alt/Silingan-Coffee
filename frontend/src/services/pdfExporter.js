@@ -554,7 +554,7 @@ const BUILDERS = {
 
 // ─── Main Export Function ───────────────────────────────────────────────────
 
-export function exportPDF(reportType, rows, meta, chartImages, productData) {
+export function exportPDF(reportType, rows, meta) {
   // 1. Determine Builder and prepare document content
   const builder = BUILDERS[reportType];
   let reportConfig;
@@ -583,51 +583,6 @@ export function exportPDF(reportType, rows, meta, chartImages, productData) {
   // Prepend a Report Summary header
   contentArray.unshift({ text: 'Report Summary', style: 'sectionHeader', alignment: 'center', margin: [0, 0, 0, 12] });
   
-  // Add chart images at the end (dashboard-style layout)
-  if (chartImages && chartImages.length > 0) {
-    contentArray.push({ text: '', pageBreak: 'before' });
-    contentArray.push({ text: 'Analytics Charts', style: 'sectionHeader', alignment: 'center', margin: [0, 0, 0, 15] });
-    // Pair charts side by side like the analytics dashboard
-    for (let i = 0; i < chartImages.length; i += 2) {
-      const left = chartImages[i];
-      const right = chartImages[i + 1];
-      const makeCol = (img) => ({
-        stack: [
-          { text: img.title, style: 'chartTitle' },
-          { text: img.desc, style: 'chartDesc' },
-          img.svg
-            ? { svg: img.svg, width: 240, alignment: 'center', margin: [0, 4, 0, 6] }
-            : { image: img.data, width: 240, alignment: 'center', margin: [0, 4, 0, 6] }
-        ],
-        margin: [0, 0, 8, 0]
-      });
-      if (right) {
-        contentArray.push({ columns: [makeCol(left), makeCol(right)], margin: [0, 0, 0, 12] });
-      } else {
-        contentArray.push({ stack: [makeCol(left)], alignment: 'center', margin: [0, 0, 0, 12] });
-      }
-    }
-  }
-
-  // Add product performance table for consolidated and inventory summary reports
-  if ((reportType === 'inventory-summary' || reportType === 'consolidated-report') && productData && productData.length > 0) {
-    contentArray.push({ text: 'Product Performance', style: 'sectionHeader', alignment: 'center', margin: [0, 0, 0, 15], pageBreak: 'before' });
-    const headers = ['#', 'Product', 'Category', 'Units Sold', 'Revenue', 'Avg Price'];
-    const body = productData.map((p, i) => [
-      { text: String(i + 1), alignment: 'center' },
-      p.product_name || '—',
-      p.category || '—',
-      { text: num(p.units_sold || 0), alignment: 'right' },
-      { text: '₱' + Number(p.revenue || 0).toLocaleString('en-PH'), alignment: 'right' },
-      { text: '₱' + Number(p.avg_price || 0).toFixed(2), alignment: 'right' },
-    ]);
-    contentArray.push({
-      table: { headerRows: 1, widths: ['auto', '*', '*', 'auto', 'auto', 'auto'], body: [headers, ...body] },
-      layout: 'silingan',
-      margin: [0, 0, 0, 10],
-    });
-  }
-
   // 3. Build the document
   const isWide = rows.length > 0 && Object.keys(rows[0]).length > 7;
 
@@ -691,8 +646,6 @@ export function exportPDF(reportType, rows, meta, chartImages, productData) {
 
     styles: {
       sectionHeader: { fontSize: 11, bold: true, color: DARK, margin: [0, 10, 0, 6] },
-      chartTitle: { fontSize: 10, bold: true, color: DARK, margin: [0, 0, 0, 3] },
-      chartDesc: { fontSize: 8, color: MUTED, margin: [0, 0, 0, 8] },
       kpiLabel: { fontSize: 7.5, color: MUTED, bold: true, margin: [0, 0, 0, 3] },
       kpiValue: { fontSize: 14, bold: true, margin: [0, 2, 0, 0] },
       kpiSub: { fontSize: 6.5, color: MUTED },

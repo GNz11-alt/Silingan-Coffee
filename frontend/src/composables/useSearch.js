@@ -68,20 +68,31 @@ export function useSearch(items, options = {}) {
 
     let filtered = itemList
 
+    // Apply branch scope — for items with branch='all', always include them unless a specific branch is selected
     if (scopes.value.branches.length > 0) {
-      filtered = filtered.filter(item => scopes.value.branches.includes(item.branch))
+      filtered = filtered.filter(item =>
+        item.branch === 'all' || scopes.value.branches.includes(String(item.branch))
+      )
     }
     if (scopes.value.categories.length > 0) {
-      filtered = filtered.filter(item => scopes.value.categories.includes(item.category))
+      filtered = filtered.filter(item =>
+        item.category && scopes.value.categories.some(c => c.toLowerCase() === item.category.toLowerCase())
+      )
     }
     if (scopes.value.statuses.length > 0) {
-      filtered = filtered.filter(item => scopes.value.statuses.includes(item.status))
+      filtered = filtered.filter(item =>
+        item.status && scopes.value.statuses.some(s => s.toLowerCase() === item.status.toLowerCase())
+      )
     }
     if (scopes.value.departments.length > 0) {
-      filtered = filtered.filter(item => scopes.value.departments.includes(item.department))
+      filtered = filtered.filter(item =>
+        item.department && scopes.value.departments.some(d => d.toLowerCase() === item.department.toLowerCase())
+      )
     }
     if (scopes.value.types.length > 0) {
-      filtered = filtered.filter(item => scopes.value.types.includes(item.type))
+      filtered = filtered.filter(item =>
+        item.type && scopes.value.types.some(t => t.toLowerCase() === item.type.toLowerCase())
+      )
     }
     if (scopes.value.dateRange.from || scopes.value.dateRange.to) {
       filtered = filtered.filter(item => {
@@ -96,8 +107,15 @@ export function useSearch(items, options = {}) {
     const scopeFiltered = filtered
 
     if (q && fuseInstance) {
-      filtered = fuseInstance.search(q).map(r => r.item)
-      filtered = filtered.filter(item => scopeFiltered.includes(item))
+      // Rebuild fuse on the scope-filtered subset for accurate results
+      const subFuse = new Fuse(scopeFiltered, {
+        keys,
+        threshold,
+        includeScore: true,
+        shouldSort: true,
+        minMatchCharLength: 2,
+      })
+      filtered = subFuse.search(q).map(r => r.item)
     }
 
     results.value = filtered
@@ -126,6 +144,7 @@ export function useSearch(items, options = {}) {
 
   const setScopes = (newScopes) => {
     scopes.value = { ...scopes.value, ...newScopes }
+    hasSearched.value = true
     runSearch()
   }
 
@@ -138,6 +157,7 @@ export function useSearch(items, options = {}) {
       dateRange: { from: null, to: null },
       types: [],
     }
+    if (!query.value.trim()) hasSearched.value = false
     runSearch()
   }
 
