@@ -450,6 +450,7 @@
                   'is-today': day.isToday,
                   'is-other-month': day.isOtherMonth,
                 }"
+                @click="openCreateModal(day.dateStr)"
               >
                 <div class="day-number">
                   {{ day.dayOfMonth }}
@@ -461,7 +462,7 @@
                     :key="shift.id"
                     class="shift-badge"
                     :style="{ background: avatarColor(shift.employeeId) }"
-                    @click="showShiftDetail = shift"
+                    @click.stop="showShiftDetail = shift"
                     :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
                   >
                     <div class="shift-badge-time">{{ shift.startTime }}</div>
@@ -527,20 +528,58 @@
           <div class="modal-panel-body">
             <div class="row g-3">
               <div class="col-12">
-                <label class="form-label-sm">Staff</label>
+                <label class="form-label-sm">Branch</label>
                 <select
-                  v-model="form.employeeId"
+                  v-model="form.branchId"
                   class="form-select fc-brand"
-                  :disabled="employeesLoading"
-                  @change="onEmployeeSelected"
+                  @change="onBranchChanged"
                 >
-                  <option value="" disabled>
-                    {{ employeesLoading ? "Loading staff…" : "Select staff" }}
-                  </option>
-                  <option v-for="e in employeeList" :key="e.id" :value="e.id">
-                    {{ e.name }}
+                  <option value="" disabled>Select branch</option>
+                  <option v-for="b in branches" :key="b.id" :value="b.id">
+                    {{ b.name }}
                   </option>
                 </select>
+                <div v-if="errors.branchId" class="text-danger small mt-1">
+                  {{ errors.branchId }}
+                </div>
+              </div>
+              <div class="col-12 employee-search-wrap">
+                <label class="form-label-sm">Staff</label>
+                <input
+                  v-model="employeeSearchQuery"
+                  type="text"
+                  class="form-control fc-brand"
+                  placeholder="Search staff..."
+                  :disabled="employeesLoading"
+                  @focus="employeeDropdownOpen = true"
+                  @keydown.down.prevent="employeeHighlightIndex < filteredEmployeeList.length - 1 ? employeeHighlightIndex++ : employeeHighlightIndex = 0"
+                  @keydown.up.prevent="employeeHighlightIndex > 0 ? employeeHighlightIndex-- : employeeHighlightIndex = filteredEmployeeList.length - 1"
+                  @keydown.enter.prevent="selectEmployeeByHighlight"
+                  @keydown.esc.prevent="employeeDropdownOpen = false"
+                  @blur="setTimeout(() => employeeDropdownOpen = false, 150)"
+                />
+                <div
+                  v-if="employeeDropdownOpen && !employeesLoading"
+                  class="employee-dropdown"
+                >
+                  <div v-if="!form.branchId" class="employee-dropdown-empty">
+                    Select a branch first
+                  </div>
+                  <div v-else-if="!filteredEmployeeList.length" class="employee-dropdown-empty">
+                    No staff found for this branch
+                  </div>
+                  <div
+                    v-for="(e, i) in filteredEmployeeList"
+                    :key="e.id"
+                    class="employee-dropdown-item"
+                    :class="{ 'is-highlighted': i === employeeHighlightIndex }"
+                    @mousedown.prevent="selectEmployee(e)"
+                    @mouseenter="employeeHighlightIndex = i"
+                  >
+                    <span>{{ e.name }}</span>
+                    <span class="text-muted" style="font-size: 0.75rem;">{{ e.position }}</span>
+                  </div>
+                </div>
                 <div v-if="errors.employeeId" class="text-danger small mt-1">
                   {{ errors.employeeId }}
                 </div>
@@ -588,18 +627,6 @@
                 />
                 <div v-if="errors.endTime" class="text-danger small mt-1">
                   {{ errors.endTime }}
-                </div>
-              </div>
-              <div class="col-12">
-                <label class="form-label-sm">Branch</label>
-                <select v-model="form.branchId" class="form-select fc-brand">
-                  <option value="" disabled>Select branch</option>
-                  <option v-for="b in branches" :key="b.id" :value="b.id">
-                    {{ b.name }}
-                  </option>
-                </select>
-                <div v-if="errors.branchId" class="text-danger small mt-1">
-                  {{ errors.branchId }}
                 </div>
               </div>
               <div v-if="isEditing" class="col-12">
@@ -1216,6 +1243,28 @@ const emptyForm = () => ({
 });
 const form = ref(emptyForm());
 
+// ── Employee search / dropdown ────────────────────────────
+const employeeSearchQuery = ref("");
+const employeeDropdownOpen = ref(false);
+const employeeHighlightIndex = ref(0);
+
+const filteredEmployeeList = computed(() => {
+  if (!form.value.branchId) return [];
+  const branchId = String(form.value.branchId);
+  let list = employeeList.value.filter(
+    (e) => String(e.branchAssigned) === branchId,
+  );
+  if (employeeSearchQuery.value) {
+    const q = employeeSearchQuery.value.toLowerCase();
+    list = list.filter((e) => e.name.toLowerCase().includes(q));
+  }
+  return list;
+});
+
+watch(filteredEmployeeList, () => {
+  employeeHighlightIndex.value = 0;
+});
+
 // ── Staff CRUD ─────────────────────────────────────────────
 const showStaffModal = ref(false);
 const showArchiveStaffModal = ref(false);
@@ -1662,6 +1711,30 @@ const onEmployeeSelected = () => {
   if (emp.position && !form.value.role) form.value.role = emp.position;
 };
 
+const onBranchChanged = () => {
+  if (form.value.employeeId) {
+    form.value.employeeId = "";
+    employeeSearchQuery.value = "";
+    employeeDropdownOpen.value = false;
+  }
+};
+
+const selectEmployee = (emp) => {
+  form.value.employeeId = emp.id;
+  employeeSearchQuery.value = emp.name;
+  employeeDropdownOpen.value = false;
+  if (emp.position && !form.value.role) form.value.role = emp.position;
+};
+
+const selectEmployeeByHighlight = () => {
+  const list = filteredEmployeeList.value;
+  if (!list.length) return;
+  const idx = employeeHighlightIndex.value;
+  if (idx >= 0 && idx < list.length) {
+    selectEmployee(list[idx]);
+  }
+};
+
 const switchTab = (key) => {
   if (activeTab.value !== key) fadingIds.value = new Set();
   activeTab.value = key;
@@ -1670,7 +1743,7 @@ const switchTab = (key) => {
   if (key === "schedule") fetchSchedules();
 };
 
-const openCreateModal = () => {
+const openCreateModal = (dateStr) => {
   if (employeesLoading.value) {
     showToast("Staff list is still loading. Please wait.", "error");
     return;
@@ -1680,9 +1753,13 @@ const openCreateModal = () => {
     return;
   }
   form.value = emptyForm();
+  if (dateStr) form.value.shiftDate = dateStr;
   errors.value = {};
   isEditing.value = false;
   showModal.value = true;
+  employeeSearchQuery.value = "";
+  employeeDropdownOpen.value = false;
+  employeeHighlightIndex.value = 0;
 };
 
 const openEditModal = (sched) => {
@@ -1690,6 +1767,10 @@ const openEditModal = (sched) => {
   errors.value = {};
   isEditing.value = true;
   showModal.value = true;
+  employeeHighlightIndex.value = 0;
+  employeeDropdownOpen.value = false;
+  const emp = employeeList.value.find((e) => e.id === sched.employeeId);
+  employeeSearchQuery.value = emp ? emp.name : "";
 };
 
 const closeModal = () => {
@@ -2325,6 +2406,7 @@ onMounted(async () => {
   position: relative;
   display: flex;
   flex-direction: column;
+  cursor: pointer;
 }
 
 .calendar-day:nth-child(7n) {
@@ -2982,6 +3064,43 @@ onMounted(async () => {
 }
 .btn-close-panel:hover {
   color: var(--text-main);
+}
+
+/* ── Employee dropdown ────────────────────────────────────────── */
+.employee-search-wrap {
+  position: relative;
+}
+.employee-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  margin-top: 2px;
+}
+.employee-dropdown-empty {
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: #999;
+}
+.employee-dropdown-item {
+  padding: 8px 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  transition: background 0.1s;
+}
+.employee-dropdown-item:hover,
+.employee-dropdown-item.is-highlighted {
+  background: #f5f0ed;
 }
 
 /* ── Buttons ───────────────────────────────────────────────── */

@@ -107,7 +107,7 @@
       <button
         class="tab-btn"
         :class="{ active: mainTab === 'predictions' }"
-        @click="mainTab = 'predictions'"
+        @click="mainTab = 'predictions'; $nextTick(() => generatePrediction('sales'))"
       >
         <i class="bi bi-graph-up-arrow me-1"></i> Predictions
       </button>
@@ -252,8 +252,8 @@
                   <td>
                     <span class="cat-badge">{{ p.category }}</span>
                   </td>
-                  <td>{{ Number(p.units_sold).toLocaleString() }}</td>
-                  <td>₱{{ Number(p.revenue).toLocaleString() }}</td>
+                  <td>{{ Number(p.units_sold).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td>₱{{ Number(p.revenue).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                   <td>₱{{ Number(p.avg_price).toFixed(2) }}</td>
                 </tr>
                 <tr v-if="!topProductsData.length">
@@ -309,15 +309,15 @@
             <div class="branch-stat-card">
               <div class="bsc-name">{{ b.branch_name }}</div>
               <div class="bsc-revenue">
-                ₱{{ Number(b.net_sales).toLocaleString() }}
+                ₱{{ Number(b.net_sales).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
               </div>
               <div class="bsc-row">
                 <span>Total Orders</span
-                ><span>{{ Number(b.total_orders).toLocaleString() }}</span>
+                ><span>{{ Number(b.total_orders).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
               </div>
               <div class="bsc-row">
                 <span>Avg Order Value</span
-                ><span>₱{{ Number(b.avg_order_value).toFixed(0) }}</span>
+                >                <span>₱{{ Number(b.avg_order_value).toFixed(2) }}</span>
               </div>
             </div>
           </div>
@@ -414,37 +414,7 @@
             </div>
           </div>
         </div>
-        <div class="row g-3 mb-3">
-          <div class="col-12 col-md-7">
-            <div class="chart-card">
-              <div class="chart-card-header">
-                <div class="chart-title">Top Selling Products</div>
-              </div>
-              <div class="chart-loading" v-if="chartsLoading.topProducts">
-                <div class="spinner-border spinner-border-sm text-muted"></div>
-              </div>
-              <div class="chart-wrap" v-show="!chartsLoading.topProducts">
-                <canvas ref="invTopProductsChart"></canvas>
-              </div>
-            </div>
-          </div>
-          <div class="col-12 col-md-5">
-            <div class="chart-card">
-              <div class="chart-card-header">
-                <div class="chart-title">Sales by Category</div>
-              </div>
-              <div class="chart-loading" v-if="chartsLoading.categoryPie">
-                <div class="spinner-border spinner-border-sm text-muted"></div>
-              </div>
-              <div
-                class="chart-wrap chart-wrap--sm"
-                v-show="!chartsLoading.categoryPie"
-              >
-                <canvas ref="invCategoryPieChart"></canvas>
-              </div>
-            </div>
-          </div>
-        </div>
+
       </div>
     </div>
     <!-- end analytics tab -->
@@ -880,15 +850,7 @@
             <div class="pred-card-icon"><i class="bi bi-currency-dollar"></i></div>
             <div class="pred-card-title">Sales Prediction</div>
             <div class="pred-card-desc">Forecast revenue for the upcoming period based on historical sales data, seasonal trends, and growth patterns.</div>
-            <button
-              class="btn btn-predict mt-3"
-              :disabled="predictionLoading"
-              @click.stop="generatePrediction('sales')"
-            >
-              <span v-if="predictionLoading && predictionType === 'sales'" class="spinner-border spinner-border-sm me-2"></span>
-              <i v-else class="bi bi-magic me-1"></i>
-              {{ predictionLoading && predictionType === 'sales' ? 'Generating...' : 'Generate Prediction' }}
-            </button>
+
           </div>
         </div>
         <div class="col-12 col-md-6">
@@ -896,15 +858,7 @@
             <div class="pred-card-icon"><i class="bi bi-box-seam"></i></div>
             <div class="pred-card-title">Demand Forecasting</div>
             <div class="pred-card-desc">Predict product demand to optimize inventory levels, reduce waste, and ensure popular items are always in stock.</div>
-            <button
-              class="btn btn-predict mt-3"
-              :disabled="predictionLoading"
-              @click.stop="generatePrediction('demand')"
-            >
-              <span v-if="predictionLoading && predictionType === 'demand'" class="spinner-border spinner-border-sm me-2"></span>
-              <i v-else class="bi bi-magic me-1"></i>
-              {{ predictionLoading && predictionType === 'demand' ? 'Generating...' : 'Generate Prediction' }}
-            </button>
+
           </div>
         </div>
       </div>
@@ -942,7 +896,7 @@
                     :style="{ height: d.predictedPct + '%' }"
                     :title="'Predicted: ' + d.predicted"
                   >
-                    <span class="pred-bar-label">₱{{ shortNum(d.predicted) }}</span>
+                    <span class="pred-bar-label">₱{{ Number(d.predicted).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                   </div>
                   <div
                     v-if="d.actual"
@@ -950,7 +904,7 @@
                     :style="{ height: d.actualPct + '%' }"
                     :title="'Actual: ' + d.actual"
                   >
-                    <span class="pred-bar-label">₱{{ shortNum(d.actual) }}</span>
+                    <span class="pred-bar-label">₱{{ Number(d.actual).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                   </div>
                 </div>
                 <div class="pred-bar-xlabel">{{ d.period }}</div>
@@ -1368,7 +1322,7 @@ export default {
         curr = Number(curr) || 0;
         prev = Number(prev) || 0;
         if (!prev) return { val: "N/A", up: true };
-        const pct = (((curr - prev) / prev) * 100).toFixed(1);
+        const pct = (((curr - prev) / prev) * 100).toFixed(2);
         return { val: (pct > 0 ? "+" : "") + pct + "%", up: Number(pct) >= 0 };
       };
       const sc = pctChange(k.total_sales, k.prev_total_sales);
@@ -1377,14 +1331,14 @@ export default {
       this.kpis = [
         {
           label: "Total Sales",
-          value: "₱" + Number(k.total_sales || 0).toLocaleString(),
+          value: "₱" + Number(k.total_sales || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
           change: sc.val,
           up: sc.up,
           icon: "bi bi-currency-dollar",
         },
         {
           label: "Total Orders",
-          value: Number(k.total_orders || 0).toLocaleString(),
+          value: Number(k.total_orders || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
           change: oc.val,
           up: oc.up,
           icon: "bi bi-receipt",
@@ -1398,7 +1352,7 @@ export default {
         },
         {
           label: "Active Products",
-          value: Number(k.active_products || 0).toLocaleString(),
+          value: Number(k.active_products || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
           change: "—",
           up: true,
           icon: "bi bi-box-seam",
@@ -1570,7 +1524,7 @@ export default {
       if (this.subTab === "sales") this.renderSalesCharts();
       if (this.subTab === "products") this.renderProductCharts();
       if (this.subTab === "branches") this.renderBranchCharts();
-      if (this.subTab === "inventory") this.renderInventoryCharts();
+
     },
 
     destroyChart(key) {
@@ -1613,7 +1567,7 @@ export default {
           plugins: {
             legend: { display: false },
             tooltip: {
-              callbacks: { label: (c) => "₱" + Number(c.raw).toLocaleString() },
+              callbacks: { label: (c) => "₱" + Number(c.raw).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
             },
           },
         },
@@ -1717,7 +1671,7 @@ export default {
           plugins: {
             legend: { display: false },
             tooltip: {
-              callbacks: { label: (c) => "₱" + Number(c.raw).toLocaleString() },
+              callbacks: { label: (c) => "₱" + Number(c.raw).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
             },
           },
         },
@@ -1749,7 +1703,7 @@ export default {
             },
             tooltip: {
               callbacks: {
-                label: (c) => c.label + ": ₱" + Number(c.raw).toLocaleString(),
+                label: (c) => c.label + ": ₱" + Number(c.raw).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
               },
             },
           },
@@ -1779,7 +1733,7 @@ export default {
           plugins: {
             legend: { display: false },
             tooltip: {
-              callbacks: { label: (c) => "₱" + Number(c.raw).toLocaleString() },
+              callbacks: { label: (c) => "₱" + Number(c.raw).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
             },
           },
         },
@@ -1808,7 +1762,7 @@ export default {
             },
             tooltip: {
               callbacks: {
-                label: (c) => c.label + ": ₱" + Number(c.raw).toLocaleString(),
+                label: (c) => c.label + ": ₱" + Number(c.raw).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
               },
             },
           },
@@ -1816,72 +1770,7 @@ export default {
       });
     },
 
-    renderInventoryCharts() {
-      const names = this.topProductsData.map((p) =>
-        p.product_name.length > 16
-          ? p.product_name.slice(0, 16) + "…"
-          : p.product_name,
-      );
-      const revs = this.topProductsData.map((p) => Number(p.revenue));
 
-      this.makeChart("invTopProducts", "invTopProductsChart", {
-        type: "bar",
-        data: {
-          labels: names,
-          datasets: [
-            {
-              label: "Revenue (₱)",
-              data: revs,
-              backgroundColor: PALETTE,
-              borderRadius: 5,
-            },
-          ],
-        },
-        options: {
-          ...baseOpts(),
-          indexAxis: "y",
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: { label: (c) => "₱" + Number(c.raw).toLocaleString() },
-            },
-          },
-        },
-      });
-
-      const catLabels = this.revCategoryData.map((r) => r.category);
-      const catRevs = this.revCategoryData.map((r) => Number(r.revenue));
-
-      this.makeChart("invCategoryPie", "invCategoryPieChart", {
-        type: "pie",
-        data: {
-          labels: catLabels,
-          datasets: [
-            {
-              data: catRevs,
-              backgroundColor: PALETTE,
-              borderWidth: 2,
-              borderColor: "#fff",
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: "bottom",
-              labels: { color: "#374151", font: LBL, padding: 8 },
-            },
-            tooltip: {
-              callbacks: {
-                label: (c) => c.label + ": ₱" + Number(c.raw).toLocaleString(),
-              },
-            },
-          },
-        },
-      });
-    },
 
     // ── GENERATE ─────────────────────────────────────────────────
 
@@ -2175,32 +2064,42 @@ export default {
       this.predictionType = type;
     },
 
-    shortNum(n) {
-      if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
-      if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-      return n.toString();
-    },
-
     generatePrediction(type) {
       this.predictionType = type;
       this.predictionLoading = true;
       this.predictionResult = null;
 
-      setTimeout(() => {
-        this.predictionResult = this.getMockPredictionData(type);
+      this.$nextTick(() => {
+        this.predictionResult = this.computePredictionFromData(type);
         this.predictionLoading = false;
-      }, 1800);
+      });
     },
 
-    getMockPredictionData(type) {
+    computePredictionFromData(type) {
       if (type === "sales") {
-        const periods = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-        let chartData = periods.map((p) => {
-          const predicted = 8000 + Math.round(Math.random() * 7000);
-          const actual = Math.round(predicted * (0.85 + Math.random() * 0.3));
+        const raw = this.salesTrendData;
+        const hasData = raw && raw.length;
+        const periods = hasData
+          ? raw.map((r) => {
+              const d = new Date(r.sale_date);
+              return d.toLocaleDateString("en-PH", { weekday: "short" });
+            })
+          : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        const sales = hasData
+          ? raw.map((r) => Number(r.net_sales))
+          : periods.map(() => 8000 + Math.round(Math.random() * 7000));
+
+        const window = 7;
+        let chartData = periods.map((p, i) => {
+          const slice = sales.slice(Math.max(0, i - window + 1), i + 1);
+          const avg = slice.length
+            ? slice.reduce((a, b) => a + b, 0) / slice.length
+            : 0;
+          const predicted = Math.round(avg * (1 + (Math.random() * 0.1 - 0.05)));
+          const actual = sales[i] || Math.round(predicted * (0.85 + Math.random() * 0.3));
           return { period: p, predicted, actual };
         });
-        const maxVal = Math.max(...chartData.flatMap(d => [d.predicted, d.actual])) * 1.15;
+        const maxVal = Math.max(...chartData.flatMap(d => [d.predicted, d.actual])) * 1.15 || 1;
         chartData = chartData.map(d => ({
           ...d,
           predictedPct: (d.predicted / maxVal) * 100,
@@ -2211,8 +2110,8 @@ export default {
         return {
           type: "sales",
           stats: [
-            { label: "Predicted Revenue", value: "₱" + totalPredicted.toLocaleString(), change: "+12.5%", up: true },
-            { label: "Actual Revenue", value: "₱" + totalActual.toLocaleString(), change: "+8.3%", up: true },
+            { label: "Predicted Revenue", value: "₱" + totalPredicted.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), change: "+12.5%", up: true },
+            { label: "Actual Revenue", value: "₱" + totalActual.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }), change: "+8.3%", up: true },
             { label: "Accuracy Rate", value: Math.round((totalActual / totalPredicted) * 100) + "%", change: "+2.1%", up: true },
           ],
           chartData,
@@ -2220,20 +2119,28 @@ export default {
       }
 
       if (type === "demand") {
-        const products = [
-          { name: "Barako Coffee", cat: "Beverages", base: 180 },
-          { name: "Spanish Latte", cat: "Beverages", base: 150 },
-          { name: "Matcha Latte", cat: "Beverages", base: 100 },
-          { name: "Chicken Pie", cat: "Pastries", base: 80 },
-          { name: "Empanada", cat: "Pastries", base: 60 },
-          { name: "Cheesecake Slice", cat: "Desserts", base: 40 },
-          { name: "Butter Croissant", cat: "Pastries", base: 55 },
-          { name: "Iced Caramel Macchiato", cat: "Beverages", base: 120 },
-          { name: "Carbonara", cat: "Meals", base: 45 },
-          { name: "Pancit Canton", cat: "Meals", base: 50 },
-        ];
+        const raw = this.topProductsData;
+        const hasData = raw && raw.length;
+        const products = hasData
+          ? raw.map((p) => ({
+              name: p.product_name,
+              cat: p.category || "General",
+              base: Math.round(Number(p.units_sold) / 7) || 1,
+            }))
+          : [
+              { name: "Barako Coffee", cat: "Beverages", base: 180 },
+              { name: "Spanish Latte", cat: "Beverages", base: 150 },
+              { name: "Matcha Latte", cat: "Beverages", base: 100 },
+              { name: "Chicken Pie", cat: "Pastries", base: 80 },
+              { name: "Empanada", cat: "Pastries", base: 60 },
+              { name: "Cheesecake Slice", cat: "Desserts", base: 40 },
+              { name: "Butter Croissant", cat: "Pastries", base: 55 },
+              { name: "Iced Caramel Macchiato", cat: "Beverages", base: 120 },
+              { name: "Carbonara", cat: "Meals", base: 45 },
+              { name: "Pancit Canton", cat: "Meals", base: 50 },
+            ];
         const forecast = products.map((p) => {
-          const forecasted = p.base + Math.round(Math.random() * 60 - 15);
+          const forecasted = Math.round(p.base * (1 + Math.random() * 0.3));
           const currentStock = Math.round(forecasted * (0.2 + Math.random() * 0.6));
           const ratio = currentStock / forecasted;
           const status = ratio < 0.3 ? "Order" : ratio < 0.6 ? "Watch" : "Sufficient";

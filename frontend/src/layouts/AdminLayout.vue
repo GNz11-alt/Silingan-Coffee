@@ -307,6 +307,7 @@ import {
 } from "lucide-vue-next";
 import NotificationPanel from "@/components/NotificationPanel.vue";
 import { useNotifications } from "@/composables/useNotifications.js";
+import { generateAllNotifications } from "@/services/notificationGenerator.js";
 
 const router = useRouter();
 const isSidebarCollapsed = ref(false);
@@ -314,6 +315,7 @@ const unreadCount = ref(0);
 const showNotifPanel = ref(false);
 const showChangePwModal = ref(false);
 const { fetchNotifications } = useNotifications();
+let notifGenInterval = null;
 
 // Clock
 const now = ref(new Date());
@@ -496,10 +498,19 @@ onMounted(async () => {
 
   const notifs = await fetchNotifications(null);
   unreadCount.value = notifs.length;
+
+  // Generate notifications on mount
+  generateAllNotifications({ role: 'admin' });
+
+  // Regenerate every 30 minutes
+  notifGenInterval = setInterval(() => {
+    generateAllNotifications({ role: 'admin' });
+  }, 30 * 60 * 1000);
 });
 
 onUnmounted(() => {
   clearInterval(clockInterval);
+  if (notifGenInterval) clearInterval(notifGenInterval);
 });
 </script>
 

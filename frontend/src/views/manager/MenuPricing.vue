@@ -359,8 +359,8 @@
             >
               <span class="rsp-name">{{ s.name }}</span>
               <span class="rsp-detail"
-                >{{ +s.available.toFixed(4) }} {{ s.unit }} available, need
-                {{ +s.needed.toFixed(4) }} {{ s.unit }}</span
+                >{{ +s.available.toFixed(2) }} {{ s.unit }} available, need
+                {{ +s.needed.toFixed(2) }} {{ s.unit }}</span
               >
             </div>
           </div>
@@ -737,7 +737,7 @@ function formatConvertHint(qty, fromUnit, toUnit) {
   if (!qty || !fromUnit || !toUnit || fromUnit === toUnit) return "";
   const c = convertUnit(qty, fromUnit, toUnit);
   if (c === null) return "⚠ incompatible units";
-  return `${+c.toFixed(4)} ${toUnit} in inventory`;
+  return `${+c.toFixed(2)} ${toUnit} in inventory`;
 }
 
 function formatIngStock(ing) {

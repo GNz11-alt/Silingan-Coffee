@@ -292,6 +292,7 @@ import {
 import { useUserBranch } from "@/composables/useUserBranch.js";
 import NotificationPanel from "@/components/NotificationPanel.vue";
 import { useNotifications } from "@/composables/useNotifications.js";
+import { generateAllNotifications } from "@/services/notificationGenerator.js";
 
 const now = ref(new Date());
 let clockInterval = null;
@@ -318,6 +319,7 @@ const branch = ref("");
 const unreadCount = ref(0);
 const showNotifPanel = ref(false);
 const { fetchNotifications } = useNotifications();
+let notifGenInterval = null;
 
 const { isAdmin, userBranchId, userBranchName, resolveBranch } =
   useUserBranch();
@@ -484,10 +486,19 @@ onMounted(async () => {
 
   const notifs = await fetchNotifications(null);
   unreadCount.value = notifs.length;
+
+  // Generate notifications for this branch
+  const branchNum = userBranchId.value ? Number(userBranchId.value) : null
+  generateAllNotifications({ branchId: branchNum, role: 'staff' });
+
+  notifGenInterval = setInterval(() => {
+    generateAllNotifications({ branchId: branchNum, role: 'staff' });
+  }, 30 * 60 * 1000);
 });
 
 onUnmounted(() => {
   clearInterval(clockInterval);
+  if (notifGenInterval) clearInterval(notifGenInterval);
 });
 </script>
 

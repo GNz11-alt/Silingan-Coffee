@@ -336,12 +336,12 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
       const totalUsed = consumptionMap[p.rawproductid] || 0
       const dailyRate = daysInRange > 0 ? totalUsed / daysInRange : 0
       const stock = stockByProduct[p.rawproductid] || 0
-      const daysRemaining = dailyRate > 0 ? Math.round(stock / dailyRate * 10) / 10 : (stock > 0 ? 'N/A' : 0)
+      const daysRemaining = dailyRate > 0 ? Number((stock / dailyRate).toFixed(2)) : (stock > 0 ? 'N/A' : 0)
       return {
         name: p.name,
         category: p.category || '—',
         unit: p.unit || '—',
-        daily_consumption_rate: Math.round(dailyRate * 100) / 100,
+        daily_consumption_rate: Number(dailyRate.toFixed(2)),
         days_of_stock_remaining: daysRemaining,
       }
     })

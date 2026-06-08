@@ -96,7 +96,7 @@ export function useSearch(items, options = {}) {
     }
     if (scopes.value.dateRange.from || scopes.value.dateRange.to) {
       filtered = filtered.filter(item => {
-        if (!item.date) return true
+        if (!item.date) return false
         const d = new Date(item.date)
         if (scopes.value.dateRange.from && d < new Date(scopes.value.dateRange.from)) return false
         if (scopes.value.dateRange.to && d > new Date(scopes.value.dateRange.to)) return false
@@ -168,15 +168,6 @@ export function useSearch(items, options = {}) {
     results.value = []
   }
 
-  // For autocomplete: get top N suggestions
-  const getSuggestions = (limit = 8) => {
-    if (!debouncedQuery.value.trim() || !fuseInstance) return []
-    return fuseInstance.search(debouncedQuery.value).slice(0, limit).map(r => ({
-      item: r.item,
-      score: r.score,
-    }))
-  }
-
   return {
     query,
     results,
@@ -187,7 +178,6 @@ export function useSearch(items, options = {}) {
     setScopes,
     clearScopes,
     clearQuery,
-    getSuggestions,
     rebuildIndex,
   }
 }

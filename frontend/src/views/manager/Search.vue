@@ -34,16 +34,6 @@
             v-model="search.query.value"
             type="text"
             placeholder="Type to search across all data... (Ctrl+K)"
-            @focus="autocompleteOpen = true"
-            @blur="onInputBlur"
-            @keydown="onInputKeydown"
-          />
-          <SearchAutocomplete
-            ref="autocompleteRef"
-            :get-suggestions="search.getSuggestions"
-            :query="search.query.value"
-            @select="onAutocompleteSelect"
-            @close="autocompleteOpen = false"
           />
         </div>
         <button class="filter-btn" @click="openFilters">
@@ -122,6 +112,8 @@
     <SearchFilters
       :is-open="showFilters"
       :scopes="search.scopes.value"
+      :items="allItems.value"
+      role="manager"
       @close="showFilters = false"
       @apply="onApplyFilters"
     />
@@ -140,7 +132,6 @@ import { useSearch } from "@/composables/useSearch.js";
 import { useBranches } from "@/composables/useBranches.js";
 import { useSearchData } from "@/composables/useSearchData.js";
 import { useUserBranch } from "@/composables/useUserBranch.js";
-import SearchAutocomplete from "@/components/SearchAutocomplete.vue";
 import SearchFilters from "@/components/SearchFilters.vue";
 import SearchResults from "@/components/SearchResults.vue";
 
@@ -149,7 +140,7 @@ const { isAdmin, userBranchId, userBranchName, resolveBranch } =
   useUserBranch();
 const router = useRouter();
 
-const { allItems, isLoading: dataLoading, error: searchError } = useSearchData(userBranchId);
+const { allItems, isLoading: dataLoading, error: searchError } = useSearchData(userBranchId, ['product', 'rawmaterial', 'employee', 'sale', 'report', 'schedule']);
 
 const search = useSearch(allItems);
 
@@ -158,6 +149,8 @@ const ROUTE_MAP = {
   rawmaterial: { path: "/manager/inventory" },
   employee: { path: "/manager/shift-management" },
   sale: { path: "/manager/sales" },
+  report: { path: "/manager/reports" },
+  schedule: { path: "/manager/shift-management" },
 };
 
 function onResultSelect(result) {
@@ -180,35 +173,6 @@ const selectedBranchName = computed(() => {
 
 const inputContainerRef = ref(null);
 const searchInputRef = ref(null);
-const autocompleteRef = ref(null);
-const autocompleteOpen = ref(false);
-
-const onInputBlur = () => {
-  setTimeout(() => {
-    autocompleteOpen.value = false;
-  }, 200);
-};
-
-const onInputKeydown = (e) => {
-  if (!autocompleteRef.value) return;
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    autocompleteRef.value.navigateDown();
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    autocompleteRef.value.navigateUp();
-  } else if (e.key === "Enter") {
-    e.preventDefault();
-    autocompleteRef.value.selectActive();
-  } else if (e.key === "Escape") {
-    autocompleteRef.value.close();
-    e.target.blur();
-  }
-};
-
-const onAutocompleteSelect = () => {
-  autocompleteOpen.value = false;
-};
 
 const showFilters = ref(false);
 

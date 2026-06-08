@@ -24,7 +24,7 @@
 </template>
 
 <script setup>
-import { Search, Package, Users, Receipt, Box } from 'lucide-vue-next'
+import { Search, Package, Users, Receipt, Box, FileText, Calendar } from 'lucide-vue-next'
 
 const props = defineProps({
   results: { type: Array, default: () => [] },
@@ -32,7 +32,7 @@ const props = defineProps({
 })
 defineEmits(['select'])
 
-const getIcon = (type) => ({ product: Package, employee: Users, sale: Receipt, rawmaterial: Box }[type] || Search)
+const getIcon = (type) => ({ product: Package, employee: Users, sale: Receipt, rawmaterial: Box, report: FileText, schedule: Calendar }[type] || Search)
 
 const getStatusClass = (status) => (status || '').toLowerCase().replace(/\s+/g, '-')
 

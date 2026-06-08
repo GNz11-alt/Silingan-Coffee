@@ -12,7 +12,7 @@ const BORDER     = '#E5E0DD';
 // ─── Shared Helpers ─────────────────────────────────────────────────────────
 const peso = (n) => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n) => Number(n || 0).toLocaleString('en-PH');
-const pct = (n) => Number(n || 0).toFixed(1) + '%';
+const pct = (n) => Number(n || 0).toFixed(2) + '%';
 const fmtTimeRemaining = (days) => {
   if (days == null || days === 'N/A') return days || '—';
   if (isNaN(days)) return '—';
@@ -431,8 +431,8 @@ const BUILDERS = {
 
     const kpis = [
       { label: 'Total Employees', value: num(employees) },
-      { label: 'Total Hours', value: totalHours.toFixed(0) },
-      { label: 'Avg Hours/Employee', value: avgHours.toFixed(1) },
+      { label: 'Total Hours', value: totalHours.toFixed(2) },
+      { label: 'Avg Hours/Employee', value: avgHours.toFixed(2) },
     ];
 
     const headers = ['Employee', 'Position', 'Shift Date', 'Hours', 'Status'];
@@ -440,7 +440,7 @@ const BUILDERS = {
       { text: r['Employee Name'] || r.employee_name || r.name, bold: true },
       r['Position'] || r.position || r.role,
       r['Shift Date'] || r.shift_date || r.date,
-      { text: getHours(r).toFixed(1), alignment: 'right' },
+      { text: getHours(r).toFixed(2), alignment: 'right' },
       { text: r['Status'] || r.status || 'Scheduled', alignment: 'center' }
     ]);
 
@@ -520,7 +520,7 @@ const BUILDERS = {
     const kpis = [
       { label: 'Forecasted Revenue', value: peso(totalForecast) },
       { label: 'Actual Revenue', value: peso(totalActual) },
-      { label: 'Accuracy', value: accuracy.toFixed(1) + '%' },
+      { label: 'Accuracy', value: accuracy.toFixed(2) + '%' },
     ];
 
     const headers = ['Date', 'Actual Sales', '3-Day Moving Avg', 'Forecast', 'Accuracy %'];
@@ -537,7 +537,7 @@ const BUILDERS = {
           ? { text: peso(forecast), alignment: 'right' }
           : { text: 'N/A—no prior data', alignment: 'right', color: '#6B7280' },
         forecast > 0
-          ? { text: acc.toFixed(1) + '%', alignment: 'right', bold: true, color: acc >= 80 ? '#16A34A' : acc >= 50 ? '#D97706' : '#DC2626' }
+          ? { text: acc.toFixed(2) + '%', alignment: 'right', bold: true, color: acc >= 80 ? '#16A34A' : acc >= 50 ? '#D97706' : '#DC2626' }
           : { text: 'N/A', alignment: 'right', color: '#6B7280' }
       ];
     });

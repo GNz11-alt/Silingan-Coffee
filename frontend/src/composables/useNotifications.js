@@ -146,9 +146,23 @@ export function useNotifications() {
     if (error) console.error('[Notifications] markAllAsRead failed:', error)
   }
 
-  async function addNotification({ branch_id, category, title, message, severity = 'medium', link = null }) {
-    const role = getRole()
+  async function addNotification({ branch_id, category, title, message, severity = 'medium', link = null, role: roleOverride = null }) {
+    const role = roleOverride || getRole()
     if (!role) return
+
+    // Duplicate prevention: skip if same category+title+role+branch already exists today
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const { data: existing } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('role', role)
+      .eq('category', category)
+      .eq('title', title)
+      .eq('branch_id', branch_id ?? null)
+      .gte('created_at', today.toISOString())
+      .limit(1)
+    if (existing && existing.length > 0) return
 
     const record = {
       role,

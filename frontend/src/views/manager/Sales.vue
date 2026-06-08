@@ -23,7 +23,7 @@
           <h3>Total Revenue</h3>
           <p class="stat-value">
             ₱{{
-              totalRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2 })
+              totalRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             }}
           </p>
           <span class="stat-trend positive"
@@ -61,6 +61,7 @@
             ₱{{
               totalDiscounts.toLocaleString("en-PH", {
                 minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
               })
             }}
           </p>

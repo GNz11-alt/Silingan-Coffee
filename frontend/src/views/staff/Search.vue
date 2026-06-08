@@ -34,16 +34,6 @@
             v-model="search.query.value"
             type="text"
             placeholder="Type to search... (Ctrl+K)"
-            @focus="autocompleteOpen = true"
-            @blur="onInputBlur"
-            @keydown="onInputKeydown"
-          />
-          <SearchAutocomplete
-            ref="autocompleteRef"
-            :get-suggestions="search.getSuggestions"
-            :query="search.query.value"
-            @select="onAutocompleteSelect"
-            @close="autocompleteOpen = false"
           />
         </div>
         <button class="filter-btn" @click="openFilters">
@@ -121,6 +111,7 @@
     <SearchFilters
       :is-open="showFilters"
       :scopes="search.scopes.value"
+      :items="allItems.value"
       role="staff"
       @close="showFilters = false"
       @apply="onApplyFilters"
@@ -136,11 +127,11 @@ import {
   MapPin,
   SlidersHorizontal,
 } from "lucide-vue-next";
+import { supabase } from "@/supabase.js";
 import { useSearch } from "@/composables/useSearch.js";
 import { useBranches } from "@/composables/useBranches.js";
 import { useSearchData } from "@/composables/useSearchData.js";
 import { useUserBranch } from "@/composables/useUserBranch.js";
-import SearchAutocomplete from "@/components/SearchAutocomplete.vue";
 import SearchFilters from "@/components/SearchFilters.vue";
 import SearchResults from "@/components/SearchResults.vue";
 
@@ -148,14 +139,16 @@ const { branches } = useBranches();
 const { isAdmin, userBranchId, userBranchName, resolveBranch } =
   useUserBranch();
 const router = useRouter();
+const employeeId = ref(null);
 
-const { allItems, isLoading: dataLoading, error: searchError } = useSearchData(userBranchId.value, ['product', 'rawmaterial']);
+const { allItems, isLoading: dataLoading, error: searchError } = useSearchData(userBranchId.value, ['product', 'rawmaterial', 'schedule', 'sale'], employeeId);
 
 const search = useSearch(allItems);
 
 const ROUTE_MAP = {
   product: { path: "/staff/menu" },
   rawmaterial: { path: "/staff/inventory" },
+  schedule: { path: "/staff/schedule" },
 };
 
 function onResultSelect(result) {
@@ -178,35 +171,6 @@ const selectedBranchName = computed(() => {
 
 const inputContainerRef = ref(null);
 const searchInputRef = ref(null);
-const autocompleteRef = ref(null);
-const autocompleteOpen = ref(false);
-
-const onInputBlur = () => {
-  setTimeout(() => {
-    autocompleteOpen.value = false;
-  }, 200);
-};
-
-const onInputKeydown = (e) => {
-  if (!autocompleteRef.value) return;
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    autocompleteRef.value.navigateDown();
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    autocompleteRef.value.navigateUp();
-  } else if (e.key === "Enter") {
-    e.preventDefault();
-    autocompleteRef.value.selectActive();
-  } else if (e.key === "Escape") {
-    autocompleteRef.value.close();
-    e.target.blur();
-  }
-};
-
-const onAutocompleteSelect = () => {
-  autocompleteOpen.value = false;
-};
 
 const showFilters = ref(false);
 
@@ -297,8 +261,16 @@ const handleKeydown = (e) => {
 onMounted(async () => {
   await resolveBranch();
   selectedBranchId.value = userBranchId.value;
-  if (selectedBranchId.value) {
-    search.setScopes({ branches: [selectedBranchId.value] });
+  const userId = localStorage.getItem("userId");
+  if (userId) {
+    const { data: user } = await supabase
+      .from("users")
+      .select("employee_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (user?.employee_id) {
+      employeeId.value = user.employee_id;
+    }
   }
 });
 </script>

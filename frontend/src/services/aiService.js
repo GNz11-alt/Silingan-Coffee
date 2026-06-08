@@ -28,7 +28,7 @@ function safeChangeDesc(pctVal) {
   if (abs > RULES.maxMeaningfulPct) {
     return `significantly ${pctVal > 0 ? 'higher' : 'lower'} than`
   }
-  return `${abs.toFixed(1)}% ${pctVal > 0 ? 'higher' : 'lower'} than`
+  return `${abs.toFixed(2)}% ${pctVal > 0 ? 'higher' : 'lower'} than`
 }
 
 function stdDev(arr) {
@@ -128,7 +128,7 @@ function engineAnomalies(data) {
         category: 'branch',
         link: { module: 'sales', label: 'View Sales' },
         title: `Branch Underperformance — ${b.branch_name}`,
-        description: `${b.branch_name} generated ₱${Number(b.net_sales).toLocaleString()} in revenue during this period, which is ${diff}% below the system-wide average of ₱${Math.round(avg).toLocaleString()}. A performance gap of this magnitude warrants a closer look at local operations — including staffing sufficiency, inventory availability, foot traffic patterns, and any external factors affecting that location. Consider conducting an operational audit to identify specific causes.`
+        description: `${b.branch_name} generated ₱${Number(b.net_sales).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in revenue during this period, which is ${diff}% below the system-wide average of ₱${Number(avg).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. A performance gap of this magnitude warrants a closer look at local operations — including staffing sufficiency, inventory availability, foot traffic patterns, and any external factors affecting that location. Consider conducting an operational audit to identify specific causes.`
       })
     }
   }
@@ -160,7 +160,7 @@ function engineTrends(data) {
     if (Math.abs(salesPct) >= r.trendChangePctMin) {
       const dir = salesPct > 0 ? 'increase' : 'decline'
       const sig = Math.abs(salesPct) > r.maxMeaningfulPct
-      const pctDesc = sig ? 'significantly' : `${Math.abs(salesPct).toFixed(1)}%`
+      const pctDesc = sig ? 'significantly' : `${Math.abs(salesPct).toFixed(2)}%`
       const rec = salesPct > 0
         ? 'The current strategies appear effective and should be maintained or scaled.'
         : 'A review of recent changes, promotions, pricing, and operational factors is recommended to identify the root cause.'
@@ -176,7 +176,7 @@ function engineTrends(data) {
     if (Math.abs(ordersPct) >= r.trendChangePctMin) {
       const dir = ordersPct > 0 ? 'higher' : 'lower'
       const sig = Math.abs(ordersPct) > r.maxMeaningfulPct
-      const pctDesc = sig ? 'significantly' : `${Math.abs(ordersPct).toFixed(1)}%`
+      const pctDesc = sig ? 'significantly' : `${Math.abs(ordersPct).toFixed(2)}%`
       findings.push({
         severity: ordersPct > 0 ? 'low' : 'medium',
         category: 'trend',
@@ -193,7 +193,7 @@ function engineTrends(data) {
     const reg = linearRegression(vals)
     if (Math.abs(reg.slope) > r.trendSlopeMin) {
       const dir = reg.slope > 0 ? 'rising' : 'declining'
-      const dailyText = Math.abs(reg.slope).toFixed(0)
+      const dailyText = Math.abs(reg.slope).toFixed(2)
       findings.push({
         severity: 'medium',
         category: 'trend',
@@ -212,7 +212,7 @@ function engineTrends(data) {
         category: 'trend',
         link: { module: 'sales', label: 'View Sales' },
         title: 'Sales Volatility Requires Attention',
-        description: `Daily revenue shows significant fluctuation with a coefficient of variation of ${(cv * 100).toFixed(0)}% (standard deviation: ₱${stdev.toFixed(0)}). High volatility makes cash flow and inventory planning more difficult, as demand varies considerably from day to day. Investigating the patterns behind the spikes and dips — such as day-of-week effects, promotions, or external events — can help build more reliable forecasts.`
+        description: `Daily revenue shows significant fluctuation with a coefficient of variation of ${(cv * 100).toFixed(2)}% (standard deviation: ₱${stdev.toFixed(2)}). High volatility makes cash flow and inventory planning more difficult, as demand varies considerably from day to day. Investigating the patterns behind the spikes and dips — such as day-of-week effects, promotions, or external events — can help build more reliable forecasts.`
       })
     } else if (cv < r.stabilityThreshold) {
       findings.push({
@@ -220,7 +220,7 @@ function engineTrends(data) {
         category: 'trend',
         link: { module: 'sales', label: 'View Sales' },
         title: 'Consistent Sales Performance Observed',
-        description: `Sales are notably stable with a coefficient of variation of ${(cv * 100).toFixed(0)}%, indicating predictable daily revenue with minimal fluctuation. This stability allows for more accurate inventory planning, staffing schedules, and cash flow projections. The current operational model appears well-calibrated to demand patterns.`
+        description: `Sales are notably stable with a coefficient of variation of ${(cv * 100).toFixed(2)}%, indicating predictable daily revenue with minimal fluctuation. This stability allows for more accurate inventory planning, staffing schedules, and cash flow projections. The current operational model appears well-calibrated to demand patterns.`
       })
     }
   }
@@ -242,7 +242,7 @@ function engineComparison(data) {
       category: 'branch',
       link: { module: 'sales', label: 'View Sales' },
       title: 'Top Performing Branch Identified',
-      description: `${sorted[0].branch_name} leads all branches with ₱${Number(sorted[0].net_sales).toLocaleString()} in revenue during this period. This performance may reflect factors such as location, customer base, management practices, or operational efficiency. Reviewing this branch's practices could yield insights applicable to other locations.`
+      description: `${sorted[0].branch_name} leads all branches with ₱${Number(sorted[0].net_sales).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in revenue during this period. This performance may reflect factors such as location, customer base, management practices, or operational efficiency. Reviewing this branch's practices could yield insights applicable to other locations.`
     })
 
     findings.push({
@@ -250,7 +250,7 @@ function engineComparison(data) {
       category: 'branch',
       link: { module: 'sales', label: 'View Sales' },
       title: 'Lowest Performing Branch Recorded',
-      description: `${sorted[sorted.length - 1].branch_name} recorded the lowest revenue at ₱${Number(sorted[sorted.length - 1].net_sales).toLocaleString()}. While context matters — such as location size, operating hours, or local demographics — this ranking serves as a starting point for identifying improvement opportunities.`
+      description: `${sorted[sorted.length - 1].branch_name} recorded the lowest revenue at ₱${Number(sorted[sorted.length - 1].net_sales).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. While context matters — such as location size, operating hours, or local demographics — this ranking serves as a starting point for identifying improvement opportunities.`
     })
 
     for (const b of branches) {
@@ -261,7 +261,7 @@ function engineComparison(data) {
           category: 'branch',
           link: { module: 'sales', label: 'View Sales' },
           title: `Primary Revenue Driver — ${b.branch_name}`,
-          description: `${b.branch_name} accounts for ${(share * 100).toFixed(1)}% of total system revenue, classifying it as a primary revenue driver. The performance of this branch has an outsized impact on overall business health. Any operational issues affecting this location should be prioritized to protect the largest revenue stream.`
+          description: `${b.branch_name} accounts for ${(share * 100).toFixed(2)}% of total system revenue, classifying it as a primary revenue driver. The performance of this branch has an outsized impact on overall business health. Any operational issues affecting this location should be prioritized to protect the largest revenue stream.`
         })
       }
     }
@@ -275,7 +275,7 @@ function engineComparison(data) {
       category: 'sales',
       link: { module: 'sales', label: 'View Sales' },
       title: 'Top Revenue Category',
-      description: `${top.category} is the highest-grossing product category this period, contributing ${Number(top.percentage).toFixed(1)}% of total revenue. This category represents the core of the business and should be prioritized in inventory planning, marketing efforts, and menu development.`
+      description: `${top.category} is the highest-grossing product category this period, contributing ${Number(top.percentage).toFixed(2)}% of total revenue. This category represents the core of the business and should be prioritized in inventory planning, marketing efforts, and menu development.`
     })
   }
 
@@ -287,7 +287,7 @@ function engineComparison(data) {
       category: 'sales',
       link: { module: 'sales', label: 'View Sales' },
       title: 'Best-Selling Product',
-      description: `${top.product_name} is the top-selling product with ${Number(top.units_sold)} units sold and ₱${Number(top.revenue).toLocaleString()} in revenue this period. Strong demand for this item makes it critical to maintain adequate stock levels and consider its role in promotions and menu positioning.`
+      description: `${top.product_name} is the top-selling product with ${Number(top.units_sold)} units sold and ₱${Number(top.revenue).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in revenue this period. Strong demand for this item makes it critical to maintain adequate stock levels and consider its role in promotions and menu positioning.`
     })
   }
 

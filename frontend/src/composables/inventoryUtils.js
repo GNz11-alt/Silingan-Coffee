@@ -151,8 +151,8 @@ export function checkStockForProduct(finishedProductId, orderQty = 1, recipes, s
       shortages.push({
         rawproductid: recipe.rawproductid,
         name: recipe.rawproduct?.name ?? `Raw #${recipe.rawproductid}`,
-        needed: +needed.toFixed(4),
-        available: +available.toFixed(4),
+        needed: +needed.toFixed(2),
+        available: +available.toFixed(2),
         unit: invUnit,
       })
     }
@@ -240,7 +240,7 @@ export async function buildFEFODeductionRows(cartItems, allRecipes, inventoryUni
         rawproductid: step.rawproductid,
         branchid: step.branchid,
         transactiontype: 'out',
-        quantity: +step.qtyToDeduct.toFixed(6),
+        quantity: +step.qtyToDeduct.toFixed(2),
         expirationdate: null, // 'out' rows don't carry expiry
         reason: 'Sale deduction (FEFO)',
         source_batch_id: step.rawtransactionid, // optional traceability
@@ -276,7 +276,7 @@ export function formatQtyDisplay(qty, unit) {
   let hint = ''
   if (u === 'g'  && qty >= 1000) hint = ` (${(qty / 1000).toFixed(2)} kg)`
   if (u === 'ml' && qty >= 1000) hint = ` (${(qty / 1000).toFixed(2)} l)`
-  if (u === 'kg' && qty < 1)     hint = ` (${(qty * 1000).toFixed(0)} g)`
-  if (u === 'l'  && qty < 1)     hint = ` (${(qty * 1000).toFixed(0)} ml)`
-  return `${+qty.toFixed(4)} ${unit}${hint}`
+  if (u === 'kg' && qty < 1)     hint = ` (${(qty * 1000).toFixed(2)} g)`
+  if (u === 'l'  && qty < 1)     hint = ` (${(qty * 1000).toFixed(2)} ml)`
+  return `${+qty.toFixed(2)} ${unit}${hint}`
 }

@@ -1,9 +1,9 @@
 import { ref, watch, onMounted } from 'vue'
 import { supabase } from '@/supabase.js'
 
-const ALL_TYPES = ['product', 'rawmaterial', 'employee', 'sale']
+const ALL_TYPES = ['product', 'rawmaterial', 'employee', 'sale', 'report', 'schedule']
 
-export function useSearchData(userBranchRef = null, allowedTypes = ALL_TYPES) {
+export function useSearchData(userBranchRef = null, allowedTypes = ALL_TYPES, employeeId = null) {
   const allItems = ref([])
   const isLoading = ref(true)
   const error = ref(null)
@@ -117,13 +117,12 @@ export function useSearchData(userBranchRef = null, allowedTypes = ALL_TYPES) {
         }
       }
 
-      // Fetch orders (limit to recent 500 for performance) — only if allowed by role
+      // Fetch orders — only if allowed by role
       if (allowedTypes.includes('sale')) {
         let orderQuery = supabase
           .from('orders')
           .select('OrderId, TotalAmount, FinalAmount, PaymentMethod, Status, CreatedAt, BranchId')
           .order('CreatedAt', { ascending: false })
-          .limit(500)
         if (branchId) orderQuery = orderQuery.eq('BranchId', branchId)
         const { data: orders } = await orderQuery
 
@@ -134,10 +133,76 @@ export function useSearchData(userBranchRef = null, allowedTypes = ALL_TYPES) {
               type: 'sale',
               title: `Order #${o.OrderId}`,
               description: `${o.PaymentMethod || 'Unknown'} payment`,
-              details: `₱${((o.FinalAmount || o.TotalAmount || 0)).toFixed(2)}`,
+              details: `Invoice #${o.OrderId} · ₱${((o.FinalAmount || o.TotalAmount || 0)).toFixed(2)}`,
               status: o.Status || 'Completed',
               branch: String(o.BranchId || ''),
               date: o.CreatedAt,
+            })
+          })
+        }
+      }
+
+      // Fetch reports — only if allowed by role
+      if (allowedTypes.includes('report')) {
+        let reportQuery = supabase
+          .from('report')
+          .select('reportid, reporttitle, reporttype, branchid, reportdate, date_from, date_to')
+          .order('reportdate', { ascending: false })
+        if (branchId) reportQuery = reportQuery.eq('branchid', branchId)
+        const { data: reports } = await reportQuery
+
+        if (reports) {
+          reports.forEach(r => {
+            items.push({
+              id: `rpt-${r.reportid}`,
+              type: 'report',
+              title: r.reporttitle || r.reporttype || 'Untitled Report',
+              description: r.reporttype || 'Report',
+              details: `${r.date_from || ''} – ${r.date_to || ''}`,
+              status: null,
+              branch: String(r.branchid || ''),
+              category: r.reporttype || 'Uncategorized',
+              date: r.reportdate,
+            })
+          })
+        }
+      }
+
+      // Fetch schedules — only if allowed by role
+      if (allowedTypes.includes('schedule')) {
+        let schedQuery = supabase
+          .from('schedule')
+          .select('ScheduleId, EmployeeId, ShiftDate, StartTime, EndTime, Status, BranchId')
+          .order('ShiftDate', { ascending: false })
+        if (branchId) schedQuery = schedQuery.eq('BranchId', branchId)
+        if (employeeId) schedQuery = schedQuery.eq('EmployeeId', employeeId)
+        const { data: schedules } = await schedQuery
+
+        if (schedules) {
+          // Fetch employee names for schedule display
+          const empIds = [...new Set(schedules.map(s => s.EmployeeId))]
+          let empMap = {}
+          if (empIds.length > 0) {
+            const { data: employees } = await supabase
+              .from('employee')
+              .select('EmployeeId, FirstName, LastName')
+              .in('EmployeeId', empIds)
+            if (employees) {
+              employees.forEach(e => { empMap[e.EmployeeId] = `${e.FirstName} ${e.LastName}` })
+            }
+          }
+
+          schedules.forEach(s => {
+            const empName = empMap[s.EmployeeId] || `Employee #${s.EmployeeId}`
+            items.push({
+              id: `sched-${s.ScheduleId}`,
+              type: 'schedule',
+              title: `${empName} — ${s.ShiftDate}`,
+              description: `${s.StartTime?.slice(0, 5) || '--'}-${s.EndTime?.slice(0, 5) || '--'}`,
+              details: empName,
+              status: s.Status || 'Pending',
+              branch: String(s.BranchId || ''),
+              date: s.ShiftDate,
             })
           })
         }

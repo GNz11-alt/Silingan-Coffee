@@ -105,7 +105,7 @@
             <span class="eoq-name">{{ item.name }}</span>
             <span class="eoq-stock">
               {{ item.stockquantity }} {{ item.unit }} remaining
-              <span v-if="item._dailyUsage > 0" class="usage-hint">· ~{{ item._dailyUsage.toFixed(1) }} {{ item.unit }}/day from sales</span>
+              <span v-if="item._dailyUsage > 0" class="usage-hint">· ~{{ item._dailyUsage.toFixed(2) }} {{ item.unit }}/day from sales</span>
             </span>
           </div>
           <div class="eoq-suggestion">
@@ -465,7 +465,7 @@
                 </div>
                 <div class="rtc-stat" v-if="restockPreviewItem._dailyUsage > 0">
                   <span class="rtcs-label">Daily Usage</span>
-                  <span class="rtcs-val neutral">~{{ restockPreviewItem._dailyUsage.toFixed(1) }} {{ restockPreviewItem.unit }}/day</span>
+                  <span class="rtcs-val neutral">~{{ restockPreviewItem._dailyUsage.toFixed(2) }} {{ restockPreviewItem.unit }}/day</span>
                 </div>
               </div>
               <button class="change-item-btn" @click="restockTarget = null; restockSelectedId = null;">← Change item</button>

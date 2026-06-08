@@ -520,6 +520,7 @@
               {{ transactions.length }} transactions · ₱{{
                 totalRevenue.toLocaleString("en-PH", {
                   minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
                 })
               }}
               revenue

@@ -248,7 +248,7 @@ const branchLabel = ref("");
 
 const formatCurrency = (value) =>
   "₱" +
-  Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+  Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const formatTime = (iso) =>
   iso

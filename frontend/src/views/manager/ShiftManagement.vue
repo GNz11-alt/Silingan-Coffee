@@ -437,6 +437,7 @@
                   'is-today': day.isToday,
                   'is-other-month': day.isOtherMonth,
                 }"
+                @click="openCreateModal(day.dateStr)"
               >
                 <div class="day-number">
                   {{ day.dayOfMonth }}
@@ -448,8 +449,8 @@
                     :key="shift.id"
                     class="shift-badge"
                     :style="{ background: avatarColor(shift.employeeId) }"
-                    @click="showShiftDetail = shift"
-                    :title="`${shift.employeeName} � ${shift.startTime}-${shift.endTime}`"
+                    @click.stop="showShiftDetail = shift"
+                    :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
                   >
                     <div class="shift-badge-time">{{ shift.startTime }}</div>
                     <div class="shift-badge-name">{{ shift.initials }}</div>
@@ -499,12 +500,8 @@
               <h5 class="mb-0">
                 {{ isEditing ? "Edit Schedule" : "Create Schedule" }}
               </h5>
-              <p class="modal-sub mb-0">
-                {{
-                  isEditing
-                    ? "Update this shift"
-                    : "Create a new schedule for a staff"
-                }}
+              <p class="modal-sub mb-0" style="margin-top:2px">
+                Branch: <strong>{{ userBranchName || branchName(form.branchId) || "—" }}</strong>
               </p>
             </div>
             <button class="btn-close-panel" @click="closeModal">
@@ -515,19 +512,34 @@
             <div class="row g-3">
               <div class="col-12">
                 <label class="form-label-sm">Staff</label>
-                <select
-                  v-model="form.employeeId"
-                  class="form-select fc-brand"
-                  :disabled="employeesLoading"
-                  @change="onEmployeeSelected"
-                >
-                  <option value="" disabled>
-                    {{ employeesLoading ? "Loading staff�" : "Select staff" }}
-                  </option>
-                  <option v-for="e in employeeList" :key="e.id" :value="e.id">
-                    {{ e.name }}
-                  </option>
-                </select>
+                <div class="staff-search-wrap" style="position:relative">
+                  <input
+                    ref="staffSearchInputRef"
+                    v-model="staffSearchText"
+                    type="text"
+                    class="form-control fc-brand"
+                    :placeholder="employeesLoading ? 'Loading staff…' : 'Search staff...'"
+                    :disabled="employeesLoading"
+                    @focus="onStaffSearchFocus"
+                    @blur="onStaffSearchBlur"
+                    @input="onStaffSearchInput"
+                    @keydown="onStaffSearchKeydown"
+                  />
+                  <ul v-if="staffDropdownOpen && filteredEmployeeList.length" class="staff-dropdown">
+                    <li
+                      v-for="(e, i) in filteredEmployeeList"
+                      :key="e.id"
+                      :class="{ active: i === staffHighlightIndex }"
+                      @mousedown.prevent="selectStaff(e)"
+                      @mouseenter="staffHighlightIndex = i"
+                    >
+                      {{ e.name }}
+                    </li>
+                  </ul>
+                  <ul v-else-if="staffDropdownOpen && staffSearchText && !filteredEmployeeList.length" class="staff-dropdown">
+                    <li class="no-match">No staff found</li>
+                  </ul>
+                </div>
                 <div v-if="errors.employeeId" class="text-danger small mt-1">
                   {{ errors.employeeId }}
                 </div>
@@ -575,28 +587,6 @@
                 />
                 <div v-if="errors.endTime" class="text-danger small mt-1">
                   {{ errors.endTime }}
-                </div>
-              </div>
-              <div class="col-12">
-                <label class="form-label-sm">Branch</label>
-                <!-- MANAGER: branch select is DISABLED, pre-selected to manager's branch -->
-                <select
-                  v-model="form.branchId"
-                  class="form-select fc-brand"
-                  disabled
-                >
-                  <option value="" disabled>Select branch</option>
-                  <option
-                    v-for="b in branches"
-                    :key="b.id"
-                    :value="b.id"
-                    :selected="b.id === managerBranchId"
-                  >
-                    {{ b.name }}
-                  </option>
-                </select>
-                <div v-if="errors.branchId" class="text-danger small mt-1">
-                  {{ errors.branchId }}
                 </div>
               </div>
               <div v-if="isEditing" class="col-12">
@@ -963,7 +953,7 @@
 
 <script setup>
 defineOptions({ name: "ManagerSchedule" });
-import { ref, computed, onMounted, watch, onUnmounted } from "vue";
+import { ref, computed, onMounted, watch, onUnmounted, nextTick } from "vue";
 import { supabase } from "@/supabase.js";
 import { useUserBranch } from "@/composables/useUserBranch.js";
 import {
@@ -1076,12 +1066,15 @@ const filteredStaff = computed(() => {
 const fetchStaff = async () => {
   staffLoading.value = true;
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("employee")
       .select(
         "EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status",
-      )
-      .order("EmployeeId", { ascending: false });
+      );
+    if (managerBranchId.value) {
+      query = query.eq("BranchAssigned", managerBranchId.value);
+    }
+    const { data, error } = await query.order("EmployeeId", { ascending: false });
     if (error) throw error;
     const branchIds = [
       ...new Set(
@@ -1299,6 +1292,11 @@ const emptyForm = () => ({
   status: "Scheduled",
 });
 const form = ref(emptyForm());
+
+const staffSearchText = ref('');
+const staffDropdownOpen = ref(false);
+const staffHighlightIndex = ref(-1);
+const staffSearchInputRef = ref(null);
 
 const pendingCount = computed(
   () => availability.value.filter((a) => a.status === "Pending").length,
@@ -1660,6 +1658,72 @@ const onEmployeeSelected = () => {
   if (emp.position && !form.value.role) form.value.role = emp.position;
 };
 
+const filteredEmployeeList = computed(() => {
+  const q = staffSearchText.value.toLowerCase().trim();
+  if (!q) return employeeList.value;
+  return employeeList.value.filter((e) => e.name.toLowerCase().includes(q));
+});
+
+const selectedEmployeeName = computed(() => {
+  if (!form.value.employeeId) return '';
+  const emp = employeeList.value.find((e) => e.id === form.value.employeeId);
+  return emp ? emp.name : '';
+});
+
+const selectStaff = (emp) => {
+  form.value.employeeId = emp.id;
+  staffSearchText.value = emp.name;
+  staffDropdownOpen.value = false;
+  staffHighlightIndex.value = -1;
+  onEmployeeSelected();
+};
+
+const onStaffSearchFocus = () => {
+  staffDropdownOpen.value = true;
+};
+
+const onStaffSearchBlur = () => {
+  setTimeout(() => {
+    staffDropdownOpen.value = false;
+    if (form.value.employeeId) {
+      staffSearchText.value = selectedEmployeeName.value;
+    }
+  }, 150);
+};
+
+const onStaffSearchInput = () => {
+  staffDropdownOpen.value = true;
+  staffHighlightIndex.value = -1;
+  if (!staffSearchText.value && form.value.employeeId) {
+    form.value.employeeId = '';
+  }
+};
+
+const onStaffSearchKeydown = (e) => {
+  const items = filteredEmployeeList.value;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    staffHighlightIndex.value =
+      staffHighlightIndex.value < items.length - 1
+        ? staffHighlightIndex.value + 1
+        : 0;
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    staffHighlightIndex.value =
+      staffHighlightIndex.value > 0
+        ? staffHighlightIndex.value - 1
+        : items.length - 1;
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (staffHighlightIndex.value >= 0 && staffHighlightIndex.value < items.length) {
+      selectStaff(items[staffHighlightIndex.value]);
+    }
+  } else if (e.key === 'Escape') {
+    staffDropdownOpen.value = false;
+    staffHighlightIndex.value = -1;
+  }
+};
+
 const switchTab = (key) => {
   if (activeTab.value !== key) fadingIds.value = new Set();
   activeTab.value = key;
@@ -1668,7 +1732,7 @@ const switchTab = (key) => {
   if (key === "schedule") fetchSchedules(true);
 };
 
-const openCreateModal = () => {
+const openCreateModal = (dateStr) => {
   if (employeesLoading.value) {
     showToast("Staff list is still loading. Please wait.", "error");
     return;
@@ -1679,6 +1743,7 @@ const openCreateModal = () => {
   }
   form.value = emptyForm();
   form.value.branchId = managerBranchId.value;
+  if (dateStr) form.value.shiftDate = dateStr;
   errors.value = {};
   isEditing.value = false;
   showModal.value = true;
@@ -2024,6 +2089,21 @@ watch(schedSearchInput, (value) => {
   }, 200);
 });
 
+watch(showModal, (val) => {
+  if (val) {
+    nextTick(() => {
+      if (form.value.employeeId) {
+        const emp = employeeList.value.find((e) => e.id === form.value.employeeId);
+        staffSearchText.value = emp ? emp.name : '';
+      } else {
+        staffSearchText.value = '';
+      }
+      staffDropdownOpen.value = false;
+      staffHighlightIndex.value = -1;
+    });
+  }
+});
+
 onUnmounted(() => {
   clearTimeout(schedSearchDebounce);
 });
@@ -2323,6 +2403,7 @@ onMounted(async () => {
   position: relative;
   display: flex;
   flex-direction: column;
+  cursor: pointer;
 }
 
 .calendar-day:nth-child(7n) {
@@ -2867,6 +2948,38 @@ onMounted(async () => {
 }
 
 /* Responsive */
+.staff-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1060;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+  list-style: none;
+  padding: 0.25rem 0;
+  margin: 2px 0 0;
+}
+.staff-dropdown li {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-main);
+}
+.staff-dropdown li:hover,
+.staff-dropdown li.active {
+  background: #f5f0ed;
+  color: var(--brand-primary);
+}
+.staff-dropdown li.no-match {
+  cursor: default;
+  color: var(--text-muted);
+}
+
 @media (max-width: 900px) {
   .split-layout {
     flex-direction: column;

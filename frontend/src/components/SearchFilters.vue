@@ -151,11 +151,12 @@ import { useBranches } from '@/composables/useBranches.js'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
-  role: { type: String, default: 'admin' }, // 'admin' | 'manager' | 'staff'
+  role: { type: String, default: 'admin' },
   scopes: { type: Object, default: () => ({
     branches: [], categories: [], statuses: [], departments: [],
     dateRange: { from: null, to: null }, types: [],
   })},
+  items: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['close', 'apply'])
@@ -167,6 +168,8 @@ const ALL_TYPE_OPTIONS = [
   { value: 'employee', label: 'Staff' },
   { value: 'sale', label: 'Sales' },
   { value: 'rawmaterial', label: 'Raw Materials' },
+  { value: 'report', label: 'Reports' },
+  { value: 'schedule', label: 'Schedules' },
 ]
 
 // Scope type options by role
@@ -177,9 +180,23 @@ const visibleTypeOptions = computed(() => {
 
 const typeOptions = visibleTypeOptions
 
-const categoryOptions = ['Beverages', 'Pastries', 'Food']
-const statusOptions = ['In Stock', 'Low Stock', 'Out of Stock', 'Active', 'On Leave', 'Inactive']
-const departmentOptions = ['Kitchen', 'Service', 'Management', 'Maintenance']
+const categoryOptions = computed(() => {
+  const cats = new Set()
+  props.items.forEach(item => { if (item.category) cats.add(item.category) })
+  return cats.size > 0 ? [...cats].sort() : ['Beverages', 'Pastries', 'Food']
+})
+
+const statusOptions = computed(() => {
+  const sts = new Set()
+  props.items.forEach(item => { if (item.status) sts.add(item.status) })
+  return sts.size > 0 ? [...sts].sort() : ['In Stock', 'Low Stock', 'Out of Stock', 'Active', 'On Leave', 'Inactive', 'Pending', 'Approved', 'Confirmed', 'Completed']
+})
+
+const departmentOptions = computed(() => {
+  const deps = new Set()
+  props.items.forEach(item => { if (item.department) deps.add(item.department) })
+  return deps.size > 0 ? [...deps].sort() : ['Kitchen', 'Service', 'Management', 'Maintenance']
+})
 
 const localScopes = reactive({
   branches: [...(props.scopes.branches || [])],
