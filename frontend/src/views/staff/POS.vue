@@ -458,38 +458,37 @@
               <Smartphone :size="17" /> GCash
             </button>
           </div>
-          <div v-if="paymentMethod === 'cash'" class="cash-fields">
-            <label>Amount Received (₱)</label>
-            <input
-              type="number"
-              v-model.number="cashReceived"
-              class="cash-input"
-              placeholder="0.00"
-            />
-            <button class="qa-btn exact-btn" @click="cashReceived = finalTotal">
-              ₱{{ finalTotal.toFixed(2) }}
-              <span class="exact-label">Exact Amount</span>
-            </button>
-            <div class="cash-calc" v-if="cashReceived > 0">
-              <div class="cc-row">
-                <span>Total Due</span><span>₱{{ finalTotal.toFixed(2) }}</span>
-              </div>
-              <div class="cc-row">
-                <span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span>
-              </div>
-              <div
-                class="cc-row change-row"
-                :class="changeAmount < 0 ? 'insufficient' : 'sufficient'"
-              >
-                <span>Change</span>
-                <span>{{
-                  changeAmount < 0
-                    ? "-₱" + Math.abs(changeAmount).toFixed(2)
-                    : "₱" + changeAmount.toFixed(2)
-                }}</span>
-              </div>
-            </div>
-          </div>
+<div v-if="paymentMethod === 'cash'" class="cash-fields">
+  <label>Amount Received (₱)</label>
+  <input type="number" v-model.number="cashReceived" class="cash-input" placeholder="0.00" />
+
+  <!-- Quick denomination buttons -->
+  <div class="denom-section">
+    <span class="denom-label">Quick amounts</span>
+    <div class="denom-grid">
+      <button
+        v-for="d in denominations"
+        :key="d"
+        :class="['denom-btn', cashReceived === d ? 'denom-active' : '']"
+        @click="cashReceived = d"
+      >
+        ₱{{ d >= 1000 ? (d/1000) + 'k' : d }}
+      </button>
+      <button class="denom-btn exact-denom" @click="cashReceived = finalTotal">
+        Exact
+      </button>
+    </div>
+  </div>
+
+  <div class="cash-calc" v-if="cashReceived > 0">
+    <div class="cc-row"><span>Total Due</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
+    <div class="cc-row"><span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span></div>
+    <div class="cc-row change-row" :class="changeAmount < 0 ? 'insufficient' : 'sufficient'">
+      <span>Change</span>
+      <span>{{ changeAmount < 0 ? '-₱' + Math.abs(changeAmount).toFixed(2) : '₱' + changeAmount.toFixed(2) }}</span>
+    </div>
+  </div>
+</div>
           <div v-else class="gcash-fields">
             <div class="gcash-badge">
               <Smartphone :size="38" />
