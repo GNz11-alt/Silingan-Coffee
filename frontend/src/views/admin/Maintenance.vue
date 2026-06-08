@@ -273,9 +273,39 @@ import {
   AlertTriangle,
 } from "lucide-vue-next";
 
+// ── Cache helpers ─────────────────────────────────────────
+const CACHE_TTL = 30 * 60 * 1000;
+const CACHE_KEY_STATS = "cache_maint_stats";
+const CACHE_KEY_USERS = "cache_maint_users";
+const CACHE_KEY_BACKUPS = "cache_maint_backups";
+const CACHE_KEY_TASKS = "cache_maint_tasks";
+const CACHE_KEY_LOGINS = "cache_maint_logins";
+
+const saveCache = (key, data) =>
+  sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+
+const loadCache = (key) => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data;
+  } catch {
+    return null;
+  }
+};
+
+window.addEventListener("beforeunload", () => {
+  sessionStorage.setItem("maint_refreshed", "1");
+});
+
+// ── State ─────────────────────────────────────────────────
 const branches = ref([]);
 const sslValid = ref(window.location.protocol === "https:");
-
 const activeTab = ref("overview");
 const tabs = [
   { key: "overview", label: "Overview" },
@@ -333,8 +363,7 @@ const formatDate = (iso) => {
 const lastActiveClass = (iso) => {
   if (!iso) return "status-never";
   const hours = (Date.now() - new Date(iso).getTime()) / 3600000;
-  if (hours >= 3) return "status-inactive";
-  return "status-active";
+  return hours >= 3 ? "status-inactive" : "status-active";
 };
 
 const timeAgo = (iso) => {
@@ -349,7 +378,15 @@ const timeAgo = (iso) => {
   return `${days} day${days > 1 ? "s" : ""} ago`;
 };
 
-const fetchStats = async () => {
+// ── Fetchers (all cached) ─────────────────────────────────
+const fetchStats = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_STATS);
+    if (cached) {
+      stats.value = cached;
+      return;
+    }
+  }
   isLoadingStats.value = true;
   await supabase.rpc("refresh_system_stats");
   const { data, error } = await supabase
@@ -362,25 +399,46 @@ const fetchStats = async () => {
     showToast("Failed to load system stats.", "error");
     return;
   }
-  stats.value = {
+  const mapped = {
     health_label: data.health_label,
     uptime_percent: data.uptime_percent,
     uptime_label: data.uptime_label,
     storage_used_gb: Math.round(data.storage_used_gb * 1024),
     storage_total_gb: Math.round(data.storage_total_gb * 1024),
   };
+  stats.value = mapped;
+  saveCache(CACHE_KEY_STATS, mapped);
 };
 
-const fetchFailedLogins = async () => {
+const fetchFailedLogins = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_LOGINS);
+    if (cached !== null) {
+      failedLogins.value = cached;
+      return;
+    }
+  }
   const since = new Date(Date.now() - 86_400_000).toISOString();
   const { count, error } = await supabase
     .from("failed_logins")
     .select("id", { count: "exact", head: true })
     .gte("attempted_at", since);
-  if (!error) failedLogins.value = count ?? 0;
+  if (!error) {
+    failedLogins.value = count ?? 0;
+    saveCache(CACHE_KEY_LOGINS, failedLogins.value);
+  }
 };
 
-const fetchUsers = async () => {
+const fetchUsers = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_USERS);
+    if (cached) {
+      userList.value = cached.userList;
+      totalUsers.value = cached.totalUsers;
+      branches.value = cached.branches;
+      return;
+    }
+  }
   isLoadingUsers.value = true;
   const [{ data, error }, { count }, { data: empData }, { data: branchData }] =
     await Promise.all([
@@ -405,10 +463,11 @@ const fetchUsers = async () => {
     return;
   }
 
-  branches.value = (branchData || []).map((b) => ({
+  const mappedBranches = (branchData || []).map((b) => ({
     id: String(b.BranchId),
     name: b.BranchName,
   }));
+  branches.value = mappedBranches;
 
   const empMap = {};
   for (const e of empData || []) {
@@ -420,7 +479,7 @@ const fetchUsers = async () => {
     empMap[key] = e;
   }
 
-  userList.value = data.map((u) => {
+  const mappedUsers = data.map((u) => {
     const emp = empMap[u.username];
     const fallbackName = u.username.includes("@")
       ? u.username.split("@")[0]
@@ -431,15 +490,30 @@ const fetchUsers = async () => {
       email: emp?.Email || (u.role === "admin" ? "admin@gmail.com" : "—"),
       position: emp?.Position || (u.role === "admin" ? "Admin" : null),
       branch:
-        branches.value.find((b) => b.id === String(u.branch))?.name || u.branch,
+        mappedBranches.find((b) => b.id === String(u.branch))?.name || u.branch,
       lastActivePretty: timeAgo(u.last_active),
     };
   });
 
+  userList.value = mappedUsers;
   totalUsers.value = count ?? 0;
+  saveCache(CACHE_KEY_USERS, {
+    userList: mappedUsers,
+    totalUsers: totalUsers.value,
+    branches: mappedBranches,
+  });
 };
 
-const fetchBackupHistory = async () => {
+const fetchBackupHistory = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_BACKUPS);
+    if (cached) {
+      backupHistory.value = cached.backupHistory;
+      lastBackupStatus.value = cached.lastBackupStatus;
+      lastBackupTime.value = cached.lastBackupTime;
+      return;
+    }
+  }
   isLoadingBackups.value = true;
   const { data, error } = await supabase
     .from("backup_logs")
@@ -452,7 +526,7 @@ const fetchBackupHistory = async () => {
     return;
   }
 
-  backupHistory.value = data.map((b) => ({
+  const mapped = data.map((b) => ({
     id: b.id,
     date: formatDate(b.created_at),
     type: b.type,
@@ -460,14 +534,35 @@ const fetchBackupHistory = async () => {
     backedUpBy: b.backed_up_by ?? "—",
     status: b.status,
   }));
+  const lbStatus = data.length ? data[0].status : "—";
+  const lbTime = data.length ? timeAgo(data[0].created_at) : "—";
 
-  if (data.length) {
-    lastBackupStatus.value = data[0].status;
-    lastBackupTime.value = timeAgo(data[0].created_at);
-  }
+  backupHistory.value = mapped;
+  lastBackupStatus.value = lbStatus;
+  lastBackupTime.value = lbTime;
+  saveCache(CACHE_KEY_BACKUPS, {
+    backupHistory: mapped,
+    lastBackupStatus: lbStatus,
+    lastBackupTime: lbTime,
+  });
 };
 
-const fetchTasks = async () => {
+const fetchTasks = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_TASKS);
+    if (cached) {
+      tasks.value = cached;
+      const optTask = tasks.value.find((t) => t.name === "Optimize Database");
+      if (optTask) {
+        const daysSince = optTask._last_run_at
+          ? (Date.now() - new Date(optTask._last_run_at).getTime()) / 86_400_000
+          : Infinity;
+        lastOptimization.value = optTask.lastRun;
+        showOptimizationAlert.value = daysSince >= 7;
+      }
+      return;
+    }
+  }
   isLoadingTasks.value = true;
   const { data, error } = await supabase
     .from("maintenance_tasks")
@@ -479,7 +574,7 @@ const fetchTasks = async () => {
     return;
   }
 
-  tasks.value = data.map((t) => ({
+  const mapped = data.map((t) => ({
     id: t.id,
     name: t.name,
     description: t.description,
@@ -487,8 +582,10 @@ const fetchTasks = async () => {
     running: false,
     _last_run_at: t.last_run_at,
   }));
+  tasks.value = mapped;
+  saveCache(CACHE_KEY_TASKS, mapped);
 
-  const optTask = tasks.value.find((t) => t.name === "Optimize Database");
+  const optTask = mapped.find((t) => t.name === "Optimize Database");
   if (optTask) {
     const daysSince = optTask._last_run_at
       ? (Date.now() - new Date(optTask._last_run_at).getTime()) / 86_400_000
@@ -498,6 +595,7 @@ const fetchTasks = async () => {
   }
 };
 
+// ── Mutations (force-refresh cache after) ────────────────
 const runOptimization = async () => {
   optimizing.value = true;
   const now = new Date().toISOString();
@@ -519,13 +617,13 @@ const runOptimization = async () => {
   lastOptimization.value = "Just now";
   showOptimizationAlert.value = false;
   showToast("Query statistics updated successfully.");
-  await fetchTasks();
+  sessionStorage.removeItem(CACHE_KEY_TASKS);
+  await fetchTasks(true);
 };
 
 const runTask = async (task) => {
   task.running = true;
   const now = new Date().toISOString();
-
   if (task.name === "Optimize Database") {
     const { error: fnError } = await supabase.rpc("run_vacuum");
     if (fnError) {
@@ -543,7 +641,6 @@ const runTask = async (task) => {
       return;
     }
   }
-
   const { error } = await supabase
     .from("maintenance_tasks")
     .update({ last_run_at: now })
@@ -553,7 +650,6 @@ const runTask = async (task) => {
     showToast(`${task.name} failed to log.`, "error");
     return;
   }
-
   task.lastRun = "Just now";
   task._last_run_at = now;
   if (task.name === "Optimize Database") {
@@ -561,9 +657,22 @@ const runTask = async (task) => {
     showOptimizationAlert.value = false;
   }
   showToast(`${task.name} completed successfully.`);
+  sessionStorage.removeItem(CACHE_KEY_TASKS);
 };
 
+// ── Mount ─────────────────────────────────────────────────
 onMounted(() => {
+  if (sessionStorage.getItem("maint_refreshed")) {
+    sessionStorage.removeItem("maint_refreshed");
+    [
+      CACHE_KEY_STATS,
+      CACHE_KEY_USERS,
+      CACHE_KEY_BACKUPS,
+      CACHE_KEY_TASKS,
+      CACHE_KEY_LOGINS,
+    ].forEach((k) => sessionStorage.removeItem(k));
+  }
+
   fetchStats();
   fetchFailedLogins();
   fetchUsers();

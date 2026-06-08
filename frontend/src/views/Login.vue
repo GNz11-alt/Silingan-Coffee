@@ -216,6 +216,7 @@ const handleLogin = async () => {
   localStorage.setItem("role", data.role);
   localStorage.setItem("branch", data.branch || "all");
   localStorage.setItem("userId", data.id);
+  localStorage.setItem("loginTime", new Date().toISOString());
 
   await supabase
     .from("users")
@@ -289,6 +290,19 @@ const handleLogin = async () => {
 .login-header {
   text-align: center;
   margin-bottom: 35px;
+}
+
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
+input::-webkit-credentials-auto-fill-button {
+  display: none;
+}
+
+input[type="password"]::-ms-reveal {
+  display: none;
 }
 
 .welcome-title {

@@ -148,21 +148,18 @@
     <div class="resources-panel mt-4">
       <div class="panel-title mb-1">Additional Resources</div>
       <div class="panel-sub mb-3">More ways to learn and get help</div>
-      <div class="resources-grid">
-        <div class="resource-card">
-          <component :is="BookOpen" :size="24" class="resource-icon" />
-          <div class="resource-title">User Manual</div>
-          <div class="resource-sub">Complete documentation</div>
-        </div>
-        <div class="resource-card">
-          <component :is="Video" :size="24" class="resource-icon" />
-          <div class="resource-title">Video Tutorials</div>
-          <div class="resource-sub">Step-by-step guides</div>
-        </div>
-        <div class="resource-card">
-          <component :is="MessageSquare" :size="24" class="resource-icon" />
-          <div class="resource-title">Community Forum</div>
-          <div class="resource-sub">Connect with other users</div>
+      <div class="resources-list">
+        <div class="resource-item">
+          <div class="resource-icon-wrap">
+            <component :is="BookOpen" :size="20" />
+          </div>
+          <div class="resource-text">
+            <div class="resource-title">User Manual</div>
+            <div class="resource-sub">
+              Complete documentation for all modules
+            </div>
+          </div>
+          <span class="resource-arrow">→</span>
         </div>
       </div>
     </div>
@@ -182,14 +179,11 @@ import {
   Users,
   Phone,
   Mail,
-  MessageCircle,
   BookOpen,
-  Video,
-  MessageSquare,
 } from "lucide-vue-next";
+
 const lastBackupStatus = ref("—");
 const searchQuery = ref("");
-
 const faqs = ref([
   {
     id: 1,
@@ -215,9 +209,9 @@ const faqs = ref([
   {
     id: 4,
     open: false,
-    question: "How do I add and manage staff?",
+    question: "How do I add and manage employees?",
     answer:
-      'Go to Staff from the sidebar (Admin only). Click "Add Staff" and fill in the staff details including name, position, department, branch, and hourly rate. You can also edit or archive existing staff.',
+      'Go to Employees from the sidebar (Admin only). Click "Add Employee" and fill in the employee details including name, position, department, branch, and hourly rate. You can also edit or archive existing employees.',
   },
   {
     id: 5,
@@ -309,7 +303,7 @@ const quickTopics = [
     faqId: 3,
   },
   {
-    title: "Staff Management",
+    title: "Employee Management",
     sub: "Adding and managing staff",
     icon: Users,
     faqId: 4,
@@ -618,36 +612,53 @@ const quickTopics = [
   border-radius: 12px;
   padding: 20px;
 }
-.resources-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+.resources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.resource-card {
+.resource-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
   border: 1px solid #f0e8df;
   border-radius: 10px;
-  padding: 20px;
-  text-align: center;
   cursor: pointer;
   transition: all 0.15s;
 }
-.resource-card:hover {
+.resource-item:hover {
   background: #fffbf5;
   border-color: #c49a6c;
 }
-.resource-icon {
+.resource-icon-wrap {
+  width: 38px;
+  height: 38px;
+  background: #fff3e6;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #8b4513;
-  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+.resource-text {
+  flex: 1;
 }
 .resource-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #8b4513;
-  margin-bottom: 4px;
+  color: #1a1a1a;
+  margin-bottom: 2px;
 }
 .resource-sub {
   font-size: 12px;
   color: #6b6b6b;
+}
+.resource-arrow {
+  color: #c49a6c;
+  font-size: 16px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 900px) {

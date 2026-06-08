@@ -22,12 +22,10 @@
 
     <template v-else>
       <div class="split-layout">
-
         <!-- ------------------------------------------
              LEFT PANEL
         ------------------------------------------- -->
         <div class="left-panel">
-
           <!-- Staff mini-tab strip -->
           <div class="left-tab-bar mb-3">
             <button
@@ -38,8 +36,16 @@
               @click="switchTab(tab.key)"
             >
               {{ tab.label }}
-              <span v-if="tab.key === 'availability' && pendingCount" class="tab-badge">{{ pendingCount }}</span>
-              <span v-if="tab.key === 'change' && inquiryPendingCount" class="tab-badge">{{ inquiryPendingCount }}</span>
+              <span
+                v-if="tab.key === 'availability' && pendingCount"
+                class="tab-badge"
+                >{{ pendingCount }}</span
+              >
+              <span
+                v-if="tab.key === 'change' && inquiryPendingCount"
+                class="tab-badge"
+                >{{ inquiryPendingCount }}</span
+              >
             </button>
           </div>
 
@@ -60,11 +66,20 @@
             <div class="mb-2">
               <div class="search-wrap">
                 <i class="bi bi-search search-icon"></i>
-                <input v-model="staffSearch" type="text" class="form-control search-input" placeholder="Search staff..." />
+                <input
+                  v-model="staffSearch"
+                  type="text"
+                  class="form-control search-input"
+                  placeholder="Search staff..."
+                />
               </div>
             </div>
             <div class="d-flex gap-1 mb-2 flex-wrap">
-              <select v-model="staffFilterStatus" class="form-select fc-brand" style="font-size:0.76rem">
+              <select
+                v-model="staffFilterStatus"
+                class="form-select fc-brand"
+                style="font-size: 0.76rem"
+              >
                 <option value="">All Statuses</option>
                 <option value="Active">Active</option>
                 <option value="On Leave">On Leave</option>
@@ -73,25 +88,48 @@
               <!-- MANAGER: no "Add" button - view/edit only -->
             </div>
             <div v-if="staffLoading" class="text-center py-3">
-              <div class="spinner-border spinner-border-sm text-secondary"></div>
+              <div
+                class="spinner-border spinner-border-sm text-secondary"
+              ></div>
             </div>
             <div v-else-if="filteredStaff.length" class="staff-list">
               <div class="emp-row" v-for="emp in filteredStaff" :key="emp.id">
-                <div class="emp-avatar-sm" :style="{ background: staffAvatarColor(emp) }">
+                <div
+                  class="emp-avatar-sm"
+                  :style="{ background: staffAvatarColor(emp) }"
+                >
                   {{ staffInitials(emp) }}
                 </div>
                 <div class="emp-row-info">
-                  <div class="emp-row-name">{{ emp.firstName }} {{ emp.lastName }}</div>
-                  <div class="emp-row-pos">{{ emp.position }} � {{ emp.branchName }}</div>
+                  <div class="emp-row-name">
+                    {{ emp.firstName }} {{ emp.lastName }}
+                  </div>
+                  <div class="emp-row-pos">
+                    {{ emp.position }} � {{ emp.branchName }}
+                  </div>
                 </div>
-                <span class="badge-status" :class="staffStatusClass(emp.status)">{{ emp.status }}</span>
+                <span
+                  class="badge-status"
+                  :class="staffStatusClass(emp.status)"
+                  >{{ emp.status }}</span
+                >
                 <div class="emp-row-actions">
-                  <button class="icon-btn" @click="openEditStaffModal(emp)"><i class="bi bi-pencil"></i></button>
-                  <button class="icon-btn" @click="openArchiveStaffModal(emp)"><i class="bi bi-archive"></i></button>
+                  <button class="icon-btn" @click="openEditStaffModal(emp)">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="icon-btn" @click="openArchiveStaffModal(emp)">
+                    <i class="bi bi-archive"></i>
+                  </button>
                 </div>
               </div>
             </div>
-            <div v-else class="text-muted text-center py-3" style="font-size:0.82rem">No staff found.</div>
+            <div
+              v-else
+              class="text-muted text-center py-3"
+              style="font-size: 0.82rem"
+            >
+              No staff found.
+            </div>
           </div>
 
           <!-- -- AVAILABILITY ----------------------- -->
@@ -106,26 +144,53 @@
                   :class="{ 'is-fading': fadingIds.has(avail.id) }"
                 >
                   <div class="avail-card-top">
-                    <div class="emp-avatar-sm" :style="{ background: avatarColor(avail.employeeId) }">
+                    <div
+                      class="emp-avatar-sm"
+                      :style="{ background: avatarColor(avail.employeeId) }"
+                    >
                       {{ avail.initials }}
                     </div>
                     <div class="avail-card-info">
-                      <div class="avail-name">{{ avail.employeeName }} <span class="avail-role">{{ avail.role }}</span></div>
-                      <div class="avail-meta">
-                        <i class="bi bi-calendar3"></i> {{ formatDate(avail.availableDate) }}
-                        &nbsp;<i class="bi bi-clock"></i> {{ avail.startTime }}�{{ avail.endTime }}
+                      <div class="avail-name">
+                        {{ avail.employeeName }}
+                        <span class="avail-role">{{ avail.role }}</span>
                       </div>
-                      <div v-if="avail.notes" class="avail-notes">{{ avail.notes }}</div>
+                      <div class="avail-meta">
+                        <i class="bi bi-calendar3"></i>
+                        {{ formatDate(avail.availableDate) }} &nbsp;<i
+                          class="bi bi-clock"
+                        ></i>
+                        {{ avail.startTime }}�{{ avail.endTime }}
+                      </div>
+                      <div v-if="avail.notes" class="avail-notes">
+                        {{ avail.notes }}
+                      </div>
                     </div>
                   </div>
                   <div class="avail-card-actions">
-                    <span v-if="avail.status === 'Confirmed'" class="badge-status badge-active">approved</span>
+                    <span
+                      v-if="avail.status === 'Confirmed'"
+                      class="badge-status badge-active"
+                      >approved</span
+                    >
                     <template v-else-if="avail.status === 'Pending'">
                       <span class="badge-status badge-pending">pending</span>
-                      <button class="btn-action approve" @click="updateAvailStatus(avail, 'Confirmed')">&#10003;</button>
-                      <button class="btn-action reject" @click="updateAvailStatus(avail, 'Cancelled')">&#10007;</button>
+                      <button
+                        class="btn-action approve"
+                        @click="updateAvailStatus(avail, 'Confirmed')"
+                      >
+                        &#10003;
+                      </button>
+                      <button
+                        class="btn-action reject"
+                        @click="updateAvailStatus(avail, 'Cancelled')"
+                      >
+                        &#10007;
+                      </button>
                     </template>
-                    <span v-else class="badge-status badge-inactive">rejected</span>
+                    <span v-else class="badge-status badge-inactive"
+                      >rejected</span
+                    >
                   </div>
                 </div>
               </TransitionGroup>
@@ -140,20 +205,41 @@
           <div v-if="activeTab === 'history'" class="left-scroll-area">
             <div class="left-section-title mb-2">Availability History</div>
             <div v-if="resolvedAvail.length" class="avail-list">
-              <div v-for="avail in resolvedAvail" :key="avail.id" class="avail-card">
+              <div
+                v-for="avail in resolvedAvail"
+                :key="avail.id"
+                class="avail-card"
+              >
                 <div class="avail-card-top">
-                  <div class="emp-avatar-sm" :style="{ background: avatarColor(avail.employeeId) }">{{ avail.initials }}</div>
+                  <div
+                    class="emp-avatar-sm"
+                    :style="{ background: avatarColor(avail.employeeId) }"
+                  >
+                    {{ avail.initials }}
+                  </div>
                   <div class="avail-card-info">
-                    <div class="avail-name">{{ avail.employeeName }} <span class="avail-role">{{ avail.role }}</span></div>
+                    <div class="avail-name">
+                      {{ avail.employeeName }}
+                      <span class="avail-role">{{ avail.role }}</span>
+                    </div>
                     <div class="avail-meta">
-                      <i class="bi bi-calendar3"></i> {{ formatDate(avail.availableDate) }}
-                      &nbsp;<i class="bi bi-clock"></i> {{ avail.startTime }}�{{ avail.endTime }}
+                      <i class="bi bi-calendar3"></i>
+                      {{ formatDate(avail.availableDate) }} &nbsp;<i
+                        class="bi bi-clock"
+                      ></i>
+                      {{ avail.startTime }}�{{ avail.endTime }}
                     </div>
                   </div>
                 </div>
                 <div class="avail-card-actions">
-                  <span v-if="avail.status === 'Confirmed'" class="badge-status badge-active">approved</span>
-                  <span v-else class="badge-status badge-inactive">rejected</span>
+                  <span
+                    v-if="avail.status === 'Confirmed'"
+                    class="badge-status badge-active"
+                    >approved</span
+                  >
+                  <span v-else class="badge-status badge-inactive"
+                    >rejected</span
+                  >
                 </div>
               </div>
             </div>
@@ -167,23 +253,58 @@
           <div v-if="activeTab === 'change'" class="left-scroll-area">
             <div class="left-section-title mb-2">Change Inquiries</div>
             <div v-if="changeInquiries.length" class="avail-list">
-              <div v-for="inq in changeInquiries" :key="inq.id" class="avail-card">
+              <div
+                v-for="inq in changeInquiries"
+                :key="inq.id"
+                class="avail-card"
+              >
                 <div class="avail-card-top">
-                  <div class="emp-avatar-sm" :style="{ background: avatarColor(inq.employeeId) }">{{ inq.initials }}</div>
+                  <div
+                    class="emp-avatar-sm"
+                    :style="{ background: avatarColor(inq.employeeId) }"
+                  >
+                    {{ inq.initials }}
+                  </div>
                   <div class="avail-card-info">
-                    <div class="avail-name">{{ inq.employeeName }} <span class="avail-role">{{ inq.role }}</span></div>
-                    <div class="avail-meta"><strong>{{ inq.requestType }}</strong> � {{ formatDate(inq.requestDate) }}</div>
+                    <div class="avail-name">
+                      {{ inq.employeeName }}
+                      <span class="avail-role">{{ inq.role }}</span>
+                    </div>
+                    <div class="avail-meta">
+                      <strong>{{ inq.requestType }}</strong> �
+                      {{ formatDate(inq.requestDate) }}
+                    </div>
                     <div class="avail-notes">{{ inq.reason }}</div>
-                    <div v-if="inq.managerNote" class="avail-notes" style="color:#5d4037"><strong>Mgr:</strong> {{ inq.managerNote }}</div>
+                    <div
+                      v-if="inq.managerNote"
+                      class="avail-notes"
+                      style="color: #5d4037"
+                    >
+                      <strong>Mgr:</strong> {{ inq.managerNote }}
+                    </div>
                   </div>
                 </div>
                 <div class="avail-card-actions">
                   <template v-if="inq.status === 'Pending'">
                     <span class="badge-status badge-pending">pending</span>
-                    <button class="btn-action approve" @click="updateInquiryStatus(inq, 'Approved')">&#10003;</button>
-                    <button class="btn-action reject" @click="updateInquiryStatus(inq, 'Denied')">&#10007;</button>
+                    <button
+                      class="btn-action approve"
+                      @click="updateInquiryStatus(inq, 'Approved')"
+                    >
+                      &#10003;
+                    </button>
+                    <button
+                      class="btn-action reject"
+                      @click="updateInquiryStatus(inq, 'Denied')"
+                    >
+                      &#10007;
+                    </button>
                   </template>
-                  <span v-else-if="inq.status === 'Approved'" class="badge-status badge-active">approved</span>
+                  <span
+                    v-else-if="inq.status === 'Approved'"
+                    class="badge-status badge-active"
+                    >approved</span
+                  >
                   <span v-else class="badge-status badge-inactive">denied</span>
                 </div>
               </div>
@@ -199,28 +320,56 @@
           <div v-if="activeTab === 'schedule'" class="left-scroll-area">
             <div class="d-flex align-items-center justify-content-between mb-2">
               <div class="left-section-title">Scheduled Shifts</div>
-              <button class="btn btn-ghost btn-sm" @click="clearSchedFilters">Clear</button>
+              <button class="btn btn-ghost btn-sm" @click="clearSchedFilters">
+                Clear
+              </button>
             </div>
             <input
               v-model="schedSearchInput"
               type="text"
               class="form-control fc-brand mb-2"
               placeholder="Search staff�"
-              style="font-size:0.82rem"
+              style="font-size: 0.82rem"
             />
             <div class="sched-card-list">
-              <div v-for="sched in filteredSchedules" :key="sched.id" class="sched-list-card">
-                <div class="sched-list-avatar" :style="{ background: avatarColor(sched.employeeId) }">{{ sched.initials }}</div>
+              <div
+                v-for="sched in filteredSchedules"
+                :key="sched.id"
+                class="sched-list-card"
+              >
+                <div
+                  class="sched-list-avatar"
+                  :style="{ background: avatarColor(sched.employeeId) }"
+                >
+                  {{ sched.initials }}
+                </div>
                 <div class="sched-list-info">
                   <div class="sched-list-name">{{ sched.employeeName }}</div>
-                  <div class="sched-list-meta">{{ formatDate(sched.shiftDate) }} � {{ sched.startTime }}�{{ sched.endTime }}</div>
-                  <div class="sched-list-meta">{{ sched.role }} � {{ branchName(sched.branchId) }}</div>
+                  <div class="sched-list-meta">
+                    {{ formatDate(sched.shiftDate) }} � {{ sched.startTime }}�{{
+                      sched.endTime
+                    }}
+                  </div>
+                  <div class="sched-list-meta">
+                    {{ sched.role }} � {{ branchName(sched.branchId) }}
+                  </div>
                 </div>
                 <div class="d-flex flex-column align-items-end gap-1">
-                  <span class="badge-status" :class="schedStatusClass(sched.status)">{{ sched.status }}</span>
+                  <span
+                    class="badge-status"
+                    :class="schedStatusClass(sched.status)"
+                    >{{ sched.status }}</span
+                  >
                   <div class="d-flex gap-1">
-                    <button class="icon-btn" @click="openEditModal(sched)"><i class="bi bi-pencil-square"></i></button>
-                    <button class="icon-btn danger" @click="confirmDelete(sched)"><i class="bi bi-trash3"></i></button>
+                    <button class="icon-btn" @click="openEditModal(sched)">
+                      <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <button
+                      class="icon-btn danger"
+                      @click="confirmDelete(sched)"
+                    >
+                      <i class="bi bi-trash3"></i>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -230,8 +379,8 @@
               </div>
             </div>
           </div>
-
-        </div><!-- end left-panel -->
+        </div>
+        <!-- end left-panel -->
 
         <!-- ------------------------------------------
              RIGHT PANEL � Calendar always visible
@@ -239,16 +388,29 @@
         <div class="right-panel">
           <!-- Month nav -->
           <div class="cal-nav mb-3">
-            <button class="btn btn-ghost btn-sm" @click="monthOffset -= 1"><i class="bi bi-chevron-left"></i></button>
+            <button class="btn btn-ghost btn-sm" @click="monthOffset -= 1">
+              <i class="bi bi-chevron-left"></i>
+            </button>
             <span class="cal-month-label">{{ monthYearLabel }}</span>
-            <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">Today</button>
-            <button class="btn btn-ghost btn-sm" @click="monthOffset += 1"><i class="bi bi-chevron-right"></i></button>
+            <button class="btn btn-ghost btn-sm" @click="monthOffset = 0">
+              Today
+            </button>
+            <button class="btn btn-ghost btn-sm" @click="monthOffset += 1">
+              <i class="bi bi-chevron-right"></i>
+            </button>
             <!-- View toggle -->
             <div class="ms-auto d-flex gap-1">
               <button
                 class="btn btn-sm"
-                :class="schedViewMode === 'calendar' ? 'btn-primary-brand' : 'btn-ghost'"
-                @click="schedViewMode = 'calendar'; switchTab('schedule')"
+                :class="
+                  schedViewMode === 'calendar'
+                    ? 'btn-primary-brand'
+                    : 'btn-ghost'
+                "
+                @click="
+                  schedViewMode = 'calendar';
+                  switchTab('schedule');
+                "
               >
                 <i class="bi bi-calendar3"></i> Schedules
               </button>
@@ -258,14 +420,23 @@
           <!-- Calendar grid -->
           <div class="calendar-container">
             <div class="calendar-header">
-              <div class="calendar-day-header" v-for="day in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']" :key="day">{{ day }}</div>
+              <div
+                class="calendar-day-header"
+                v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
+                :key="day"
+              >
+                {{ day }}
+              </div>
             </div>
             <div class="calendar-grid">
               <div
                 v-for="day in monthDays"
                 :key="day.dateStr"
                 class="calendar-day"
-                :class="{ 'is-today': day.isToday, 'is-other-month': day.isOtherMonth }"
+                :class="{
+                  'is-today': day.isToday,
+                  'is-other-month': day.isOtherMonth,
+                }"
               >
                 <div class="day-number">
                   {{ day.dayOfMonth }}
@@ -291,70 +462,142 @@
           <!-- Legend -->
           <div v-if="schedEmployees.length" class="employee-legend mt-2">
             <span class="legend-label">Staff:</span>
-            <span v-for="emp in schedEmployees" :key="emp.id" class="legend-item" :title="emp.name">
-              <span class="legend-swatch" :style="{ background: avatarColor(emp.id) }"></span>
+            <span
+              v-for="emp in schedEmployees"
+              :key="emp.id"
+              class="legend-item"
+              :title="emp.name"
+            >
+              <span
+                class="legend-swatch"
+                :style="{ background: avatarColor(emp.id) }"
+              ></span>
               {{ emp.name }}
             </span>
           </div>
-        </div><!-- end right-panel -->
-
-      </div><!-- end split-layout -->
+        </div>
+        <!-- end right-panel -->
+      </div>
+      <!-- end split-layout -->
     </template>
 
     <!-- -- All modals unchanged ------------------------------- -->
     <!-- CREATE / EDIT MODAL -->
     <Teleport to="body">
       <div v-if="showModal" class="modal-overlay">
-        <div style="position:absolute;inset:0;z-index:0;" @click="closeModal"></div>
-        <div class="modal-panel" style="position:relative;z-index:1;" @click.stop>
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+          @click="closeModal"
+        ></div>
+        <div
+          class="modal-panel"
+          style="position: relative; z-index: 1"
+          @click.stop
+        >
           <div class="modal-panel-header">
             <div>
-              <h5 class="mb-0">{{ isEditing ? 'Edit Schedule' : 'Create Schedule' }}</h5>
-              <p class="modal-sub mb-0">{{ isEditing ? 'Update this shift' : 'Create a new schedule for a staff' }}</p>
+              <h5 class="mb-0">
+                {{ isEditing ? "Edit Schedule" : "Create Schedule" }}
+              </h5>
+              <p class="modal-sub mb-0">
+                {{
+                  isEditing
+                    ? "Update this shift"
+                    : "Create a new schedule for a staff"
+                }}
+              </p>
             </div>
-            <button class="btn-close-panel" @click="closeModal"><i class="bi bi-x-lg"></i></button>
+            <button class="btn-close-panel" @click="closeModal">
+              <i class="bi bi-x-lg"></i>
+            </button>
           </div>
           <div class="modal-panel-body">
             <div class="row g-3">
               <div class="col-12">
                 <label class="form-label-sm">Staff</label>
-                <select v-model="form.employeeId" class="form-select fc-brand" :disabled="employeesLoading" @change="onEmployeeSelected">
-                  <option value="" disabled>{{ employeesLoading ? 'Loading staff�' : 'Select staff' }}</option>
-                  <option v-for="e in employeeList" :key="e.id" :value="e.id">{{ e.name }}</option>
+                <select
+                  v-model="form.employeeId"
+                  class="form-select fc-brand"
+                  :disabled="employeesLoading"
+                  @change="onEmployeeSelected"
+                >
+                  <option value="" disabled>
+                    {{ employeesLoading ? "Loading staff�" : "Select staff" }}
+                  </option>
+                  <option v-for="e in employeeList" :key="e.id" :value="e.id">
+                    {{ e.name }}
+                  </option>
                 </select>
-                <div v-if="errors.employeeId" class="text-danger small mt-1">{{ errors.employeeId }}</div>
+                <div v-if="errors.employeeId" class="text-danger small mt-1">
+                  {{ errors.employeeId }}
+                </div>
               </div>
               <div class="col-12">
                 <label class="form-label-sm">Role</label>
                 <select v-model="form.role" class="form-select fc-brand">
                   <option value="" disabled>Select role</option>
-                  <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
+                  <option v-for="r in roles" :key="r" :value="r">
+                    {{ r }}
+                  </option>
                 </select>
-                <div v-if="errors.role" class="text-danger small mt-1">{{ errors.role }}</div>
+                <div v-if="errors.role" class="text-danger small mt-1">
+                  {{ errors.role }}
+                </div>
               </div>
               <div class="col-12">
                 <label class="form-label-sm">Shift Date</label>
-                <input v-model="form.shiftDate" type="date" class="form-control fc-brand" />
-                <div v-if="errors.shiftDate" class="text-danger small mt-1">{{ errors.shiftDate }}</div>
+                <input
+                  v-model="form.shiftDate"
+                  type="date"
+                  class="form-control fc-brand"
+                />
+                <div v-if="errors.shiftDate" class="text-danger small mt-1">
+                  {{ errors.shiftDate }}
+                </div>
               </div>
               <div class="col-6">
                 <label class="form-label-sm">Start Time</label>
-                <input v-model="form.startTime" type="time" class="form-control fc-brand" />
-                <div v-if="errors.startTime" class="text-danger small mt-1">{{ errors.startTime }}</div>
+                <input
+                  v-model="form.startTime"
+                  type="time"
+                  class="form-control fc-brand"
+                />
+                <div v-if="errors.startTime" class="text-danger small mt-1">
+                  {{ errors.startTime }}
+                </div>
               </div>
               <div class="col-6">
                 <label class="form-label-sm">End Time</label>
-                <input v-model="form.endTime" type="time" class="form-control fc-brand" />
-                <div v-if="errors.endTime" class="text-danger small mt-1">{{ errors.endTime }}</div>
+                <input
+                  v-model="form.endTime"
+                  type="time"
+                  class="form-control fc-brand"
+                />
+                <div v-if="errors.endTime" class="text-danger small mt-1">
+                  {{ errors.endTime }}
+                </div>
               </div>
               <div class="col-12">
                 <label class="form-label-sm">Branch</label>
                 <!-- MANAGER: branch select is DISABLED, pre-selected to manager's branch -->
-                <select v-model="form.branchId" class="form-select fc-brand" disabled>
+                <select
+                  v-model="form.branchId"
+                  class="form-select fc-brand"
+                  disabled
+                >
                   <option value="" disabled>Select branch</option>
-                  <option v-for="b in branches" :key="b.id" :value="b.id" :selected="b.id === managerBranchId">{{ b.name }}</option>
+                  <option
+                    v-for="b in branches"
+                    :key="b.id"
+                    :value="b.id"
+                    :selected="b.id === managerBranchId"
+                  >
+                    {{ b.name }}
+                  </option>
                 </select>
-                <div v-if="errors.branchId" class="text-danger small mt-1">{{ errors.branchId }}</div>
+                <div v-if="errors.branchId" class="text-danger small mt-1">
+                  {{ errors.branchId }}
+                </div>
               </div>
               <div v-if="isEditing" class="col-12">
                 <label class="form-label-sm">Status</label>
@@ -368,9 +611,16 @@
           </div>
           <div class="modal-panel-footer">
             <button class="btn btn-ghost" @click="closeModal">Cancel</button>
-            <button class="btn btn-primary-brand" @click="saveSchedule()" :disabled="saving || employeesLoading">
-              <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
-              {{ isEditing ? 'Save Changes' : 'Create Schedule' }}
+            <button
+              class="btn btn-primary-brand"
+              @click="saveSchedule()"
+              :disabled="saving || employeesLoading"
+            >
+              <span
+                v-if="saving"
+                class="spinner-border spinner-border-sm me-1"
+              ></span>
+              {{ isEditing ? "Save Changes" : "Create Schedule" }}
             </button>
           </div>
         </div>
@@ -380,22 +630,44 @@
     <!-- CONFLICT CONFIRM -->
     <Teleport to="body">
       <div v-if="showConflictConfirm" class="modal-overlay">
-        <div style="position:absolute;inset:0;z-index:0;" @click="showConflictConfirm = false"></div>
-        <div class="modal-panel modal-panel--sm" style="position:relative;z-index:1;" @click.stop>
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+          @click="showConflictConfirm = false"
+        ></div>
+        <div
+          class="modal-panel modal-panel--sm"
+          style="position: relative; z-index: 1"
+          @click.stop
+        >
           <div class="modal-panel-header">
             <h5 class="mb-0">Schedule Conflict</h5>
-            <button class="btn-close-panel" @click="showConflictConfirm = false"><i class="bi bi-x-lg"></i></button>
+            <button
+              class="btn-close-panel"
+              @click="showConflictConfirm = false"
+            >
+              <i class="bi bi-x-lg"></i>
+            </button>
           </div>
           <div class="modal-panel-body">
             <p v-if="conflictInfo">
-              This staff already has a shift on <strong>{{ formatDate(form.shiftDate) }}</strong> from
-              <strong>{{ conflictInfo.existingStart }}�{{ conflictInfo.existingEnd }}</strong> ({{ conflictInfo.existingRole }}).
+              This staff already has a shift on
+              <strong>{{ formatDate(form.shiftDate) }}</strong> from
+              <strong
+                >{{ conflictInfo.existingStart }}�{{
+                  conflictInfo.existingEnd
+                }}</strong
+              >
+              ({{ conflictInfo.existingRole }}).
             </p>
             <p class="mb-0">Save anyway and allow double-booking?</p>
           </div>
           <div class="modal-panel-footer">
-            <button class="btn btn-ghost" @click="showConflictConfirm = false">Cancel</button>
-            <button class="btn btn-danger-brand" @click="confirmConflictSave">Save Anyway</button>
+            <button class="btn btn-ghost" @click="showConflictConfirm = false">
+              Cancel
+            </button>
+            <button class="btn btn-danger-brand" @click="confirmConflictSave">
+              Save Anyway
+            </button>
           </div>
         </div>
       </div>
@@ -404,18 +676,36 @@
     <!-- DELETE CONFIRM -->
     <Teleport to="body">
       <div v-if="showDeleteConfirm" class="modal-overlay">
-        <div style="position:absolute;inset:0;z-index:0;" @click="showDeleteConfirm = false"></div>
-        <div class="modal-panel modal-panel--sm" style="position:relative;z-index:1;" @click.stop>
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+          @click="showDeleteConfirm = false"
+        ></div>
+        <div
+          class="modal-panel modal-panel--sm"
+          style="position: relative; z-index: 1"
+          @click.stop
+        >
           <div class="modal-panel-header">
             <h5 class="mb-0">Delete Schedule</h5>
-            <button class="btn-close-panel" @click="showDeleteConfirm = false"><i class="bi bi-x-lg"></i></button>
+            <button class="btn-close-panel" @click="showDeleteConfirm = false">
+              <i class="bi bi-x-lg"></i>
+            </button>
           </div>
           <div class="modal-panel-body">
-            <p>Delete the schedule for <strong>{{ deleteTarget?.employeeName }}</strong> on <strong>{{ formatDate(deleteTarget?.shiftDate) }}</strong>? This cannot be undone.</p>
+            <p>
+              Delete the schedule for
+              <strong>{{ deleteTarget?.employeeName }}</strong> on
+              <strong>{{ formatDate(deleteTarget?.shiftDate) }}</strong
+              >? This cannot be undone.
+            </p>
           </div>
           <div class="modal-panel-footer">
-            <button class="btn btn-ghost" @click="showDeleteConfirm = false">Cancel</button>
-            <button class="btn btn-danger-brand" @click="deleteSchedule">Delete</button>
+            <button class="btn btn-ghost" @click="showDeleteConfirm = false">
+              Cancel
+            </button>
+            <button class="btn btn-danger-brand" @click="deleteSchedule">
+              Delete
+            </button>
           </div>
         </div>
       </div>
@@ -424,26 +714,71 @@
     <!-- SHIFT DETAIL -->
     <Teleport to="body">
       <div v-if="showShiftDetail" class="modal-overlay">
-        <div style="position:absolute;inset:0;z-index:0;" @click="showShiftDetail = null"></div>
-        <div class="modal-panel modal-panel--sm" style="position:relative;z-index:1;" @click.stop>
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+          @click="showShiftDetail = null"
+        ></div>
+        <div
+          class="modal-panel modal-panel--sm"
+          style="position: relative; z-index: 1"
+          @click.stop
+        >
           <div class="modal-panel-header">
             <h5 class="mb-0">Shift Details</h5>
-            <button class="btn-close-panel" @click="showShiftDetail = null"><i class="bi bi-x-lg"></i></button>
+            <button class="btn-close-panel" @click="showShiftDetail = null">
+              <i class="bi bi-x-lg"></i>
+            </button>
           </div>
           <div class="modal-panel-body">
             <div class="shift-detail-content">
               <div class="shift-detail-employee">
-                <div class="emp-avatar lg" :style="{ background: avatarColor(showShiftDetail.employeeId) }">{{ showShiftDetail.initials }}</div>
+                <div
+                  class="emp-avatar lg"
+                  :style="{
+                    background: avatarColor(showShiftDetail.employeeId),
+                  }"
+                >
+                  {{ showShiftDetail.initials }}
+                </div>
                 <div>
-                  <div class="shift-detail-name">{{ showShiftDetail.employeeName }}</div>
-                  <div class="shift-detail-role">{{ showShiftDetail.role }}</div>
+                  <div class="shift-detail-name">
+                    {{ showShiftDetail.employeeName }}
+                  </div>
+                  <div class="shift-detail-role">
+                    {{ showShiftDetail.role }}
+                  </div>
                 </div>
               </div>
               <div class="shift-detail-info">
-                <div class="shift-detail-row"><span class="label">Date:</span><span class="value">{{ formatDate(showShiftDetail.shiftDate) }}</span></div>
-                <div class="shift-detail-row"><span class="label">Time:</span><span class="value">{{ showShiftDetail.startTime }} � {{ showShiftDetail.endTime }}</span></div>
-                <div class="shift-detail-row"><span class="label">Branch:</span><span class="value">{{ branchName(showShiftDetail.branchId) }}</span></div>
-                <div class="shift-detail-row"><span class="label">Status:</span><span class="value"><span class="badge-status" :class="schedStatusClass(showShiftDetail.status)">{{ showShiftDetail.status }}</span></span></div>
+                <div class="shift-detail-row">
+                  <span class="label">Date:</span
+                  ><span class="value">{{
+                    formatDate(showShiftDetail.shiftDate)
+                  }}</span>
+                </div>
+                <div class="shift-detail-row">
+                  <span class="label">Time:</span
+                  ><span class="value"
+                    >{{ showShiftDetail.startTime }} �
+                    {{ showShiftDetail.endTime }}</span
+                  >
+                </div>
+                <div class="shift-detail-row">
+                  <span class="label">Branch:</span
+                  ><span class="value">{{
+                    branchName(showShiftDetail.branchId)
+                  }}</span>
+                </div>
+                <div class="shift-detail-row">
+                  <span class="label">Status:</span
+                  ><span class="value"
+                    ><span
+                      class="badge-status"
+                      :class="schedStatusClass(showShiftDetail.status)"
+                      >{{ showShiftDetail.status }}</span
+                    ></span
+                  >
+                </div>
               </div>
             </div>
           </div>
@@ -454,25 +789,85 @@
     <!-- STAFF MODAL (MANAGER: Edit only, no branch field) -->
     <Teleport to="body">
       <div v-if="showStaffModal" class="modal-overlay">
-        <div style="position:absolute;inset:0;z-index:0;" @click="showStaffModal = false"></div>
-        <div class="modal-panel" style="position:relative;z-index:1;" @click.stop>
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+          @click="showStaffModal = false"
+        ></div>
+        <div
+          class="modal-panel"
+          style="position: relative; z-index: 1"
+          @click.stop
+        >
           <div class="modal-panel-header">
             <div>
               <h5>Edit Staff</h5>
               <div class="modal-sub">Update staff details</div>
             </div>
-            <button class="btn-close-panel" @click="showStaffModal = false">&times;</button>
+            <button class="btn-close-panel" @click="showStaffModal = false">
+              &times;
+            </button>
           </div>
           <div class="modal-panel-body">
             <div class="row g-3">
-              <div class="col-6"><label class="form-label-sm">First Name</label><input v-model="staffForm.firstName" type="text" class="form-control fc-brand" /></div>
-              <div class="col-6"><label class="form-label-sm">Last Name</label><input v-model="staffForm.lastName" type="text" class="form-control fc-brand" /></div>
-              <div class="col-6"><label class="form-label-sm">Email</label><input v-model="staffForm.email" type="email" class="form-control fc-brand" /></div>
-              <div class="col-6"><label class="form-label-sm">Phone</label><input v-model="staffForm.phone" type="text" class="form-control fc-brand" /></div>
-              <div class="col-6"><label class="form-label-sm">Position</label><input v-model="staffForm.position" type="text" class="form-control fc-brand" /></div>
-              <div class="col-6"><label class="form-label-sm">Department</label><input v-model="staffForm.department" type="text" class="form-control fc-brand" /></div>
-              <div class="col-6"><label class="form-label-sm">Hourly Rate (&#8369;)</label><input v-model="staffForm.hourlyRate" type="number" step="0.01" class="form-control fc-brand" /></div>
-              <div class="col-6"><label class="form-label-sm">Status</label>
+              <div class="col-6">
+                <label class="form-label-sm">First Name</label
+                ><input
+                  v-model="staffForm.firstName"
+                  type="text"
+                  class="form-control fc-brand"
+                />
+              </div>
+              <div class="col-6">
+                <label class="form-label-sm">Last Name</label
+                ><input
+                  v-model="staffForm.lastName"
+                  type="text"
+                  class="form-control fc-brand"
+                />
+              </div>
+              <div class="col-6">
+                <label class="form-label-sm">Email</label
+                ><input
+                  v-model="staffForm.email"
+                  type="email"
+                  class="form-control fc-brand"
+                />
+              </div>
+              <div class="col-6">
+                <label class="form-label-sm">Phone</label
+                ><input
+                  v-model="staffForm.phone"
+                  type="text"
+                  class="form-control fc-brand"
+                />
+              </div>
+              <div class="col-6">
+                <label class="form-label-sm">Position</label
+                ><input
+                  v-model="staffForm.position"
+                  type="text"
+                  class="form-control fc-brand"
+                />
+              </div>
+              <div class="col-6">
+                <label class="form-label-sm">Department</label
+                ><input
+                  v-model="staffForm.department"
+                  type="text"
+                  class="form-control fc-brand"
+                />
+              </div>
+              <div class="col-6">
+                <label class="form-label-sm">Hourly Rate (&#8369;)</label
+                ><input
+                  v-model="staffForm.hourlyRate"
+                  type="number"
+                  step="0.01"
+                  class="form-control fc-brand"
+                />
+              </div>
+              <div class="col-6">
+                <label class="form-label-sm">Status</label>
                 <select v-model="staffForm.status" class="form-select fc-brand">
                   <option value="Active">Active</option>
                   <option value="On Leave">On Leave</option>
@@ -482,9 +877,18 @@
             </div>
           </div>
           <div class="modal-panel-footer">
-            <button class="btn btn-ghost" @click="showStaffModal = false">Cancel</button>
-            <button class="btn btn-primary-brand" @click="saveStaff" :disabled="staffSaving">
-              <span v-if="staffSaving" class="spinner-border spinner-border-sm me-2"></span>
+            <button class="btn btn-ghost" @click="showStaffModal = false">
+              Cancel
+            </button>
+            <button
+              class="btn btn-primary-brand"
+              @click="saveStaff"
+              :disabled="staffSaving"
+            >
+              <span
+                v-if="staffSaving"
+                class="spinner-border spinner-border-sm me-2"
+              ></span>
               Save Changes
             </button>
           </div>
@@ -495,19 +899,46 @@
     <!-- ARCHIVE STAFF -->
     <Teleport to="body">
       <div v-if="showArchiveStaffModal" class="modal-overlay">
-        <div style="position:absolute;inset:0;z-index:0;" @click="showArchiveStaffModal = false"></div>
-        <div class="modal-panel" style="position:relative;z-index:1;max-width:420px" @click.stop>
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+          @click="showArchiveStaffModal = false"
+        ></div>
+        <div
+          class="modal-panel"
+          style="position: relative; z-index: 1; max-width: 420px"
+          @click.stop
+        >
           <div class="modal-panel-header">
             <h5>Archive Staff</h5>
-            <button class="btn-close-panel" @click="showArchiveStaffModal = false">&times;</button>
+            <button
+              class="btn-close-panel"
+              @click="showArchiveStaffModal = false"
+            >
+              &times;
+            </button>
           </div>
           <div class="modal-panel-body">
-            <p>Are you sure you want to archive <strong>{{ staffArchiveTarget?.firstName }} {{ staffArchiveTarget?.lastName }}</strong>?</p>
-            <p class="text-muted" style="font-size: 0.82rem">Archived staff cannot log in or be assigned to schedules.</p>
+            <p>
+              Are you sure you want to archive
+              <strong
+                >{{ staffArchiveTarget?.firstName }}
+                {{ staffArchiveTarget?.lastName }}</strong
+              >?
+            </p>
+            <p class="text-muted" style="font-size: 0.82rem">
+              Archived staff cannot log in or be assigned to schedules.
+            </p>
           </div>
           <div class="modal-panel-footer">
-            <button class="btn btn-ghost" @click="showArchiveStaffModal = false">Cancel</button>
-            <button class="btn btn-danger-brand" @click="confirmArchiveStaff">Archive</button>
+            <button
+              class="btn btn-ghost"
+              @click="showArchiveStaffModal = false"
+            >
+              Cancel
+            </button>
+            <button class="btn btn-danger-brand" @click="confirmArchiveStaff">
+              Archive
+            </button>
           </div>
         </div>
       </div>
@@ -516,7 +947,14 @@
     <!-- TOAST -->
     <Teleport to="body">
       <div v-if="toast.show" class="toast-wrap" :class="toast.type">
-        <i class="bi" :class="toast.type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle'"></i>
+        <i
+          class="bi"
+          :class="
+            toast.type === 'success'
+              ? 'bi-check-circle'
+              : 'bi-exclamation-circle'
+          "
+        ></i>
         {{ toast.message }}
       </div>
     </Teleport>
@@ -548,11 +986,11 @@ const tabs = [
   { key: "change", label: "Change Inquiries" },
 ];
 const leftTabs = [
-  { key: 'staff',        label: 'Staff' },
-  { key: 'availability', label: 'Requests' },
-  { key: 'history',      label: 'History' },
-  { key: 'schedule',     label: 'Schedules' },
-  { key: 'change',       label: 'Inquiries' },
+  { key: "staff", label: "Staff" },
+  { key: "availability", label: "Requests" },
+  { key: "history", label: "History" },
+  { key: "schedule", label: "Schedules" },
+  { key: "change", label: "Inquiries" },
 ];
 
 const { isAdmin, userBranchId, userBranchName, resolveBranch } =
@@ -590,13 +1028,32 @@ const staffDepartments = ref([]);
 const staffStats = computed(() => {
   const total = staffMembers.value.length;
   const active = staffMembers.value.filter((e) => e.status === "Active").length;
-  const onLeave = staffMembers.value.filter((e) => e.status === "On Leave").length;
-  const managers = staffMembers.value.filter((e) => e.position === "Manager").length;
+  const onLeave = staffMembers.value.filter(
+    (e) => e.status === "On Leave",
+  ).length;
+  const managers = staffMembers.value.filter(
+    (e) => e.position === "Manager",
+  ).length;
   return [
-    { label: "Total Staff", value: total, icon: "bi bi-people", sub: "All branches" },
-    { label: "Active", value: active, icon: "bi bi-check-circle", sub: "Currently working" },
+    {
+      label: "Total Staff",
+      value: total,
+      icon: "bi bi-people",
+      sub: "All branches",
+    },
+    {
+      label: "Active",
+      value: active,
+      icon: "bi bi-check-circle",
+      sub: "Currently working",
+    },
     { label: "On Leave", value: onLeave, icon: "bi bi-clock", sub: "On leave" },
-    { label: "Managers", value: managers, icon: "bi bi-person-badge", sub: "Management" },
+    {
+      label: "Managers",
+      value: managers,
+      icon: "bi bi-person-badge",
+      sub: "Management",
+    },
   ];
 });
 
@@ -605,10 +1062,13 @@ const filteredStaff = computed(() => {
     if (staffSearch.value) {
       const q = staffSearch.value.toLowerCase();
       const fullName = `${e.firstName} ${e.lastName}`.toLowerCase();
-      if (!fullName.includes(q) && !(e.email || "").toLowerCase().includes(q)) return false;
+      if (!fullName.includes(q) && !(e.email || "").toLowerCase().includes(q))
+        return false;
     }
-    if (staffFilterDept.value && e.department !== staffFilterDept.value) return false;
-    if (staffFilterStatus.value && e.status !== staffFilterStatus.value) return false;
+    if (staffFilterDept.value && e.department !== staffFilterDept.value)
+      return false;
+    if (staffFilterStatus.value && e.status !== staffFilterStatus.value)
+      return false;
     return true;
   });
 });
@@ -618,14 +1078,28 @@ const fetchStaff = async () => {
   try {
     const { data, error } = await supabase
       .from("employee")
-      .select("EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status")
+      .select(
+        "EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status",
+      )
       .order("EmployeeId", { ascending: false });
     if (error) throw error;
-    const branchIds = [...new Set((data || []).filter((e) => e.BranchAssigned).map((e) => e.BranchAssigned))];
+    const branchIds = [
+      ...new Set(
+        (data || [])
+          .filter((e) => e.BranchAssigned)
+          .map((e) => e.BranchAssigned),
+      ),
+    ];
     let branchMap = {};
     if (branchIds.length) {
-      const { data: bData } = await supabase.from("branch").select("BranchId, BranchName").in("BranchId", branchIds);
-      if (bData) bData.forEach((b) => { branchMap[b.BranchId] = b.BranchName; });
+      const { data: bData } = await supabase
+        .from("branch")
+        .select("BranchId, BranchName")
+        .in("BranchId", branchIds);
+      if (bData)
+        bData.forEach((b) => {
+          branchMap[b.BranchId] = b.BranchName;
+        });
     }
     staffMembers.value = (data || []).map((e) => ({
       id: e.EmployeeId,
@@ -642,7 +1116,9 @@ const fetchStaff = async () => {
       branchName: branchMap[e.BranchAssigned] || "—",
       status: e.Status || "Active",
     }));
-    const depts = [...new Set(staffMembers.value.map((e) => e.department).filter(Boolean))];
+    const depts = [
+      ...new Set(staffMembers.value.map((e) => e.department).filter(Boolean)),
+    ];
     staffDepartments.value = depts.sort();
   } catch (err) {
     console.error("[ShiftManagement] fetchStaff failed:", err);
@@ -652,12 +1128,21 @@ const fetchStaff = async () => {
 };
 
 const staffAvatarColor = (emp) => {
-  const colors = ["#7b1d1d", "#2d6a4f", "#1d4ed8", "#9333ea", "#b45309", "#0369a1"];
+  const colors = [
+    "#7b1d1d",
+    "#2d6a4f",
+    "#1d4ed8",
+    "#9333ea",
+    "#b45309",
+    "#0369a1",
+  ];
   let hash = 0;
-  for (let i = 0; i < (emp.firstName || "").length; i++) hash = emp.firstName.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < (emp.firstName || "").length; i++)
+    hash = emp.firstName.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
 };
-const staffInitials = (emp) => ((emp.firstName || "")[0] || "") + ((emp.lastName || "")[0] || "");
+const staffInitials = (emp) =>
+  ((emp.firstName || "")[0] || "") + ((emp.lastName || "")[0] || "");
 const staffStatusClass = (status) => {
   if (status === "Active") return "badge-active";
   if (status === "On Leave") return "badge-leave";
@@ -673,7 +1158,18 @@ const clearStaffFilters = () => {
 // ── Staff CRUD (manager: view/edit only) ──────────────────
 const showStaffModal = ref(false);
 const showArchiveStaffModal = ref(false);
-const staffForm = ref({ id: null, firstName: "", lastName: "", email: "", phone: "", position: "", department: "", hourlyRate: 0, branchId: "", status: "Active" });
+const staffForm = ref({
+  id: null,
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  position: "",
+  department: "",
+  hourlyRate: 0,
+  branchId: "",
+  status: "Active",
+});
 const staffArchiveTarget = ref(null);
 const staffSaving = ref(false);
 
@@ -710,7 +1206,10 @@ const saveStaff = async () => {
       BranchAssigned: staffForm.value.branchId || null,
       Status: staffForm.value.status,
     };
-    const { error } = await supabase.from("employee").update(payload).eq("EmployeeId", staffForm.value.id);
+    const { error } = await supabase
+      .from("employee")
+      .update(payload)
+      .eq("EmployeeId", staffForm.value.id);
     if (error) throw error;
     showToast("Staff updated successfully.", "success");
     showStaffModal.value = false;
@@ -724,9 +1223,15 @@ const saveStaff = async () => {
 const confirmArchiveStaff = async () => {
   if (!staffArchiveTarget.value) return;
   try {
-    const { error } = await supabase.from("employee").update({ Status: "Inactive" }).eq("EmployeeId", staffArchiveTarget.value.id);
+    const { error } = await supabase
+      .from("employee")
+      .update({ Status: "Inactive" })
+      .eq("EmployeeId", staffArchiveTarget.value.id);
     if (error) throw error;
-    showToast(`${staffArchiveTarget.value.firstName} ${staffArchiveTarget.value.lastName} has been archived.`, "success");
+    showToast(
+      `${staffArchiveTarget.value.firstName} ${staffArchiveTarget.value.lastName} has been archived.`,
+      "success",
+    );
     showArchiveStaffModal.value = false;
     staffArchiveTarget.value = null;
     await fetchStaff();
@@ -2151,9 +2656,13 @@ onMounted(async () => {
   gap: 0.3rem;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
-.left-tab-btn:hover { color: var(--brand-primary); }
+.left-tab-btn:hover {
+  color: var(--brand-primary);
+}
 .left-tab-btn.active {
   color: var(--brand-primary);
   border-bottom-color: var(--brand-primary);
@@ -2215,11 +2724,29 @@ onMounted(async () => {
   background: #fafafa;
   transition: background 0.15s;
 }
-.emp-row:hover { background: #f5f0ed; }
-.emp-row-info { flex: 1; min-width: 0; }
-.emp-row-name { font-size: 0.82rem; font-weight: 600; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.emp-row-pos  { font-size: 0.7rem; color: #6b7280; }
-.emp-row-actions { display: flex; gap: 0.2rem; }
+.emp-row:hover {
+  background: #f5f0ed;
+}
+.emp-row-info {
+  flex: 1;
+  min-width: 0;
+}
+.emp-row-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.emp-row-pos {
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+.emp-row-actions {
+  display: flex;
+  gap: 0.2rem;
+}
 
 /* Avail cards in left panel */
 .avail-card {
@@ -2235,7 +2762,10 @@ onMounted(async () => {
   align-items: flex-start;
   margin-bottom: 0.5rem;
 }
-.avail-card-info { flex: 1; min-width: 0; }
+.avail-card-info {
+  flex: 1;
+  min-width: 0;
+}
 .avail-card-actions {
   display: flex;
   align-items: center;
@@ -2259,7 +2789,9 @@ onMounted(async () => {
   border-radius: 8px;
   transition: background 0.15s;
 }
-.sched-list-card:hover { background: #f5f0ed; }
+.sched-list-card:hover {
+  background: #f5f0ed;
+}
 .sched-list-avatar {
   width: 32px;
   height: 32px;
@@ -2272,9 +2804,19 @@ onMounted(async () => {
   font-size: 0.72rem;
   flex-shrink: 0;
 }
-.sched-list-info { flex: 1; min-width: 0; }
-.sched-list-name { font-size: 0.82rem; font-weight: 600; color: #1a1a1a; }
-.sched-list-meta { font-size: 0.72rem; color: #6b7280; }
+.sched-list-info {
+  flex: 1;
+  min-width: 0;
+}
+.sched-list-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.sched-list-meta {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
 
 /* Mini stat cards */
 .mini-stat-card {
@@ -2298,8 +2840,15 @@ onMounted(async () => {
   font-size: 0.9rem;
   flex-shrink: 0;
 }
-.mini-stat-value { font-size: 1rem; font-weight: 800; color: #1a1a1a; }
-.mini-stat-label { font-size: 0.68rem; color: #6b7280; }
+.mini-stat-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1a1a1a;
+}
+.mini-stat-label {
+  font-size: 0.68rem;
+  color: #6b7280;
+}
 
 /* Empty state in left panel */
 .empty-left {
@@ -2307,8 +2856,15 @@ onMounted(async () => {
   padding: 2rem 1rem;
   color: #9ca3af;
 }
-.empty-left i { font-size: 1.8rem; display: block; margin-bottom: 0.5rem; }
-.empty-left p { font-size: 0.8rem; margin: 0; }
+.empty-left i {
+  font-size: 1.8rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.empty-left p {
+  font-size: 0.8rem;
+  margin: 0;
+}
 
 /* Responsive */
 @media (max-width: 900px) {
@@ -2360,8 +2916,14 @@ onMounted(async () => {
   max-width: 420px;
 }
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .modal-panel-header {
   display: flex;
@@ -2578,7 +3140,13 @@ onMounted(async () => {
   border-left: 4px solid #dc3545;
 }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
