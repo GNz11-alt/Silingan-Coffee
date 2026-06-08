@@ -238,18 +238,26 @@
 
           <div class="ingredient-list">
             <div v-for="(ing, i) in recipeRows" :key="i" class="ingredient-row">
-              <!-- Raw material picker -->
-              <div class="field-item">
-                <div class="select-wrap full">
-                  <select v-model="ing.rawproductid" @change="onRawProductChange(ing)">
-                    <option :value="null">Select raw material</option>
-                    <option v-for="rp in rawProducts" :key="rp.rawproductid" :value="rp.rawproductid">
-                      {{ rp.name }} ({{ rp.unit }})
-                    </option>
-                  </select>
-                  <ChevronDown :size="12" class="sel-icon" />
-                </div>
+            <!-- Raw material picker — grouped by category -->
+            <div class="field-item">
+              <div class="select-wrap full">
+                <select v-model="ing.rawproductid" @change="onRawProductChange(ing)">
+                  <option :value="null">Select raw material</option>
+                  <template v-for="cat in rawProductCategories" :key="cat">
+                    <optgroup :label="cat">
+                      <option
+                        v-for="rp in rawProductsByCategory[cat]"
+                        :key="rp.rawproductid"
+                        :value="rp.rawproductid"
+                      >
+                        {{ rp.name }} ({{ rp.unit }})
+                      </option>
+                    </optgroup>
+                  </template>
+                </select>
+                <ChevronDown :size="12" class="sel-icon" />
               </div>
+            </div>
 
               <!-- Quantity -->
               <div class="field-item">
@@ -496,6 +504,28 @@ const categories = computed(() =>
   [...new Set(menuItems.value.map(i => i.Category).filter(Boolean))].sort()
 )
 
+// ─── Grouped raw products for recipe dropdown ─────────────────────────────────
+const rawProductCategories = computed(() =>
+  [...new Set(
+    rawProducts.value
+      .filter(r => r.status !== 'Archived')
+      .map(r => r.category || 'Other')
+  )].sort()
+)
+
+const rawProductsByCategory = computed(() => {
+  const map = {}
+  rawProducts.value
+    .filter(r => r.status !== 'Archived')
+    .forEach(r => {
+      const cat = r.category || 'Other'
+      if (!map[cat]) map[cat] = []
+      map[cat].push(r)
+    })
+  Object.values(map).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name)))
+  return map
+})
+
 function getStockStatus(item) {
   if (item._recipeCount === 0) return 'no_recipe'
   const shortages = checkStockForProduct(
@@ -571,7 +601,7 @@ const recipeStockPreview = computed(() => {
 const fetchRawProducts = async () => {
   const cached = loadCache(CACHE_KEY_RAW)
   if (cached) { rawProducts.value = cached; return }
-  const { data } = await supabase.from('rawproduct').select('rawproductid, name, unit, reorderlevel, status').neq('status', 'Archived').order('name')
+  const { data } = await supabase.from('rawproduct').select('rawproductid, name, unit, reorderlevel, status, category').neq('status', 'Archived').order('name')
   if (data) { rawProducts.value = data; saveCache(CACHE_KEY_RAW, data) }
 }
 

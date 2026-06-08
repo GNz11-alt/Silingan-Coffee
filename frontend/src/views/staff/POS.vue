@@ -259,19 +259,37 @@
             <button :class="['pm-tab', paymentMethod === 'cash' ? 'active' : '']" @click="paymentMethod = 'cash'"><Banknote :size="17" /> Cash</button>
             <button :class="['pm-tab', paymentMethod === 'gcash' ? 'active' : '']" @click="paymentMethod = 'gcash'"><Smartphone :size="17" /> GCash</button>
           </div>
-          <div v-if="paymentMethod === 'cash'" class="cash-fields">
-            <label>Amount Received (₱)</label>
-            <input type="number" v-model.number="cashReceived" class="cash-input" placeholder="0.00" />
-            <button class="qa-btn exact-btn" @click="cashReceived = finalTotal">₱{{ finalTotal.toFixed(2) }} <span class="exact-label">Exact Amount</span></button>
-            <div class="cash-calc" v-if="cashReceived > 0">
-              <div class="cc-row"><span>Total Due</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
-              <div class="cc-row"><span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span></div>
-              <div class="cc-row change-row" :class="changeAmount < 0 ? 'insufficient' : 'sufficient'">
-                <span>Change</span>
-                <span>{{ changeAmount < 0 ? '-₱' + Math.abs(changeAmount).toFixed(2) : '₱' + changeAmount.toFixed(2) }}</span>
-              </div>
-            </div>
-          </div>
+<div v-if="paymentMethod === 'cash'" class="cash-fields">
+  <label>Amount Received (₱)</label>
+  <input type="number" v-model.number="cashReceived" class="cash-input" placeholder="0.00" />
+
+  <!-- Quick denomination buttons -->
+  <div class="denom-section">
+    <span class="denom-label">Quick amounts</span>
+    <div class="denom-grid">
+      <button
+        v-for="d in denominations"
+        :key="d"
+        :class="['denom-btn', cashReceived === d ? 'denom-active' : '']"
+        @click="cashReceived = d"
+      >
+        ₱{{ d >= 1000 ? (d/1000) + 'k' : d }}
+      </button>
+      <button class="denom-btn exact-denom" @click="cashReceived = finalTotal">
+        Exact
+      </button>
+    </div>
+  </div>
+
+  <div class="cash-calc" v-if="cashReceived > 0">
+    <div class="cc-row"><span>Total Due</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
+    <div class="cc-row"><span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span></div>
+    <div class="cc-row change-row" :class="changeAmount < 0 ? 'insufficient' : 'sufficient'">
+      <span>Change</span>
+      <span>{{ changeAmount < 0 ? '-₱' + Math.abs(changeAmount).toFixed(2) : '₱' + changeAmount.toFixed(2) }}</span>
+    </div>
+  </div>
+</div>
           <div v-else class="gcash-fields">
             <div class="gcash-badge"><Smartphone :size="38" /><p>GCash Payment</p><span>No change required. Confirm to complete.</span></div>
           </div>
@@ -404,6 +422,8 @@ const getBasePrice = (item) => {
   if (t === 'iced') return (sp.Regular || item.Price)?.toFixed(2) ?? '0.00'
   return item.Price?.toFixed(2) ?? '0.00'
 }
+
+const denominations = [200, 500, 1000]
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const menu          = ref([])
@@ -942,6 +962,18 @@ onMounted(async () => {
 .so-price{font-size:20px;font-weight:800;color:#C49A6C;}
 .payment-modal{background:white;border-radius:20px;width:480px;max-width:95vw;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.22);}
 .payment-view,.receipt-view{padding:26px 30px;}
+
+
+.denom-section { display: flex; flex-direction: column; gap: 7px; }
+.denom-label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+.denom-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.denom-btn { padding: 9px 6px; background: #f5f0eb; border: 1.5px solid #e8d5c4; border-radius: 9px; font-size: 13px; font-weight: 700; color: #31201D; cursor: pointer; font-family: inherit; transition: 0.15s; text-align: center; }
+.denom-btn:hover { background: #ede5d8; border-color: #c49a6c; }
+.denom-btn.denom-active { background: #31201D; color: white; border-color: #31201D; }
+.exact-denom {width:100%;background:#f0f9f0;border:1.5px solid #86efac;color:#15803d;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:700;padding:11px;border-radius:9px;cursor:pointer;font-family:inherit;transition:0.2s;}
+.exact-denom:hover {background:#dcfce7;border-color:#4ade80;}
+
+
 .pv-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;}
 .pv-header h2{font-size:21px;font-weight:700;color:#31201D;margin:0 0 3px;}
 .pv-header p{font-size:13px;color:#888;margin:0;}
@@ -955,9 +987,6 @@ onMounted(async () => {
 .cash-input{width:100%;padding:13px 15px;border:2px solid #e8e0d5;border-radius:11px;font-size:26px;font-weight:700;text-align:right;outline:none;color:#31201D;box-sizing:border-box;font-family:inherit;transition:border-color 0.2s;}
 .cash-input:focus{border-color:#31201D;}
 .qa-btn{padding:9px;background:white;border:1px solid #e8e0d5;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:0.15s;color:#31201D;}
-.exact-btn{width:100%;background:#f0f9f0;border:1.5px solid #86efac;color:#15803d;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:700;padding:11px;border-radius:9px;cursor:pointer;font-family:inherit;transition:0.2s;}
-.exact-btn:hover{background:#dcfce7;border-color:#4ade80;}
-.exact-label{font-size:11px;background:#16a34a;color:white;padding:2px 7px;border-radius:4px;font-weight:700;}
 .cash-calc{background:#f9f4ef;border-radius:11px;padding:14px;display:flex;flex-direction:column;gap:7px;}
 .cc-row{display:flex;justify-content:space-between;font-size:13px;color:#555;}
 .change-row{font-size:16px;font-weight:800;padding-top:9px;border-top:1px solid #e8e0d5;margin-top:3px;}
