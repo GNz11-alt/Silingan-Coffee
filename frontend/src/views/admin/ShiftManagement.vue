@@ -42,9 +42,12 @@
                 >{{ pendingCount }}</span
               >
               <span
-                v-if="tab.key === 'change' && inquiryPendingCount"
+                v-if="
+                  tab.key === 'change' &&
+                  inquiryPendingCount + resetPendingCount
+                "
                 class="tab-badge"
-                >{{ inquiryPendingCount }}</span
+                >{{ inquiryPendingCount + resetPendingCount }}</span
               >
             </button>
           </div>
@@ -251,8 +254,9 @@
             </div>
           </div>
 
-          <!-- ── CHANGE INQUIRIES ─────────────────── -->
+          <!-- ── CHANGE INQUIRIES + PASSWORD RESETS ─────────────────── -->
           <div v-if="activeTab === 'change'" class="left-scroll-area">
+            <!-- Section 1: Change Inquiries -->
             <div class="left-section-title mb-2">Change Inquiries</div>
             <div v-if="changeInquiries.length" class="avail-list">
               <div
@@ -269,8 +273,8 @@
                   </div>
                   <div class="avail-card-info">
                     <div class="avail-name">
-                      {{ inq.employeeName }}
-                      <span class="avail-role">{{ inq.role }}</span>
+                      {{ inq.employeeName
+                      }}<span class="avail-role">{{ inq.role }}</span>
                     </div>
                     <div class="avail-meta">
                       <strong>{{ inq.requestType }}</strong> ·
@@ -314,6 +318,72 @@
             <div v-else class="empty-left">
               <i class="bi bi-arrow-left-right"></i>
               <p>No inquiries</p>
+            </div>
+
+            <!-- Divider -->
+            <div class="reset-section-divider">
+              <i class="bi bi-key-fill"></i>
+              Password Reset Requests
+              <span v-if="resetPendingCount" class="tab-badge ms-1">{{
+                resetPendingCount
+              }}</span>
+            </div>
+
+            <!-- Section 2: Password Resets -->
+            <div v-if="resetRequests.length" class="avail-list">
+              <div
+                v-for="req in resetRequests"
+                :key="req.id"
+                class="avail-card reset-card"
+              >
+                <div class="avail-card-top">
+                  <div
+                    class="emp-avatar-sm"
+                    :style="{ background: avatarColor(req.employeeId) }"
+                  >
+                    {{ req.initials }}
+                  </div>
+                  <div class="avail-card-info">
+                    <div class="avail-name">
+                      {{ req.username
+                      }}<span class="avail-role">{{ req.role }}</span>
+                    </div>
+                    <div class="avail-meta">
+                      <i class="bi bi-clock"></i> Requested
+                      {{ formatDate(req.requestedAt) }}
+                    </div>
+                  </div>
+                </div>
+                <div class="avail-card-actions">
+                  <template v-if="req.status === 'Pending'">
+                    <span class="badge-status badge-pending">pending</span>
+                    <button
+                      class="btn-action approve"
+                      @click="openResetConfirm(req)"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      class="btn-action reject"
+                      @click="dismissResetRequest(req)"
+                    >
+                      &#10007;
+                    </button>
+                  </template>
+                  <span
+                    v-else-if="req.status === 'Resolved'"
+                    class="badge-status badge-active"
+                    >resolved</span
+                  >
+                  <span v-else class="badge-status badge-inactive"
+                    >dismissed</span
+                  >
+                </div>
+              </div>
+            </div>
+            <div v-else style="padding-top: 1rem" class="empty-left">
+              <i class="bi bi-key"></i>
+              <p>No password reset requests</p>
             </div>
           </div>
 
@@ -552,11 +622,20 @@
                   placeholder="Search staff..."
                   :disabled="employeesLoading"
                   @focus="employeeDropdownOpen = true"
-                  @keydown.down.prevent="employeeHighlightIndex < filteredEmployeeList.length - 1 ? employeeHighlightIndex++ : employeeHighlightIndex = 0"
-                  @keydown.up.prevent="employeeHighlightIndex > 0 ? employeeHighlightIndex-- : employeeHighlightIndex = filteredEmployeeList.length - 1"
+                  @keydown.down.prevent="
+                    employeeHighlightIndex < filteredEmployeeList.length - 1
+                      ? employeeHighlightIndex++
+                      : (employeeHighlightIndex = 0)
+                  "
+                  @keydown.up.prevent="
+                    employeeHighlightIndex > 0
+                      ? employeeHighlightIndex--
+                      : (employeeHighlightIndex =
+                          filteredEmployeeList.length - 1)
+                  "
                   @keydown.enter.prevent="selectEmployeeByHighlight"
                   @keydown.esc.prevent="employeeDropdownOpen = false"
-                  @blur="setTimeout(() => employeeDropdownOpen = false, 150)"
+                  @blur="setTimeout(() => (employeeDropdownOpen = false), 150)"
                 />
                 <div
                   v-if="employeeDropdownOpen && !employeesLoading"
@@ -565,7 +644,10 @@
                   <div v-if="!form.branchId" class="employee-dropdown-empty">
                     Select a branch first
                   </div>
-                  <div v-else-if="!filteredEmployeeList.length" class="employee-dropdown-empty">
+                  <div
+                    v-else-if="!filteredEmployeeList.length"
+                    class="employee-dropdown-empty"
+                  >
                     No staff found for this branch
                   </div>
                   <div
@@ -577,7 +659,9 @@
                     @mouseenter="employeeHighlightIndex = i"
                   >
                     <span>{{ e.name }}</span>
-                    <span class="text-muted" style="font-size: 0.75rem;">{{ e.position }}</span>
+                    <span class="text-muted" style="font-size: 0.75rem">{{
+                      e.position
+                    }}</span>
                   </div>
                 </div>
                 <div v-if="errors.employeeId" class="text-danger small mt-1">
@@ -992,6 +1076,78 @@
       </div>
     </Teleport>
 
+    <!-- PASSWORD RESET CONFIRM MODAL -->
+    <Teleport to="body">
+      <div v-if="showResetConfirm" class="modal-overlay">
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+          @click="showResetConfirm = false"
+        ></div>
+        <div
+          class="modal-panel modal-panel--sm"
+          style="position: relative; z-index: 1"
+          @click.stop
+        >
+          <div class="modal-panel-header">
+            <h5 class="mb-0">Reset Password</h5>
+            <button class="btn-close-panel" @click="showResetConfirm = false">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="modal-panel-body">
+            <p>
+              You are about to reset the password for
+              <strong>{{ resetTarget?.username }}</strong>
+              to the default password for their role (<strong>{{
+                resetTarget?.role === "staff" ? "Staff@1234" : "Manager@1234"
+              }}</strong
+              >).
+            </p>
+            <p class="text-muted mb-3" style="font-size: 0.82rem">
+              Please enter your admin password to confirm.
+            </p>
+            <div class="input-group-modal">
+              <input
+                :type="showResetAdminPw ? 'text' : 'password'"
+                v-model="resetAdminPassword"
+                class="form-control fc-brand"
+                placeholder="Your admin password"
+                @keydown.enter="confirmReset"
+              />
+              <button
+                type="button"
+                class="pw-toggle-btn"
+                @click="showResetAdminPw = !showResetAdminPw"
+              >
+                <i
+                  :class="showResetAdminPw ? 'bi bi-eye-slash' : 'bi bi-eye'"
+                ></i>
+              </button>
+            </div>
+            <p v-if="resetConfirmError" class="text-danger small mt-2">
+              {{ resetConfirmError }}
+            </p>
+          </div>
+          <div class="modal-panel-footer">
+            <button class="btn btn-ghost" @click="showResetConfirm = false">
+              Cancel
+            </button>
+            <button
+              class="btn btn-primary-brand"
+              @click="confirmReset"
+              :disabled="resetSaving"
+            >
+              <span
+                v-if="resetSaving"
+                class="spinner-border spinner-border-sm me-1"
+              ></span>
+              Confirm Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- TOAST -->
     <Teleport to="body">
       <div v-if="toast.show" class="toast-wrap" :class="toast.type">
@@ -1221,6 +1377,182 @@ const CACHE_KEY_EMPLOYEES_SCHED = "cache_admin_sched_employees";
 const CACHE_KEY_INQUIRIES = "cache_admin_inquiries";
 const CACHE_KEY_STAFF = "cache_admin_staff";
 const CACHE_TTL = 30 * 60 * 1000;
+
+// ── Password Reset Requests ───────────────────────────────
+const CACHE_KEY_RESET_REQUESTS = "cache_admin_reset_requests";
+const resetRequests = ref([]);
+const showResetConfirm = ref(false);
+const resetTarget = ref(null);
+const resetAdminPassword = ref("");
+const showResetAdminPw = ref(false);
+const resetConfirmError = ref("");
+const resetSaving = ref(false);
+
+const resetPendingCount = computed(
+  () => resetRequests.value.filter((r) => r.status === "Pending").length,
+);
+
+const fetchResetRequests = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_RESET_REQUESTS);
+    if (cached) {
+      resetRequests.value = cached;
+      return;
+    }
+  }
+  const { data, error } = await supabase
+    .from("passwordresetrequests")
+    .select("*")
+    .order("requested_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error("[ShiftManagement] fetchResetRequests failed:", error);
+    return;
+  }
+
+  resetRequests.value = (data || []).map((r) => ({
+    id: r.id,
+    employeeId: r.employee_id,
+    username: r.username,
+    role: r.role,
+    status: r.status,
+    requestedAt: r.requested_at,
+    resolvedAt: r.resolved_at,
+    resolvedBy: r.resolved_by,
+    // Build initials from username e.g. "jose.cruz" → "JC"
+    initials:
+      r.username
+        .split(".")
+        .map((p) => (p[0] || "").toUpperCase())
+        .join("")
+        .slice(0, 2) || "?",
+  }));
+
+  saveCache(CACHE_KEY_RESET_REQUESTS, resetRequests.value);
+};
+
+const openResetConfirm = (req) => {
+  resetTarget.value = req;
+  resetAdminPassword.value = "";
+  resetConfirmError.value = "";
+  showResetAdminPw.value = false;
+  showResetConfirm.value = true;
+};
+
+const confirmReset = async () => {
+  resetConfirmError.value = "";
+
+  if (!resetAdminPassword.value) {
+    resetConfirmError.value = "Please enter your admin password.";
+    return;
+  }
+
+  resetSaving.value = true;
+
+  try {
+    // Hash the entered admin password and verify against DB
+    const encoder = new TextEncoder();
+    const data = encoder.encode(resetAdminPassword.value);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashedInput = hashArray
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    const adminUsername = localStorage.getItem("username");
+    const { data: adminUser, error: adminErr } = await supabase
+      .from("users")
+      .select("id, password, role")
+      .eq("username", adminUsername)
+      .maybeSingle();
+
+    if (adminErr || !adminUser) {
+      resetConfirmError.value = "Could not verify admin account.";
+      return;
+    }
+
+    if (adminUser.role !== "admin") {
+      resetConfirmError.value = "Only admins can reset passwords.";
+      return;
+    }
+
+    if (adminUser.password !== hashedInput) {
+      resetConfirmError.value = "Incorrect password. Please try again.";
+      return;
+    }
+
+    // Determine default password based on target role
+    const defaultPassword =
+      resetTarget.value.role === "staff" ? "Staff@1234" : "Manager@1234";
+
+    // Hash the default password
+    const defaultData = encoder.encode(defaultPassword);
+    const defaultHashBuffer = await crypto.subtle.digest(
+      "SHA-256",
+      defaultData,
+    );
+    const defaultHashArray = Array.from(new Uint8Array(defaultHashBuffer));
+    const hashedDefault = defaultHashArray
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    // Update the user's password
+    const { error: updateErr } = await supabase
+      .from("users")
+      .update({ password: hashedDefault })
+      .eq("username", resetTarget.value.username);
+
+    if (updateErr) throw updateErr;
+
+    // Mark the request as resolved
+    const now = new Date().toISOString();
+    const { error: resolveErr } = await supabase
+      .from("passwordresetrequests")
+      .update({
+        status: "Resolved",
+        resolved_at: now,
+        resolved_by: adminUsername,
+      })
+      .eq("id", resetTarget.value.id);
+
+    if (resolveErr) throw resolveErr;
+
+    sessionStorage.removeItem(CACHE_KEY_RESET_REQUESTS);
+    showResetConfirm.value = false;
+    resetTarget.value = null;
+    showToast(
+      `Password reset to default for ${resetTarget?.value?.username || "user"}.`,
+      "success",
+    );
+    await fetchResetRequests(true);
+  } catch (err) {
+    console.error("[ShiftManagement] confirmReset failed:", err);
+    resetConfirmError.value = "Something went wrong. Please try again.";
+  } finally {
+    resetSaving.value = false;
+  }
+};
+
+const dismissResetRequest = async (req) => {
+  const { error } = await supabase
+    .from("passwordresetrequests")
+    .update({
+      status: "Dismissed",
+      resolved_at: new Date().toISOString(),
+      resolved_by: localStorage.getItem("username") || "admin",
+    })
+    .eq("id", req.id);
+
+  if (error) {
+    showToast("Failed to dismiss request.", "error");
+    return;
+  }
+
+  sessionStorage.removeItem(CACHE_KEY_RESET_REQUESTS);
+  showToast("Request dismissed.", "success");
+  await fetchResetRequests(true);
+};
 
 const roles = [
   "Barista",
@@ -1738,7 +2070,10 @@ const selectEmployeeByHighlight = () => {
 const switchTab = (key) => {
   if (activeTab.value !== key) fadingIds.value = new Set();
   activeTab.value = key;
-  if (key === "change") fetchChangeInquiries();
+  if (key === "change") {
+    fetchChangeInquiries();
+    fetchResetRequests();
+  }
   if (key === "availability") fetchAvailability();
   if (key === "schedule") fetchSchedules();
 };
@@ -2131,6 +2466,7 @@ onMounted(async () => {
       CACHE_KEY_EMPLOYEES_SCHED,
       CACHE_KEY_INQUIRIES,
       CACHE_KEY_STAFF,
+      CACHE_KEY_RESET_REQUESTS,
     ].forEach((k) => sessionStorage.removeItem(k));
   }
 
@@ -2141,6 +2477,7 @@ onMounted(async () => {
     fetchAvailability(),
     fetchSchedules(),
     fetchChangeInquiries(),
+    fetchResetRequests(),
   ]);
   isLoading.value = false;
 });
@@ -2205,6 +2542,29 @@ onMounted(async () => {
   text-align: center;
 }
 
+.input-group-modal {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-group-modal .form-control {
+  padding-right: 40px;
+}
+.pw-toggle-btn {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+.pw-toggle-btn:hover {
+  color: #1a1a1a;
+}
 .section-title {
   font-size: 0.9rem;
   font-weight: 700;
@@ -3081,7 +3441,7 @@ onMounted(async () => {
   border-radius: 6px;
   max-height: 220px;
   overflow-y: auto;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   margin-top: 2px;
 }
 .employee-dropdown-empty {
@@ -3298,5 +3658,29 @@ onMounted(async () => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+.reset-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #5d4037;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 1rem 0 0.6rem;
+  padding: 0.5rem 0.6rem;
+  background: #f5ede8;
+  border-radius: 6px;
+  border-left: 3px solid #7b1d1d;
+}
+
+.reset-card {
+  border-left: 3px solid #7b4f3a;
+  background: #fdf8f6;
+}
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
 }
 </style>

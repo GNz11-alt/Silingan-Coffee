@@ -10,7 +10,8 @@
       <p class="brand-subtitle">Management System</p>
     </div>
 
-    <div class="login-card">
+    <!-- ── LOGIN CARD ─────────────────────────────────────── -->
+    <div class="login-card" v-if="!showForgotPassword">
       <div class="login-header">
         <h2 class="welcome-title">Welcome Back</h2>
         <p class="welcome-subtitle">
@@ -110,7 +111,99 @@
           <span v-if="isLoading">Signing in...</span>
           <span v-else>Sign In</span>
         </button>
+
+        <!-- Forgot Password Link -->
+        <div class="forgot-password-wrap">
+          <button
+            type="button"
+            class="forgot-password-link"
+            @click="openForgotPassword"
+          >
+            Forgot your password?
+          </button>
+        </div>
       </form>
+    </div>
+
+    <!-- ── FORGOT PASSWORD CARD ────────────────────────────── -->
+    <div class="login-card" v-else>
+      <div class="login-header">
+        <h2 class="welcome-title">Forgot Password</h2>
+        <p class="welcome-subtitle">
+          Enter your username to request a password reset from your admin.
+        </p>
+      </div>
+
+      <!-- Success state -->
+      <div v-if="forgotSuccess" class="forgot-success">
+        <div class="forgot-success-icon">
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#27ae60"
+            stroke-width="2"
+          >
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </div>
+        <p class="forgot-success-msg">
+          Your password reset request has been submitted. Please wait for your
+          admin or manager to reset it for you.
+        </p>
+        <button class="login-btn" @click="closeForgotPassword">
+          Back to Sign In
+        </button>
+      </div>
+
+      <!-- Request form -->
+      <div v-else class="login-form">
+        <div class="form-group">
+          <div class="input-group">
+            <span class="input-icon">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </span>
+            <input
+              type="text"
+              v-model="forgotUsername"
+              placeholder="Enter your username"
+            />
+          </div>
+        </div>
+
+        <p v-if="forgotError" class="error-message">{{ forgotError }}</p>
+
+        <button
+          class="login-btn"
+          :disabled="forgotLoading"
+          @click="submitForgotPassword"
+        >
+          <span v-if="forgotLoading">Submitting...</span>
+          <span v-else>Submit Request</span>
+        </button>
+
+        <div class="forgot-password-wrap">
+          <button
+            type="button"
+            class="forgot-password-link"
+            @click="closeForgotPassword"
+          >
+            Back to Sign In
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -125,6 +218,13 @@ const password = ref("");
 const isLoading = ref(false);
 const errorMessage = ref("");
 const showPassword = ref(false);
+
+// Forgot password state
+const showForgotPassword = ref(false);
+const forgotUsername = ref("");
+const forgotError = ref("");
+const forgotLoading = ref(false);
+const forgotSuccess = ref(false);
 
 const rules = reactive({
   length: false,
@@ -198,7 +298,7 @@ const handleLogin = async () => {
   }
 
   // Block archived employees from logging in
-  const { data: employee, error: empError } = await supabase
+  const { data: employee } = await supabase
     .from("employee")
     .select("Status")
     .eq("EmployeeId", data.employee_id)
@@ -229,6 +329,88 @@ const handleLogin = async () => {
     router.push("/manager/dashboard");
   } else if (data.role === "staff") {
     router.push("/staff/dashboard");
+  }
+};
+
+// ── Forgot Password ───────────────────────────────────────
+const openForgotPassword = () => {
+  forgotUsername.value = "";
+  forgotError.value = "";
+  forgotSuccess.value = false;
+  showForgotPassword.value = true;
+};
+
+const closeForgotPassword = () => {
+  showForgotPassword.value = false;
+  forgotUsername.value = "";
+  forgotError.value = "";
+  forgotSuccess.value = false;
+};
+
+const submitForgotPassword = async () => {
+  forgotError.value = "";
+  const uname = forgotUsername.value.trim().toLowerCase();
+
+  if (!uname) {
+    forgotError.value = "Please enter your username.";
+    return;
+  }
+
+  forgotLoading.value = true;
+
+  try {
+    // Look up the user
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("id, username, role, employee_id, status")
+      .eq("username", uname)
+      .maybeSingle();
+
+    if (userError || !userData) {
+      forgotError.value = "Username not found. Please check and try again.";
+      return;
+    }
+
+    if (userData.status === "archived") {
+      forgotError.value = "This account has been deactivated.";
+      return;
+    }
+
+    // Check if there's already a pending request for this user
+    const { data: existing } = await supabase
+      .from("passwordresetrequests")
+      .select("id")
+      .eq("employee_id", userData.employee_id)
+      .eq("status", "Pending")
+      .maybeSingle();
+
+    if (existing) {
+      forgotError.value =
+        "You already have a pending reset request. Please wait for your admin to process it.";
+      return;
+    }
+
+    // Insert the reset request
+    const { error: insertError } = await supabase
+      .from("passwordresetrequests")
+      .insert([
+        {
+          employee_id: userData.employee_id,
+          username: userData.username,
+          role: userData.role,
+          status: "Pending",
+          requested_at: new Date().toISOString(),
+        },
+      ]);
+
+    if (insertError) throw insertError;
+
+    forgotSuccess.value = true;
+  } catch (err) {
+    forgotError.value = "Something went wrong. Please try again.";
+    console.error("[ForgotPassword]", err);
+  } finally {
+    forgotLoading.value = false;
   }
 };
 </script>
@@ -294,14 +476,6 @@ const handleLogin = async () => {
 
 input::-ms-reveal,
 input::-ms-clear {
-  display: none;
-}
-
-input::-webkit-credentials-auto-fill-button {
-  display: none;
-}
-
-input[type="password"]::-ms-reveal {
   display: none;
 }
 
@@ -391,32 +565,6 @@ input[type="password"]::-ms-reveal {
   opacity: 1;
 }
 
-.password-rules {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.rule {
-  font-size: 12px;
-  color: #c0392b;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: color 0.2s;
-}
-
-.rule.met {
-  color: #27ae60;
-}
-
-.rule-icon {
-  font-size: 11px;
-  font-weight: 700;
-  width: 14px;
-}
-
 .error-message {
   color: #c0392b;
   font-size: 13px;
@@ -435,7 +583,6 @@ input[type="password"]::-ms-reveal {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-top: 10px;
   letter-spacing: 0.5px;
 }
 
@@ -452,6 +599,55 @@ input[type="password"]::-ms-reveal {
 .login-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+/* Forgot password link */
+.forgot-password-wrap {
+  text-align: center;
+  margin-top: -8px;
+}
+
+.forgot-password-link {
+  background: none;
+  border: none;
+  color: #532f15;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  opacity: 0.75;
+  transition: opacity 0.2s;
+}
+
+.forgot-password-link:hover {
+  opacity: 1;
+}
+
+/* Success state */
+.forgot-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.forgot-success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  background: #eafaf1;
+  border-radius: 50%;
+}
+
+.forgot-success-msg {
+  font-size: 14px;
+  color: #532f15;
+  line-height: 1.6;
+  margin: 0;
 }
 
 @media (max-width: 480px) {

@@ -42,9 +42,12 @@
                 >{{ pendingCount }}</span
               >
               <span
-                v-if="tab.key === 'change' && inquiryPendingCount"
+                v-if="
+                  tab.key === 'change' &&
+                  inquiryPendingCount + resetPendingCount
+                "
                 class="tab-badge"
-                >{{ inquiryPendingCount }}</span
+                >{{ inquiryPendingCount + resetPendingCount }}</span
               >
             </button>
           </div>
@@ -313,6 +316,72 @@
               <i class="bi bi-arrow-left-right"></i>
               <p>No inquiries</p>
             </div>
+
+            <!-- Divider -->
+            <div class="reset-section-divider">
+              <i class="bi bi-key-fill"></i>
+              Password Reset Requests
+              <span v-if="resetPendingCount" class="tab-badge ms-1">{{
+                resetPendingCount
+              }}</span>
+            </div>
+
+            <!-- Section 2: Password Resets -->
+            <div v-if="resetRequests.length" class="avail-list">
+              <div
+                v-for="req in resetRequests"
+                :key="req.id"
+                class="avail-card reset-card"
+              >
+                <div class="avail-card-top">
+                  <div
+                    class="emp-avatar-sm"
+                    :style="{ background: avatarColor(req.employeeId) }"
+                  >
+                    {{ req.initials }}
+                  </div>
+                  <div class="avail-card-info">
+                    <div class="avail-name">
+                      {{ req.username
+                      }}<span class="avail-role">{{ req.role }}</span>
+                    </div>
+                    <div class="avail-meta">
+                      <i class="bi bi-clock"></i> Requested
+                      {{ formatDate(req.requestedAt) }}
+                    </div>
+                  </div>
+                </div>
+                <div class="avail-card-actions">
+                  <template v-if="req.status === 'Pending'">
+                    <span class="badge-status badge-pending">pending</span>
+                    <button
+                      class="btn-action approve"
+                      @click="openResetConfirm(req)"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      class="btn-action reject"
+                      @click="dismissResetRequest(req)"
+                    >
+                      &#10007;
+                    </button>
+                  </template>
+                  <span
+                    v-else-if="req.status === 'Resolved'"
+                    class="badge-status badge-active"
+                    >resolved</span
+                  >
+                  <span v-else class="badge-status badge-inactive"
+                    >dismissed</span
+                  >
+                </div>
+              </div>
+            </div>
+            <div v-else style="padding-top: 1rem" class="empty-left">
+              <i class="bi bi-key"></i>
+              <p>No password reset requests</p>
+            </div>
           </div>
 
           <!-- -- SCHEDULE TABLE (left overflow) ---- -->
@@ -500,8 +569,11 @@
               <h5 class="mb-0">
                 {{ isEditing ? "Edit Schedule" : "Create Schedule" }}
               </h5>
-              <p class="modal-sub mb-0" style="margin-top:2px">
-                Branch: <strong>{{ userBranchName || branchName(form.branchId) || "—" }}</strong>
+              <p class="modal-sub mb-0" style="margin-top: 2px">
+                Branch:
+                <strong>{{
+                  userBranchName || branchName(form.branchId) || "—"
+                }}</strong>
               </p>
             </div>
             <button class="btn-close-panel" @click="closeModal">
@@ -512,20 +584,25 @@
             <div class="row g-3">
               <div class="col-12">
                 <label class="form-label-sm">Staff</label>
-                <div class="staff-search-wrap" style="position:relative">
+                <div class="staff-search-wrap" style="position: relative">
                   <input
                     ref="staffSearchInputRef"
                     v-model="staffSearchText"
                     type="text"
                     class="form-control fc-brand"
-                    :placeholder="employeesLoading ? 'Loading staff…' : 'Search staff...'"
+                    :placeholder="
+                      employeesLoading ? 'Loading staff…' : 'Search staff...'
+                    "
                     :disabled="employeesLoading"
                     @focus="onStaffSearchFocus"
                     @blur="onStaffSearchBlur"
                     @input="onStaffSearchInput"
                     @keydown="onStaffSearchKeydown"
                   />
-                  <ul v-if="staffDropdownOpen && filteredEmployeeList.length" class="staff-dropdown">
+                  <ul
+                    v-if="staffDropdownOpen && filteredEmployeeList.length"
+                    class="staff-dropdown"
+                  >
                     <li
                       v-for="(e, i) in filteredEmployeeList"
                       :key="e.id"
@@ -536,7 +613,14 @@
                       {{ e.name }}
                     </li>
                   </ul>
-                  <ul v-else-if="staffDropdownOpen && staffSearchText && !filteredEmployeeList.length" class="staff-dropdown">
+                  <ul
+                    v-else-if="
+                      staffDropdownOpen &&
+                      staffSearchText &&
+                      !filteredEmployeeList.length
+                    "
+                    class="staff-dropdown"
+                  >
                     <li class="no-match">No staff found</li>
                   </ul>
                 </div>
@@ -934,6 +1018,77 @@
       </div>
     </Teleport>
 
+    <!-- PASSWORD RESET CONFIRM MODAL -->
+    <Teleport to="body">
+      <div v-if="showResetConfirm" class="modal-overlay">
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+          @click="showResetConfirm = false"
+        ></div>
+        <div
+          class="modal-panel modal-panel--sm"
+          style="position: relative; z-index: 1"
+          @click.stop
+        >
+          <div class="modal-panel-header">
+            <h5 class="mb-0">Reset Password</h5>
+            <button class="btn-close-panel" @click="showResetConfirm = false">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="modal-panel-body">
+            <p>
+              You are about to reset the password for
+              <strong>{{ resetTarget?.username }}</strong>
+              to the default password for their role (<strong>{{
+                resetTarget?.role === "staff" ? "Staff@1234" : "Manager@1234"
+              }}</strong
+              >).
+            </p>
+            <p class="text-muted mb-3" style="font-size: 0.82rem">
+              Please enter your manager password to confirm.
+            </p>
+            <div class="input-group-modal">
+              <input
+                :type="showResetAdminPw ? 'text' : 'password'"
+                v-model="resetAdminPassword"
+                class="form-control fc-brand"
+                placeholder="Your password"
+                @keydown.enter="confirmReset"
+              />
+              <button
+                type="button"
+                class="pw-toggle-btn"
+                @click="showResetAdminPw = !showResetAdminPw"
+              >
+                <i
+                  :class="showResetAdminPw ? 'bi bi-eye-slash' : 'bi bi-eye'"
+                ></i>
+              </button>
+            </div>
+            <p v-if="resetConfirmError" class="text-danger small mt-2">
+              {{ resetConfirmError }}
+            </p>
+          </div>
+          <div class="modal-panel-footer">
+            <button class="btn btn-ghost" @click="showResetConfirm = false">
+              Cancel
+            </button>
+            <button
+              class="btn btn-primary-brand"
+              @click="confirmReset"
+              :disabled="resetSaving"
+            >
+              <span
+                v-if="resetSaving"
+                class="spinner-border spinner-border-sm me-1"
+              ></span>
+              Confirm Reset
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
     <!-- TOAST -->
     <Teleport to="body">
       <div v-if="toast.show" class="toast-wrap" :class="toast.type">
@@ -1047,6 +1202,19 @@ const staffStats = computed(() => {
   ];
 });
 
+const CACHE_KEY_RESET_REQUESTS = "cache_mgr_reset_requests";
+const resetRequests = ref([]);
+const showResetConfirm = ref(false);
+const resetTarget = ref(null);
+const resetAdminPassword = ref("");
+const showResetAdminPw = ref(false);
+const resetConfirmError = ref("");
+const resetSaving = ref(false);
+
+const resetPendingCount = computed(
+  () => resetRequests.value.filter((r) => r.status === "Pending").length,
+);
+
 const filteredStaff = computed(() => {
   return staffMembers.value.filter((e) => {
     if (staffSearch.value) {
@@ -1074,7 +1242,9 @@ const fetchStaff = async () => {
     if (managerBranchId.value) {
       query = query.eq("BranchAssigned", managerBranchId.value);
     }
-    const { data, error } = await query.order("EmployeeId", { ascending: false });
+    const { data, error } = await query.order("EmployeeId", {
+      ascending: false,
+    });
     if (error) throw error;
     const branchIds = [
       ...new Set(
@@ -1293,7 +1463,7 @@ const emptyForm = () => ({
 });
 const form = ref(emptyForm());
 
-const staffSearchText = ref('');
+const staffSearchText = ref("");
 const staffDropdownOpen = ref(false);
 const staffHighlightIndex = ref(-1);
 const staffSearchInputRef = ref(null);
@@ -1610,6 +1780,173 @@ const fetchChangeInquiries = async (force = false) => {
   }
 };
 
+const fetchResetRequests = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_RESET_REQUESTS);
+    if (cached) {
+      resetRequests.value = cached;
+      return;
+    }
+  }
+
+  // Only fetch reset requests for employees in the manager's branch
+  const { data: branchEmps } = await supabase
+    .from("employee")
+    .select("EmployeeId")
+    .eq("BranchAssigned", managerBranchId.value);
+
+  const empIds = (branchEmps || []).map((e) => e.EmployeeId);
+
+  if (!empIds.length) {
+    resetRequests.value = [];
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("passwordresetrequests")
+    .select("*")
+    .in("employee_id", empIds)
+    .order("requested_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error("[ShiftManagement] fetchResetRequests failed:", error);
+    return;
+  }
+
+  resetRequests.value = (data || []).map((r) => ({
+    id: r.id,
+    employeeId: r.employee_id,
+    username: r.username,
+    role: r.role,
+    status: r.status,
+    requestedAt: r.requested_at,
+    resolvedAt: r.resolved_at,
+    resolvedBy: r.resolved_by,
+    initials:
+      r.username
+        .split(".")
+        .map((p) => (p[0] || "").toUpperCase())
+        .join("")
+        .slice(0, 2) || "?",
+  }));
+
+  saveCache(CACHE_KEY_RESET_REQUESTS, resetRequests.value);
+};
+
+const openResetConfirm = (req) => {
+  resetTarget.value = req;
+  resetAdminPassword.value = "";
+  resetConfirmError.value = "";
+  showResetAdminPw.value = false;
+  showResetConfirm.value = true;
+};
+
+const confirmReset = async () => {
+  resetConfirmError.value = "";
+
+  if (!resetAdminPassword.value) {
+    resetConfirmError.value = "Please enter your password.";
+    return;
+  }
+
+  resetSaving.value = true;
+
+  try {
+    const encoder = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(resetAdminPassword.value),
+    );
+    const hashedInput = Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    const managerUsername = localStorage.getItem("username");
+    const { data: managerUser, error: managerErr } = await supabase
+      .from("users")
+      .select("id, password, role")
+      .eq("username", managerUsername)
+      .maybeSingle();
+
+    if (managerErr || !managerUser) {
+      resetConfirmError.value = "Could not verify your account.";
+      return;
+    }
+
+    if (!["admin", "manager"].includes(managerUser.role)) {
+      resetConfirmError.value =
+        "You do not have permission to reset passwords.";
+      return;
+    }
+
+    if (managerUser.password !== hashedInput) {
+      resetConfirmError.value = "Incorrect password. Please try again.";
+      return;
+    }
+
+    const defaultPassword =
+      resetTarget.value.role === "staff" ? "Staff@1234" : "Manager@1234";
+    const defaultHashBuffer = await crypto.subtle.digest(
+      "SHA-256",
+      encoder.encode(defaultPassword),
+    );
+    const hashedDefault = Array.from(new Uint8Array(defaultHashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    const { error: updateErr } = await supabase
+      .from("users")
+      .update({ password: hashedDefault })
+      .eq("username", resetTarget.value.username);
+
+    if (updateErr) throw updateErr;
+
+    const now = new Date().toISOString();
+    const { error: resolveErr } = await supabase
+      .from("passwordresetrequests")
+      .update({
+        status: "Resolved",
+        resolved_at: now,
+        resolved_by: managerUsername,
+      })
+      .eq("id", resetTarget.value.id);
+
+    if (resolveErr) throw resolveErr;
+
+    sessionStorage.removeItem(CACHE_KEY_RESET_REQUESTS);
+    showResetConfirm.value = false;
+    showToast(`Password reset for ${resetTarget.value.username}.`, "success");
+    resetTarget.value = null;
+    await fetchResetRequests(true);
+  } catch (err) {
+    console.error("[ShiftManagement] confirmReset failed:", err);
+    resetConfirmError.value = "Something went wrong. Please try again.";
+  } finally {
+    resetSaving.value = false;
+  }
+};
+
+const dismissResetRequest = async (req) => {
+  const { error } = await supabase
+    .from("passwordresetrequests")
+    .update({
+      status: "Dismissed",
+      resolved_at: new Date().toISOString(),
+      resolved_by: localStorage.getItem("username") || "manager",
+    })
+    .eq("id", req.id);
+
+  if (error) {
+    showToast("Failed to dismiss request.", "error");
+    return;
+  }
+
+  sessionStorage.removeItem(CACHE_KEY_RESET_REQUESTS);
+  showToast("Request dismissed.", "success");
+  await fetchResetRequests(true);
+};
+
 const fetchSchedules = async (force = false) => {
   if (!force) {
     const cached = loadCache(CACHE_KEY_SCHEDULES);
@@ -1665,9 +2002,9 @@ const filteredEmployeeList = computed(() => {
 });
 
 const selectedEmployeeName = computed(() => {
-  if (!form.value.employeeId) return '';
+  if (!form.value.employeeId) return "";
   const emp = employeeList.value.find((e) => e.id === form.value.employeeId);
-  return emp ? emp.name : '';
+  return emp ? emp.name : "";
 });
 
 const selectStaff = (emp) => {
@@ -1695,30 +2032,33 @@ const onStaffSearchInput = () => {
   staffDropdownOpen.value = true;
   staffHighlightIndex.value = -1;
   if (!staffSearchText.value && form.value.employeeId) {
-    form.value.employeeId = '';
+    form.value.employeeId = "";
   }
 };
 
 const onStaffSearchKeydown = (e) => {
   const items = filteredEmployeeList.value;
-  if (e.key === 'ArrowDown') {
+  if (e.key === "ArrowDown") {
     e.preventDefault();
     staffHighlightIndex.value =
       staffHighlightIndex.value < items.length - 1
         ? staffHighlightIndex.value + 1
         : 0;
-  } else if (e.key === 'ArrowUp') {
+  } else if (e.key === "ArrowUp") {
     e.preventDefault();
     staffHighlightIndex.value =
       staffHighlightIndex.value > 0
         ? staffHighlightIndex.value - 1
         : items.length - 1;
-  } else if (e.key === 'Enter') {
+  } else if (e.key === "Enter") {
     e.preventDefault();
-    if (staffHighlightIndex.value >= 0 && staffHighlightIndex.value < items.length) {
+    if (
+      staffHighlightIndex.value >= 0 &&
+      staffHighlightIndex.value < items.length
+    ) {
       selectStaff(items[staffHighlightIndex.value]);
     }
-  } else if (e.key === 'Escape') {
+  } else if (e.key === "Escape") {
     staffDropdownOpen.value = false;
     staffHighlightIndex.value = -1;
   }
@@ -1727,7 +2067,10 @@ const onStaffSearchKeydown = (e) => {
 const switchTab = (key) => {
   if (activeTab.value !== key) fadingIds.value = new Set();
   activeTab.value = key;
-  if (key === "change") fetchChangeInquiries(true);
+  if (key === "change") {
+    fetchChangeInquiries(true);
+    fetchResetRequests(true);
+  }
   if (key === "availability") fetchAvailability(true);
   if (key === "schedule") fetchSchedules(true);
 };
@@ -2093,10 +2436,12 @@ watch(showModal, (val) => {
   if (val) {
     nextTick(() => {
       if (form.value.employeeId) {
-        const emp = employeeList.value.find((e) => e.id === form.value.employeeId);
-        staffSearchText.value = emp ? emp.name : '';
+        const emp = employeeList.value.find(
+          (e) => e.id === form.value.employeeId,
+        );
+        staffSearchText.value = emp ? emp.name : "";
       } else {
-        staffSearchText.value = '';
+        staffSearchText.value = "";
       }
       staffDropdownOpen.value = false;
       staffHighlightIndex.value = -1;
@@ -2117,6 +2462,7 @@ onMounted(async () => {
       CACHE_KEY_BRANCHES,
       CACHE_KEY_EMPLOYEES,
       CACHE_KEY_INQUIRIES,
+      CACHE_KEY_RESET_REQUESTS,
     ].forEach((k) => sessionStorage.removeItem(k));
   }
 
@@ -2138,6 +2484,7 @@ onMounted(async () => {
     fetchAvailability(),
     fetchSchedules(),
     fetchChangeInquiries(),
+    fetchResetRequests(),
   ]);
   isLoading.value = false;
 });
@@ -3261,5 +3608,47 @@ onMounted(async () => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+.input-group-modal {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-group-modal .form-control {
+  padding-right: 40px;
+}
+.pw-toggle-btn {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+.pw-toggle-btn:hover {
+  color: #1a1a1a;
+}
+.reset-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #5d4037;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 1rem 0 0.6rem;
+  padding: 0.5rem 0.6rem;
+  background: #f5ede8;
+  border-radius: 6px;
+  border-left: 3px solid #7b1d1d;
+}
+.reset-card {
+  border-left: 3px solid #7b4f3a;
+  background: #fdf8f6;
 }
 </style>
