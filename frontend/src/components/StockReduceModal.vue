@@ -233,10 +233,6 @@ const confirm = async () => {
   if (!form.value.quantity || form.value.quantity <= 0) e.quantity = 'Enter a valid quantity.'
   if (form.value.quantity > (selectedItem.value?.stockquantity ?? 0)) e.quantity = 'Cannot reduce more than current stock.'
   errors.value = e
-  if (reduceQty > item.stockquantity) {
-  setError(`Cannot reduce more than current stock (${item.stockquantity} ${item.unit})`);
-  return;
-}
   if (Object.keys(e).length > 0) return
 
   saving.value = true
