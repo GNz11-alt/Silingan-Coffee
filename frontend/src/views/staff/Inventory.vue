@@ -349,17 +349,10 @@
           <div class="form-row">
             <div class="form-group">
               <label>Category</label>
-              <select v-model="newItemForm.category">
-                <option value="">Select</option>
-                <option value="Coffee Beans">Coffee Beans</option>
-                <option value="Dairy">Dairy</option>
-                <option value="Syrup">Syrup</option>
-                <option value="Powder">Powder</option>
-                <option value="Sweetener">Sweetener</option>
-                <option value="Baking">Baking</option>
-                <option value="Supplies">Supplies</option>
-                <option value="Other">Other</option>
-              </select>
+                <select v-model="newItemForm.category">
+                  <option value="">Select</option>
+                  <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+                </select>
             </div>
             <div class="form-group">
               <label>Unit *</label>
@@ -624,17 +617,11 @@
       <div class="form-row">
         <div class="form-group">
           <label>Category</label>
-          <select v-model="editItemForm.category">
-            <option value="">Select</option>
-            <option value="Coffee Beans">Coffee Beans</option>
-            <option value="Dairy">Dairy</option>
-            <option value="Syrup">Syrup</option>
-            <option value="Powder">Powder</option>
-            <option value="Sweetener">Sweetener</option>
-            <option value="Baking">Baking</option>
-            <option value="Supplies">Supplies</option>
-            <option value="Other">Other</option>
-          </select>
+            <select v-model="editItemForm.category">
+              <option value="">Select</option>
+              <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+            </select>
+
         </div>
         <div class="form-group">
           <label>Unit *</label>
