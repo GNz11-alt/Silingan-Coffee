@@ -1549,7 +1549,7 @@ export default {
               labels: { color: "#374151", font: LBL, padding: 8 },
             },
             tooltip: {
-              callbacks: { label: (c) => c.label + ": " + c.raw + "%" },
+              callbacks: { label: (c) => c.label + ": " + Number(c.raw).toFixed(2) + "%" },
             },
           },
         },
@@ -1883,6 +1883,7 @@ export default {
     // ── Predictions ──────────────────────────────────────
     selectPrediction(type) {
       this.predictionType = type;
+      this.$nextTick(() => this.generatePrediction(type));
     },
 
     generatePrediction(type) {
@@ -2993,6 +2994,7 @@ export default {
   justify-content: center;
   gap: 6px;
   width: 100%;
+  height: 100%;
 }
 .pred-bar {
   width: 52px;
