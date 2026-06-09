@@ -478,36 +478,6 @@
       </div>
     </div>
 
-    <!-- ══ DELETE CONFIRM MODAL ══ -->
-    <div
-      v-if="showDeleteModal"
-      class="modal-overlay"
-      @click.self="showDeleteModal = false"
-    >
-      <div class="modal-content" style="max-width: 420px">
-        <header class="modal-hdr">
-          <h3>Remove Item</h3>
-          <button class="close-x-btn" @click="showDeleteModal = false">
-            <X :size="18" />
-          </button>
-        </header>
-        <hr class="delete-divider" />
-        <p class="delete-body-text">
-          Remove <strong>{{ deleteTarget?.ProductName }}</strong> and ALL its
-          batches? This cannot be undone.
-        </p>
-        <hr class="delete-divider" />
-        <div class="delete-actions">
-          <button class="btn-delete-cancel" @click="showDeleteModal = false">
-            Cancel
-          </button>
-          <button class="btn-delete-confirm" @click="confirmDelete">
-            Remove
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- ══ ALL RECIPES MODAL ══ -->
     <div
       v-if="showAllRecipesModal"
@@ -662,7 +632,7 @@ const CACHE_KEY_STOCK = "cache_stock_map";
 const CACHE_KEY_RECIPES = "cache_all_recipes";
 const CACHE_TTL_MENU = 5 * 60 * 1000;
 const CACHE_TTL_RAW = 5 * 60 * 1000;
-const CACHE_TTL_STOCK = 1 * 60 * 1000;
+const CACHE_TTL_STOCK = 1 * 60 * 1000; 
 const CACHE_TTL_RECIPES = 5 * 60 * 1000;
 
 const saveCache = (key, data, ttl) =>
@@ -1149,17 +1119,11 @@ const saveItem = async () => {
   saving.value = false;
 };
 
-const showDeleteModal = ref(false);
-const deleteTarget = ref(null);
-
-const deleteItem = (id) => {
-  const item = menuItems.value.find((i) => i.ProductId === id);
-  deleteTarget.value = item;
-  showDeleteModal.value = true;
-};
-
-const confirmDelete = async () => {
-  if (!deleteTarget.value) return;
+const deleteItem = async (id) => {
+  if (
+    !confirm("Archive this product? It can be restored from Backup & Restore.")
+  )
+    return;
   const currentUser = localStorage.getItem("username") || "Unknown";
   const { error } = await supabase
     .from("product")
@@ -1168,15 +1132,13 @@ const confirmDelete = async () => {
       ArchivedAt: new Date().toISOString(),
       ArchivedBy: currentUser,
     })
-    .eq("ProductId", deleteTarget.value.ProductId);
+    .eq("ProductId", id);
   if (error) {
     alert("Failed to archive: " + error.message);
   } else {
     sessionStorage.removeItem(CACHE_KEY_MENU);
     await fetchMenuItems(true);
   }
-  showDeleteModal.value = false;
-  deleteTarget.value = null;
 };
 
 // ─── Recipe CRUD ──────────────────────────────────────────────────────────────
@@ -1365,52 +1327,6 @@ onMounted(async () => {
 }
 .add-btn:hover {
   background: #4a3330;
-}
-
-.delete-divider {
-  border: none;
-  border-top: 1px solid #e9ecef;
-  margin: 0;
-}
-.delete-body-text {
-  font-size: 14px;
-  color: #343a40;
-  padding: 20px 0;
-  margin: 0;
-}
-.delete-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 16px;
-}
-.btn-delete-cancel {
-  background: #fff;
-  border: 1px solid #dee2e6;
-  color: #495057;
-  border-radius: 8px;
-  padding: 7px 20px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.btn-delete-cancel:hover {
-  background: #f8f9fa;
-}
-.btn-delete-confirm {
-  background: #dc2626;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 7px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.btn-delete-confirm:hover {
-  background: #b91c1c;
 }
 
 /* LEGEND BAR */
