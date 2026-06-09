@@ -994,10 +994,10 @@ const fetchRawMaterials = async () => {
     // Always compute stock for the user's branch only
     let batches = allBatches.value.filter((b) => b.rawproductid === item.rawproductid);
     if (selectedBranchId.value) batches = batches.filter((b) => b.branchid === selectedBranchId.value);
-    item.stockquantity = batches.reduce((sum, b) => {
+    item.stockquantity = Math.max(0, batches.reduce((sum, b) => {
       const qty = b.transactiontype === "in" ? (b.quantity ?? 0) : -(b.quantity ?? 0);
       return sum + qty;
-    }, 0);
+    }, 0));
   });
 
   allRawItems.value = items.map((item) => ({
