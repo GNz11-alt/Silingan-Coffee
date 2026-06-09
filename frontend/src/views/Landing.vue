@@ -1,6 +1,7 @@
 <script setup>
 import LandingTopbar from "@/components/LandingTopbar.vue";
 import logo from "@/assets/images/logo.png"
+import vanImage from "@/assets/images/van.png" 
 import { themeColor } from "@/data/items";
 import {
   Home,
@@ -71,36 +72,41 @@ const locations = [
   <div>
     <LandingTopbar />
     <!-- hero page -->
-    <div class="silingan_co-hero min-vh-100 d-flex align-items-center" id="home-section">
-      <div class="container">
-        <div class="row justify-content-center">
-          <div class="col-lg-8 text-center">
-            <!-- logo -->
-            <img :src="logo" alt="Image" class="img-fluid mx-auto d-block mb-4" style="max-width: 200px;" />
+<!-- Hero Section -->
+<div class="silingan_co-hero min-vh-100 d-flex align-items-center" id="home-section">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-8 text-center">
 
-            <!-- main heading title -->
-            <h1 class="heading mb-3">
-              {{ heroHeading }}
-            </h1>
-
-            <!-- main heading subtitle -->
-            <p class="mb-4">
-              Your comprehensive coffee shop management solution. Streamline operations, track inventory, manage sales, and grow your business across all branches.
-            </p>
-
-            <!-- alternative login button 1 -->
-            <router-link
-              to="/login"
-              class="btn btn-primary px-4 py-2"
-              style="margin-right: 5px"
-              :style="{ backgroundColor: themeColor, borderColor: themeColor }"
-            >
-              {{ buttonAltLogin }}
-            </router-link>
-          </div>
+        <!-- Van Image -->
+        <div class="van-wrapper mb-0">
+          <img
+            :src="vanImage"
+            alt="Silingan Coffee Van"
+            class="van-hero-img"
+          />
         </div>
+
+        <!-- Text sits flush under the van shadow -->
+        <h1 class="heading mb-3">{{ heroHeading }}</h1>
+
+        <p class="mb-4">
+          Your comprehensive coffee shop management solution. Streamline operations,
+          track inventory, manage sales, and grow your business across all branches.
+        </p>
+
+        <router-link
+          to="/login"
+          class="btn btn-primary px-4 py-2"
+          :style="{ backgroundColor: themeColor, borderColor: themeColor }"
+        >
+          {{ buttonAltLogin }}
+        </router-link>
+
       </div>
     </div>
+  </div>
+</div>
 
     <!-- Services Section -->
     <div class="silingan_co-services bg-light py-5">
@@ -160,12 +166,32 @@ const locations = [
 <style scoped>
 .silingan_co-hero {
   background-color: #fff;
+  display: flex;
+  align-items: center;
+  padding-top: 0px; 
+}
+
+.van-wrapper {
+  margin-top: -350px;       
+  margin-bottom: -10px;    
+}
+
+.van-hero-img {
+  width: 100%;
+  max-width: 680px;
+  clip-path: inset(200px 0 0 0);   
+  mix-blend-mode: multiply;
+  filter: drop-shadow(0 15px 10px rgba(63, 45, 30, 0.307));
+  display: block;
+  margin: 0 auto;
 }
 
 .heading {
   font-size: 3.5rem;
   font-weight: 800;
   letter-spacing: -1px;
+  margin-top: -220px;
+  color: #432003;
 }
 
 .section-title {
