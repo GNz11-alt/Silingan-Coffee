@@ -125,12 +125,12 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "@/supabase.js";
+import { useUserBranch } from "@/composables/useUserBranch.js";
 import {
   DollarSign,
   ShoppingBag,
   AlertCircle,
-  Calendar,
-  ShoppingCart,
+  ClipboardList,
   Package,
 } from "lucide-vue-next";
 
@@ -140,7 +140,7 @@ const name = raw.split(/[^a-zA-Z]/)[0];
 const username = ref(
   name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
 );
-const userBranch = ref(localStorage.getItem("branch") || "");
+const { userBranchId, userBranchName, resolveBranch } = useUserBranch();
 const isLoading = ref(true);
 
 const totalRevenue = ref(0);
@@ -166,14 +166,9 @@ const fetchDashboardData = async () => {
   isLoading.value = true;
   const today = new Date().toISOString().split("T")[0];
 
-  const { data: branchData } = await supabase
-    .from("branch")
-    .select("BranchId, BranchName")
-    .eq("Location", userBranch.value)
-    .maybeSingle();
-
-  const branchId = branchData?.BranchId;
-  branchLabel.value = branchData?.BranchName || userBranch.value;
+  await resolveBranch();
+  const branchId = userBranchId.value;
+  branchLabel.value = userBranchName.value || localStorage.getItem("branch") || "";
 
   if (branchId) {
     const { data: ordersData } = await supabase

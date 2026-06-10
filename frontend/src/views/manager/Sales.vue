@@ -398,6 +398,7 @@ import {
   CreditCard,
 } from "lucide-vue-next";
 import { supabase } from "@/supabase";
+import { useUserBranch } from "@/composables/useUserBranch.js";
 import POSView from "@/views/staff/POS.vue";
 
 const route = useRoute();
@@ -414,6 +415,7 @@ const SortIcon = {
 // ── Role / branch lock ──────────────────────────────────────────────────────
 const userRole = ref(localStorage.getItem("role") ?? "staff");
 const isManager = computed(() => userRole.value === "manager");
+const { userBranchId, userBranchName, resolveBranch } = useUserBranch();
 const lockedBranchId = ref(null);
 
 // ── State ───────────────────────────────────────────────────────────────────
@@ -557,18 +559,9 @@ const fetchBranches = async () => {
     .order("BranchName");
   if (data) branches.value = data;
 
-  const role = localStorage.getItem("role");
-  const slug = localStorage.getItem("branch");
-
-  if (role === "manager" && slug && slug !== "all") {
-    const match = data?.find((b) =>
-      b.BranchName?.toLowerCase().includes(slug.toLowerCase()),
-    );
-    if (match) {
-      lockedBranchId.value = match.BranchId;
-      filterBranch.value = match.BranchId;
-    }
-  }
+  await resolveBranch();
+  lockedBranchId.value = userBranchId.value;
+  filterBranch.value = userBranchId.value;
 };
 
 const fetchAllOrders = async () => {

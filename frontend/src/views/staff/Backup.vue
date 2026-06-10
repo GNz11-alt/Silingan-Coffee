@@ -220,6 +220,7 @@ import {
   UtensilsCrossed,
 } from "lucide-vue-next";
 import { supabase } from "@/supabase.js";
+import { useUserBranch } from "@/composables/useUserBranch.js";
 
 // ── Current user ───────────────────────────────────────────
 const currentUser = localStorage.getItem("username") || "Unknown";
@@ -332,16 +333,12 @@ const filteredItems = computed(() =>
   }),
 );
 
-// ── Resolve branch (mirrors manager logic) ─────────────────
+// ── Resolve branch ──────────────────────────────────────────
+const { userBranchId, resolveBranch } = useUserBranch();
+
 const resolveManagerBranch = async () => {
-  const slug = localStorage.getItem("branch");
-  if (!slug || slug === "all") return;
-  const { data } = await supabase
-    .from("branch")
-    .select("BranchId")
-    .eq("Location", slug)
-    .maybeSingle();
-  managerBranchId.value = data?.BranchId ?? null;
+  await resolveBranch();
+  managerBranchId.value = userBranchId.value;
 };
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
