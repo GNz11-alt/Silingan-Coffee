@@ -1,5 +1,5 @@
 <template>
-  <div class="search-module" @keydown="handleKeydown">
+  <div class="search-module">
     <header class="module-header">
       <div class="header-titles">
         <h1>Search</h1>
@@ -33,7 +33,7 @@
             ref="searchInputRef"
             v-model="search.query.value"
             type="text"
-            placeholder="Type to search across all data... (Ctrl+K)"
+            placeholder="Type to search across all data..."
           />
         </div>
         <button class="filter-btn" @click="openFilters">
@@ -247,13 +247,6 @@ const filterChips = computed(() => {
   return chips;
 });
 
-// --- KEYBOARD SHORTCUT ---
-const handleKeydown = (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-    e.preventDefault();
-    searchInputRef.value?.focus();
-  }
-};
 
 </script>
 
