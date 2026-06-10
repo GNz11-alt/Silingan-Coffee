@@ -39,7 +39,21 @@ export function getBaseUnit(unit) {
   }
   return unit // unknown — return as-is
 }
+// In inventoryUtils.js, add this helper:
+// Add this helper to inventoryUtils.js
+export const roundQuantityByUnit = (quantity, unit) => {
+  if (!unit) return quantity;
+  const unitLower = unit.toLowerCase();
+  if (unitLower === 'pcs' || unitLower === 'pc' || unitLower === 'piece' || unitLower === 'pieces') {
+    return Math.round(quantity);
+  }
+  // Keep 4 decimal places for weight/volume
+  return Math.round(quantity * 10000) / 10000;
+};
 
+// Use it in checkStockForProduct when calculating needed amounts
+
+// Then in checkStockForProduct, use it when calculating needed quantities
 /**
  * Returns the conversion factor for a unit relative to its group base.
  *   factorToBase('kg') → 1000   (1 kg = 1000 g)
