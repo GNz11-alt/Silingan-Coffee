@@ -389,6 +389,67 @@
 
           <!-- ── SCHEDULE TABLE (left overflow) ──── -->
           <div v-if="activeTab === 'schedule'" class="left-scroll-area">
+            <!-- Date mode pill group -->
+            <div class="date-mode-pills mb-2">
+              <button
+                class="date-pill"
+                :class="{ active: schedDateMode === 'all' }"
+                @click="schedDateMode = 'all'"
+              >All Dates</button>
+              <button
+                class="date-pill"
+                :class="{ active: schedDateMode === 'today' }"
+                @click="setTodayFilter"
+              >Today</button>
+              <button
+                class="date-pill"
+                :class="{ active: schedDateMode === 'single' }"
+                @click="schedDateMode = 'single'"
+              >Single</button>
+              <button
+                class="date-pill"
+                :class="{ active: schedDateMode === 'range' }"
+                @click="schedDateMode = 'range'"
+              >Range</button>
+            </div>
+
+            <!-- Single date input -->
+            <input
+              v-show="schedDateMode === 'single'"
+              v-model="schedDateFilter"
+              type="date"
+              class="form-control fc-brand mb-2"
+              style="font-size: 0.82rem"
+            />
+
+            <!-- Range inputs with validation -->
+            <div v-show="schedDateMode === 'range'" class="d-flex gap-1 mb-2">
+              <input
+                v-model="schedRangeStart"
+                type="date"
+                class="form-control fc-brand"
+                style="font-size: 0.82rem"
+              />
+              <span class="range-sep">→</span>
+              <input
+                v-model="schedRangeEnd"
+                type="date"
+                class="form-control fc-brand"
+                style="font-size: 0.82rem"
+              />
+            </div>
+            <div
+              v-if="
+                schedDateMode === 'range' &&
+                schedRangeStart &&
+                schedRangeEnd &&
+                schedRangeStart > schedRangeEnd
+              "
+              class="range-validation-error"
+            >
+              Start date must be before end date
+            </div>
+
             <div class="d-flex align-items-center justify-content-between mb-2">
               <div class="left-section-title">Scheduled Shifts</div>
               <div class="d-flex gap-1">
@@ -414,48 +475,126 @@
               placeholder="Search staff…"
               style="font-size: 0.82rem"
             />
+
+            <!-- Result count label -->
+            <div class="result-count-label mb-1">
+              {{ filteredSchedules.length }} schedule{{ filteredSchedules.length !== 1 ? 's' : '' }}
+            </div>
+
             <div class="sched-card-list">
-              <div
-                v-for="sched in filteredSchedules"
-                :key="sched.id"
-                class="sched-list-card"
-              >
+              <template v-if="!schedBranchFilter">
                 <div
-                  class="sched-list-avatar"
-                  :style="{ background: avatarColor(sched.employeeId) }"
+                  v-for="group in groupedSchedules"
+                  :key="group.branchId"
+                  class="branch-group"
                 >
-                  {{ sched.initials }}
-                </div>
-                <div class="sched-list-info">
-                  <div class="sched-list-name">{{ sched.employeeName }}</div>
-                  <div class="sched-list-meta">
-                    {{ formatDate(sched.shiftDate) }} · {{ sched.startTime }}–{{
-                      sched.endTime
-                    }}
-                  </div>
-                  <div class="sched-list-meta">
-                    {{ sched.role }} · {{ branchName(sched.branchId) }}
-                  </div>
-                </div>
-                <div class="d-flex flex-column align-items-end gap-1">
-                  <span
-                    class="badge-status"
-                    :class="schedStatusClass(sched.status)"
-                    >{{ sched.status }}</span
+                  <div
+                    class="branch-group-header"
+                    :style="{ borderLeftColor: group.color }"
                   >
-                  <div class="d-flex gap-1">
-                    <button class="icon-btn" @click="openEditModal(sched)">
-                      <i class="bi bi-pencil-square"></i>
-                    </button>
-                    <button
-                      class="icon-btn danger"
-                      @click="confirmDelete(sched)"
+                    <span
+                      class="branch-group-dot"
+                      :style="{ background: group.color }"
+                    ></span>
+                    {{ group.branchName }}
+                    <span class="branch-group-count">{{
+                      group.schedules.length
+                    }}</span>
+                  </div>
+                  <div
+                    v-for="sched in group.schedules"
+                    :key="sched.id"
+                    class="sched-list-card"
+                  >
+                    <div
+                      class="sched-list-avatar"
+                      :style="{ background: avatarColor(sched.employeeId) }"
                     >
-                      <i class="bi bi-trash3"></i>
-                    </button>
+                      {{ sched.initials }}
+                    </div>
+                    <div class="sched-list-info">
+                      <div class="sched-list-name">
+                        {{ sched.employeeName }}
+                      </div>
+                      <div class="sched-list-meta">
+                        {{ formatDate(sched.shiftDate) }} ·
+                        {{ sched.startTime }}–{{ sched.endTime }}
+                      </div>
+                      <div class="sched-list-meta">
+                        {{ sched.role }}
+                      </div>
+                    </div>
+                    <div class="d-flex flex-column align-items-end gap-1">
+                      <span
+                        class="badge-status"
+                        :class="schedStatusClass(sched.status)"
+                        >{{ sched.status }}</span
+                      >
+                      <div class="d-flex gap-1">
+                        <button
+                          class="icon-btn"
+                          @click="openEditModal(sched)"
+                        >
+                          <i class="bi bi-pencil-square"></i>
+                        </button>
+                        <button
+                          class="icon-btn danger"
+                          @click="confirmDelete(sched)"
+                        >
+                          <i class="bi bi-trash3"></i>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+            </template>
+            <template v-else>
+                <div
+                  v-for="sched in filteredSchedules"
+                  :key="sched.id"
+                  class="sched-list-card"
+                >
+                  <div
+                    class="sched-list-avatar"
+                    :style="{ background: avatarColor(sched.employeeId) }"
+                  >
+                    {{ sched.initials }}
+                  </div>
+                  <div class="sched-list-info">
+                    <div class="sched-list-name">
+                      {{ sched.employeeName }}
+                    </div>
+                    <div class="sched-list-meta">
+                      {{ formatDate(sched.shiftDate) }} ·
+                      {{ sched.startTime }}–{{ sched.endTime }}
+                    </div>
+                    <div class="sched-list-meta">
+                      {{ sched.role }} · {{ branchName(sched.branchId) }}
+                    </div>
+                  </div>
+                  <div class="d-flex flex-column align-items-end gap-1">
+                    <span
+                      class="badge-status"
+                      :class="schedStatusClass(sched.status)"
+                      >{{ sched.status }}</span
+                    >
+                    <div class="d-flex gap-1">
+                      <button
+                        class="icon-btn"
+                        @click="openEditModal(sched)"
+                      >
+                        <i class="bi bi-pencil-square"></i>
+                      </button>
+                      <button
+                        class="icon-btn danger"
+                        @click="confirmDelete(sched)"
+                      >
+                        <i class="bi bi-trash3"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </template>
               <div v-if="!filteredSchedules.length" class="empty-left">
                 <i class="bi bi-calendar2-x"></i>
                 <p>No schedules found</p>
@@ -497,6 +636,20 @@
               >
                 <i class="bi bi-calendar3"></i> Schedules
               </button>
+              <button
+                class="btn btn-sm"
+                :class="
+                  schedViewMode === 'timeline'
+                    ? 'btn-primary-brand'
+                    : 'btn-ghost'
+                "
+                @click="
+                  schedViewMode = 'timeline';
+                  switchTab('schedule');
+                "
+              >
+                <i class="bi bi-clock-history"></i> Timeline
+              </button>
             </div>
           </div>
 
@@ -528,7 +681,7 @@
                 </div>
                 <div class="day-shifts">
                   <div
-                    v-for="shift in day.shifts"
+                    v-for="shift in day.shifts.slice(0, overflowThreshold)"
                     :key="shift.id"
                     class="shift-badge"
                     :style="{ background: avatarColor(shift.employeeId) }"
@@ -536,7 +689,105 @@
                     :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
                   >
                     <div class="shift-badge-time">{{ shift.startTime }}</div>
-                    <div class="shift-badge-name">{{ shift.initials }}</div>
+                    <div class="shift-badge-name">{{ shift.employeeName }}</div>
+                  </div>
+                  <div
+                    v-if="day.shifts.length > overflowThreshold"
+                    class="overflow-pill"
+                    @click.stop="openDayDetail(day)"
+                  >
+                    <span class="overflow-pill-label"
+                      >+{{ day.shifts.length - overflowThreshold }} more</span
+                    >
+                    <span class="overflow-pill-avatars">
+                      <span
+                        v-for="s in day.shifts.slice(overflowThreshold, overflowThreshold + 3)"
+                        :key="s.id"
+                        class="overflow-pill-avatar"
+                        :style="{ background: avatarColor(s.employeeId) }"
+                        :title="s.employeeName"
+                      >
+                        {{ s.initials }}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Timeline -->
+          <div v-if="schedViewMode === 'timeline'" class="timeline-container">
+            <div class="timeline-nav mb-2">
+              <button class="btn btn-ghost btn-sm" @click="timelineDateOffset -= 1">
+                <i class="bi bi-chevron-left"></i>
+              </button>
+              <span class="timeline-date-label">{{ timelineDateLabel }}</span>
+              <button class="btn btn-ghost btn-sm" @click="timelineDateOffset = 0">
+                Today
+              </button>
+              <button class="btn btn-ghost btn-sm" @click="timelineDateOffset += 1">
+                <i class="bi bi-chevron-right"></i>
+              </button>
+            </div>
+            <div class="timeline-scroll">
+              <div class="timeline-grid">
+                <div class="timeline-col timeline-time-col">
+                  <div class="timeline-corner"></div>
+                  <div
+                    v-for="h in timelineHours"
+                    :key="h"
+                    class="timeline-hour-label"
+                  >
+                    {{ String(h).padStart(2, "0") }}:00
+                  </div>
+                </div>
+                <div
+                  v-for="branch in timelineBranches"
+                  :key="branch.branchId"
+                  class="timeline-col timeline-branch-col"
+                >
+                  <div
+                    class="timeline-branch-header"
+                    :style="{ borderLeftColor: branch.color }"
+                  >
+                    <span
+                      class="timeline-branch-dot"
+                      :style="{ background: branch.color }"
+                    ></span>
+                    {{ branch.branchName }}
+                  </div>
+                  <div class="timeline-branch-body">
+                    <div
+                      v-for="shift in branch.shifts"
+                      :key="shift.id"
+                      class="timeline-shift"
+                      :style="{
+                        top: timeToPosition(shift.startTime) + 'px',
+                        height: timeToHeight(shift.startTime, shift.endTime) + 'px',
+                        background: avatarColor(shift.employeeId),
+                      }"
+                      @click.stop="showShiftDetail = shift"
+                      :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
+                    >
+                      <div
+                        v-if="timeToHeight(shift.startTime, shift.endTime) >= 28"
+                        class="timeline-shift-name"
+                      >
+                        {{ shift.employeeName }}
+                      </div>
+                      <div
+                        v-if="timeToHeight(shift.startTime, shift.endTime) >= 28"
+                        class="timeline-shift-time"
+                      >
+                        {{ shift.startTime }}–{{ shift.endTime }}
+                      </div>
+                    </div>
+                    <div
+                      v-if="isTimelineToday"
+                      class="timeline-now-line"
+                      :style="{ top: currentTimeTop + 'px' }"
+                    ></div>
                   </div>
                 </div>
               </div>
@@ -907,6 +1158,147 @@
       </div>
     </Teleport>
 
+    <!-- DAY DETAIL -->
+    <Teleport to="body">
+      <div v-if="showDayDetail" class="modal-overlay">
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+          @click="closeDayDetail"
+        ></div>
+        <div
+          class="modal-panel modal-panel--day-detail"
+          style="position: relative; z-index: 1"
+          @click.stop
+        >
+          <div class="modal-panel-header">
+            <div class="day-detail-header-left">
+              <h5 class="mb-0">
+                {{ dayDetailDateLabel }}
+              </h5>
+              <span class="day-detail-count-badge">{{
+                showDayDetail.shifts.length
+              }}</span>
+            </div>
+            <div class="day-detail-header-actions">
+              <button
+                class="btn btn-sm btn-primary-brand"
+                @click="openCreateModal(showDayDetail.dateStr); closeDayDetail()"
+              >
+                <i class="bi bi-plus-lg me-1"></i> Schedule
+              </button>
+              <button class="btn-close-panel" @click="closeDayDetail">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+          <div class="modal-panel-body modal-panel-body--day-detail">
+            <template v-if="showDayDetail.shifts.length">
+              <div class="day-detail-timeline-wrap">
+              <div class="day-detail-timeline-grid">
+                  <div class="dtd-time-col">
+                    <div
+                      v-for="h in dayDetailHours"
+                      :key="h"
+                      class="dtd-hour-label"
+                    >
+                      {{ String(h).padStart(2, "0") }}:00
+                    </div>
+                  </div>
+                  <div
+                    v-for="group in dayDetailGroups"
+                    :key="group.branchId"
+                    class="dtd-branch-col"
+                  >
+                    <div
+                      class="dtd-branch-header"
+                      :style="{ borderLeftColor: group.color }"
+                    >
+                      <span
+                        class="dtd-branch-dot"
+                        :style="{ background: group.color }"
+                      ></span>
+                      {{ group.branchName }}
+                      <span class="dtd-branch-count">{{ group.shifts.length }}</span>
+                    </div>
+                    <div
+                      class="dtd-branch-body"
+                      :style="{ height: dayDetailTimelineHeight + 'px' }"
+                    >
+                      <div
+                        v-for="shift in group.shifts"
+                        :key="shift.id"
+                        class="dtd-shift"
+                        :style="{
+                          top: timeToPosition(shift.startTime) + 'px',
+                          height: timeToHeight(shift.startTime, shift.endTime) + 'px',
+                          background: avatarColor(shift.employeeId),
+                        }"
+                        @click.stop="showShiftDetail = shift; closeDayDetail()"
+                        :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
+                      >
+                        <div
+                          class="dtd-shift-pattern"
+                          :style="{ backgroundImage: patternSVG(ACCENT_VARIANTS[empVariantIndex(shift.employeeId)].pattern) }"
+                        ></div>
+                        <div
+                          class="dtd-shift-stripe"
+                          :style="{ background: ACCENT_VARIANTS[empVariantIndex(shift.employeeId)].accent }"
+                        ></div>
+                        <div class="dtd-shift-content">
+                          <div class="dtd-shift-name">
+                            {{ shift.employeeName }}
+                          </div>
+                          <div
+                            v-if="timeToHeight(shift.startTime, shift.endTime) >= 48"
+                            class="dtd-shift-time"
+                          >
+                            {{ shift.startTime }}–{{ shift.endTime }}
+                          </div>
+                          <div
+                            v-if="timeToHeight(shift.startTime, shift.endTime) >= 72"
+                            class="dtd-shift-role-pill"
+                            :style="{ background: ROLE_PILL_COLORS[shift.role] || 'rgba(255,255,255,0.5)' }"
+                          >
+                            {{ shift.role }}
+                          </div>
+                        </div>
+                        <div class="dtd-shift-actions">
+                          <button
+                            @click.stop="openEditModal(shift); closeDayDetail()"
+                            title="Edit"
+                          >
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                          <button
+                            @click.stop="confirmDelete(shift); closeDayDetail()"
+                            title="Archive"
+                          >
+                            <i class="bi bi-trash3"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template v-else>
+              <div class="day-detail-empty">
+                <i class="bi bi-calendar2-x"></i>
+                <p>No shifts scheduled for this day.</p>
+                <button
+                  class="btn btn-primary-brand btn-sm"
+                  @click="openCreateModal(showDayDetail.dateStr); closeDayDetail()"
+                >
+                  <i class="bi bi-plus-lg me-1"></i> Create Schedule
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- STAFF MODAL -->
     <Teleport to="body">
       <div v-if="showStaffModal" class="modal-overlay">
@@ -1185,6 +1577,19 @@ import {
   availabilitySinceDate,
 } from "@/composables/useScheduleHelpers.js";
 
+const SHIFT_OVERFLOW = 3;
+const windowWidth = ref(window.innerWidth);
+let resizeCleanup = null;
+onMounted(() => {
+  const onResize = () => { windowWidth.value = window.innerWidth; };
+  window.addEventListener("resize", onResize);
+  resizeCleanup = () => window.removeEventListener("resize", onResize);
+});
+onUnmounted(() => { resizeCleanup?.(); });
+const overflowThreshold = computed(() =>
+  windowWidth.value < 600 ? 2 : SHIFT_OVERFLOW,
+);
+
 const isLoading = ref(true);
 const activeTab = ref("availability");
 const tabs = [
@@ -1209,10 +1614,17 @@ window.addEventListener("beforeunload", () => {
 const schedSearchInput = ref("");
 const schedSearch = ref("");
 let schedSearchDebounce = null;
+const schedDateMode = ref(sessionStorage.getItem("schedDateMode") || "all");
+const schedRangeStart = ref("");
+const schedRangeEnd = ref("");
 const schedDateFilter = ref("");
 const schedBranchFilter = ref("");
 const schedStatusFilter = ref("");
-const schedViewMode = ref("table"); // "table" or "calendar"
+const schedViewMode = ref("table"); // "table", "calendar", or "timeline"
+const timelineDateOffset = ref(0);
+const TLINE_ROW_HEIGHT = 48;
+const TLINE_AXIS_START = 6; // 06:00
+const TLINE_AXIS_END = 22; // 22:00
 const monthOffset = ref(0); // 0 = current month, -1 = last month, +1 = next month
 const showModal = ref(false);
 const showConflictConfirm = ref(false);
@@ -1220,6 +1632,7 @@ const conflictInfo = ref(null);
 const employeesLoading = ref(true);
 const showDeleteConfirm = ref(false);
 const showShiftDetail = ref(null);
+const showDayDetail = ref(null);
 const isEditing = ref(false);
 const saving = ref(false);
 const deleteTarget = ref(null);
@@ -1751,15 +2164,41 @@ const pendingOrFading = computed(() =>
   ),
 );
 
+const dateFilterRange = computed(() => {
+  const mode = schedDateMode.value;
+  if (mode === "all") return { start: null, end: null };
+  if (mode === "today") {
+    const d = new Date().toISOString().slice(0, 10);
+    return { start: d, end: d };
+  }
+  if (mode === "single" && schedDateFilter.value) {
+    const d = schedDateFilter.value;
+    return { start: d, end: d };
+  }
+  if (mode === "range") {
+    const s = schedRangeStart.value;
+    const e = schedRangeEnd.value;
+    if (s && e && s <= e) return { start: s, end: e };
+  }
+  return { start: null, end: null };
+});
+
+watch(schedDateMode, (val) => {
+  sessionStorage.setItem("schedDateMode", val);
+});
+
 const filteredSchedules = computed(() => {
+  const dateRange = dateFilterRange.value;
   return schedules.value.filter((s) => {
     const q = schedSearch.value.toLowerCase();
     const matchSearch =
       !q ||
       s.employeeName.toLowerCase().includes(q) ||
       s.role.toLowerCase().includes(q);
-    const matchDate =
-      !schedDateFilter.value || s.shiftDate === schedDateFilter.value;
+    let matchDate = true;
+    if (dateRange.start && dateRange.end) {
+      matchDate = s.shiftDate >= dateRange.start && s.shiftDate <= dateRange.end;
+    }
     const matchBranch =
       !schedBranchFilter.value ||
       String(s.branchId) === String(schedBranchFilter.value);
@@ -1768,6 +2207,75 @@ const filteredSchedules = computed(() => {
     return matchSearch && matchDate && matchBranch && matchStatus;
   });
 });
+
+const groupedSchedules = computed(() => {
+  const groups = {};
+  for (const s of filteredSchedules.value) {
+    const branchId = s.branchId;
+    if (!groups[branchId]) {
+      groups[branchId] = {
+        branchId,
+        branchName: branchName(branchId),
+        color: avatarColor(branchId),
+        schedules: [],
+      };
+    }
+    groups[branchId].schedules.push(s);
+  }
+  return Object.values(groups).sort((a, b) =>
+    a.branchName.localeCompare(b.branchName),
+  );
+});
+
+const dayDetailGroups = computed(() => {
+  if (!showDayDetail.value) return [];
+  const groups = {};
+  for (const s of showDayDetail.value.shifts) {
+    const branchId = s.branchId;
+    if (!groups[branchId]) {
+      groups[branchId] = {
+        branchId,
+        branchName: branchName(branchId),
+        color: avatarColor(branchId),
+        shifts: [],
+      };
+    }
+    groups[branchId].shifts.push(s);
+  }
+  for (const g of Object.values(groups)) {
+    g.shifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
+  return Object.values(groups).sort((a, b) =>
+    a.branchName.localeCompare(b.branchName),
+  );
+});
+
+const dayDetailDateLabel = computed(() => {
+  if (!showDayDetail.value) return "";
+  const d = new Date(showDayDetail.value.dateStr);
+  return d.toLocaleDateString("en-PH", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
+});
+
+const dayDetailHours = computed(() => {
+  if (!showDayDetail.value) return [];
+  let min = TLINE_AXIS_START;
+  let max = TLINE_AXIS_END;
+  for (const s of showDayDetail.value.shifts) {
+    const sh = parseInt(s.startTime.split(":")[0], 10);
+    const eh = parseInt(s.endTime.split(":")[0], 10);
+    if (sh < min) min = sh;
+    if (eh > max) max = eh;
+  }
+  const hours = [];
+  for (let h = min; h <= max; h++) hours.push(h);
+  return hours;
+});
+
+const dayDetailTimelineHeight = computed(() =>
+  dayDetailHours.value.length * TLINE_ROW_HEIGHT,
+);
 
 const schedulesByDate = computed(() =>
   buildSchedulesByDate(filteredSchedules.value),
@@ -1786,6 +2294,110 @@ const schedEmployees = computed(() => {
       name: s.employeeName,
       initials: s.initials,
     }));
+});
+
+// ── Timeline helpers ────────────────────────────────────
+const timelineDate = computed(() => {
+  const d = new Date();
+  d.setDate(d.getDate() + timelineDateOffset.value);
+  return toLocalDateKey(d);
+});
+
+const timelineDateLabel = computed(() => {
+  const d = new Date();
+  d.setDate(d.getDate() + timelineDateOffset.value);
+  return d.toLocaleDateString("en-PH", {
+    weekday: "short", month: "short", day: "numeric", year: "numeric",
+  });
+});
+
+const isTimelineToday = computed(() => timelineDateOffset.value === 0);
+
+const timelineShifts = computed(() =>
+  schedules.value.filter((s) => s.shiftDate === timelineDate.value),
+);
+
+const timelineHours = computed(() => {
+  let min = TLINE_AXIS_START;
+  let max = TLINE_AXIS_END;
+  for (const s of timelineShifts.value) {
+    const sh = parseInt(s.startTime.split(":")[0], 10);
+    const eh = parseInt(s.endTime.split(":")[0], 10);
+    if (sh < min) min = sh;
+    if (eh > max) max = eh;
+  }
+  const hours = [];
+  for (let h = min; h <= max; h++) hours.push(h);
+  return hours;
+});
+
+const timelineBranches = computed(() => {
+  const groups = {};
+  for (const s of timelineShifts.value) {
+    const bid = s.branchId;
+    if (!groups[bid]) {
+      groups[bid] = {
+        branchId: bid,
+        branchName: branchName(bid),
+        color: avatarColor(bid),
+        shifts: [],
+      };
+    }
+    groups[bid].shifts.push(s);
+  }
+  for (const g of Object.values(groups)) {
+    g.shifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
+  return Object.values(groups).sort((a, b) =>
+    a.branchName.localeCompare(b.branchName),
+  );
+});
+
+const ACCENT_VARIANTS = [
+  { accent: "rgba(255,255,255,0.55)", pattern: "none" },
+  { accent: "rgba(255,220,100,0.85)", pattern: "stripes" },
+  { accent: "rgba(120,220,180,0.85)", pattern: "dots" },
+  { accent: "rgba(200,160,255,0.85)", pattern: "crosshatch" },
+];
+
+const empVariantIndex = (employeeId) => employeeId % ACCENT_VARIANTS.length;
+
+function patternSVG(type) {
+  const c = encodeURIComponent("rgba(255,255,255,0.9)");
+  if (type === "stripes")
+    return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2' stroke='${c}' stroke-width='1.5'/%3E%3C/svg%3E")`;
+  if (type === "dots")
+    return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='2' cy='2' r='1.2' fill='${c}'/%3E%3C/svg%3E")`;
+  if (type === "crosshatch")
+    return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M0,0 l8,8 M8,0 l-8,8' stroke='${c}' stroke-width='1'/%3E%3C/svg%3E")`;
+  return "none";
+}
+
+const ROLE_PILL_COLORS = {
+  "Barista": "rgba(255,255,255,0.9)",
+  "Cashier": "rgba(255,193,7,0.85)",
+  "Kitchen Staff": "rgba(255,152,0,0.85)",
+  "Cleaning Staff": "rgba(0,188,212,0.85)",
+  "Server": "rgba(233,30,99,0.85)",
+  "Supervisor": "rgba(76,175,80,0.85)",
+};
+
+const timeToPosition = (time) => {
+  const [h, m] = time.split(":").map(Number);
+  return ((h + m / 60) - TLINE_AXIS_START) * TLINE_ROW_HEIGHT;
+};
+
+const timeToHeight = (start, end) => {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  let dur = (eh + em / 60) - (sh + sm / 60);
+  if (dur <= 0) dur = TLINE_AXIS_END - TLINE_AXIS_START - (sh + sm / 60 - TLINE_AXIS_START);
+  return Math.max(dur * TLINE_ROW_HEIGHT, 20);
+};
+
+const currentTimeTop = computed(() => {
+  const now = new Date();
+  return ((now.getHours() + now.getMinutes() / 60) - TLINE_AXIS_START) * TLINE_ROW_HEIGHT;
 });
 
 // Calendar view computed properties
@@ -2083,6 +2695,14 @@ const switchTab = (key) => {
   }
   if (key === "availability") fetchAvailability();
   if (key === "schedule") fetchSchedules();
+};
+
+const openDayDetail = (day) => {
+  showDayDetail.value = day;
+};
+
+const closeDayDetail = () => {
+  showDayDetail.value = null;
 };
 
 const openCreateModal = (dateStr) => {
@@ -2411,10 +3031,17 @@ const updateAvailStatus = async (avail, status) => {
   }
 };
 
+const setTodayFilter = () => {
+  schedDateMode.value = "today";
+};
+
 const clearSchedFilters = () => {
   schedSearchInput.value = "";
   schedSearch.value = "";
+  schedDateMode.value = "all";
   schedDateFilter.value = "";
+  schedRangeStart.value = "";
+  schedRangeEnd.value = "";
   schedBranchFilter.value = "";
   schedStatusFilter.value = "";
 };
@@ -2856,6 +3483,340 @@ onMounted(async () => {
   font-weight: 700;
   font-size: 0.7rem;
   margin-left: auto;
+}
+
+/* Overflow pill */
+.overflow-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: #5d4037;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  margin-top: 0.15rem;
+}
+.overflow-pill:hover {
+  opacity: 0.85;
+}
+.overflow-pill-label {
+  white-space: nowrap;
+}
+.overflow-pill-avatars {
+  display: flex;
+  align-items: center;
+}
+.overflow-pill-avatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 0.5rem;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #5d4037;
+  margin-left: -4px;
+}
+.overflow-pill-avatar:first-child {
+  margin-left: 0;
+}
+
+/* Day detail modal */
+.modal-panel--day-detail {
+  max-width: 760px;
+  width: 90vw;
+}
+.modal-panel-body--day-detail {
+  overflow: hidden;
+}
+.day-detail-timeline-wrap {
+  overflow: auto;
+  max-height: 480px;
+}
+.day-detail-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.day-detail-count-badge {
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+}
+.day-detail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.day-detail-timeline-grid {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  min-width: 100%;
+}
+.dtd-time-col {
+  width: 44px;
+  min-width: 44px;
+  flex-shrink: 0;
+  border-right: 1px solid #e5e7eb;
+}
+.dtd-hour-label {
+  height: 48px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 2px;
+  font-size: 0.6rem;
+  color: #9ca3af;
+  font-weight: 600;
+  border-bottom: 1px solid #f3f4f6;
+}
+.dtd-branch-col {
+  border-right: 1px solid #e5e7eb;
+}
+.dtd-branch-col:last-child {
+  border-right: none;
+}
+.dtd-branch-header {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #4b5563;
+  background: #f9fafb;
+  border-left: 3px solid #7b2d2d;
+  border-bottom: 1px solid #e5e7eb;
+}
+.dtd-branch-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dtd-branch-count {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: 0.6rem;
+  color: #9ca3af;
+}
+.dtd-branch-body {
+  position: relative;
+}
+.dtd-shift {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  z-index: 10;
+  transition: opacity 0.15s;
+}
+.dtd-shift:hover {
+  opacity: 0.9;
+}
+.dtd-shift-pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.12;
+  pointer-events: none;
+  border-radius: 4px;
+}
+.dtd-shift-stripe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 4px 0 0 4px;
+}
+.dtd-shift-content {
+  padding: 0.2rem 0.3rem;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+.dtd-shift-name {
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dtd-shift-time {
+  font-size: 0.55rem;
+  opacity: 0.9;
+  line-height: 1.2;
+}
+.dtd-shift-role-pill {
+  display: inline-block;
+  font-size: 0.5rem;
+  line-height: 1;
+  padding: 1px 5px;
+  border-radius: 8px;
+  color: rgba(0,0,0,0.75);
+  margin-top: 2px;
+}
+.dtd-shift-actions {
+  display: none;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  gap: 2px;
+  z-index: 20;
+}
+.dtd-shift:hover .dtd-shift-actions {
+  display: flex;
+}
+.dtd-shift-actions button {
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
+  color: #fff;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s;
+}
+.dtd-shift-actions button:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+.day-detail-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: #9ca3af;
+}
+.day-detail-empty i {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.day-detail-empty p {
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+  .day-detail-timeline-grid {
+    display: block;
+    min-width: 0;
+  }
+  .dtd-time-col {
+    display: flex !important;
+    width: 100%;
+    min-width: 100%;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
+  }
+  .dtd-time-col .dtd-hour-label {
+    flex-shrink: 0;
+    width: 48px;
+    min-width: 48px;
+    height: auto;
+    padding: 0.35rem 0;
+    border-bottom: none;
+    justify-content: center;
+    font-size: 0.65rem;
+  }
+  .dtd-branch-col {
+    width: 100%;
+    border-right: none;
+    margin-bottom: 0.5rem;
+  }
+  .dtd-branch-col:last-child {
+    margin-bottom: 0;
+  }
+}
+.day-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.day-detail-item:hover {
+  background: #f3f4f6;
+}
+.day-detail-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.day-detail-info {
+  flex: 1;
+  min-width: 0;
+}
+/* Day detail group header */
+.day-detail-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4b5563;
+  background: #f3f4f6;
+  border-left: 3px solid #7b2d2d;
+  border-radius: 0 4px 4px 0;
+  margin-top: 0.5rem;
+}
+.day-detail-group-header:first-child {
+  margin-top: 0;
+}
+.day-detail-group-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.day-detail-group-count {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: 0.65rem;
+  color: #9ca3af;
+}
+
+.day-detail-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.day-detail-meta {
+  font-size: 0.72rem;
+  color: #6b7280;
 }
 
 .is-fading {
@@ -3324,6 +4285,38 @@ onMounted(async () => {
   color: #6b7280;
 }
 
+/* Branch group */
+.branch-group {
+  margin-bottom: 0.75rem;
+}
+.branch-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4b5563;
+  background: #f3f4f6;
+  border-left: 3px solid #7b2d2d;
+  border-radius: 0 4px 4px 0;
+}
+.branch-group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.branch-group-count {
+  margin-left: auto;
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: #9ca3af;
+}
+
 /* Empty state in left panel */
 .empty-left {
   text-align: center;
@@ -3351,6 +4344,137 @@ onMounted(async () => {
     position: static;
     max-height: 50vh;
   }
+}
+
+/* ── Timeline ────────────────────────────────────────── */
+.timeline-container {
+  margin-top: 0.5rem;
+}
+.timeline-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.timeline-date-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  min-width: 180px;
+  text-align: center;
+}
+.timeline-scroll {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+.timeline-grid {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  min-width: 100%;
+}
+.timeline-col {
+  min-width: 0;
+}
+.timeline-time-col {
+  width: 52px;
+  min-width: 52px;
+  flex-shrink: 0;
+  border-right: 1px solid #e5e7eb;
+}
+.timeline-corner {
+  height: 36px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.timeline-hour-label {
+  height: 48px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 2px;
+  font-size: 0.65rem;
+  color: #9ca3af;
+  font-weight: 600;
+  border-bottom: 1px solid #f3f4f6;
+}
+.timeline-branch-col {
+  border-right: 1px solid #e5e7eb;
+}
+.timeline-branch-col:last-child {
+  border-right: none;
+}
+.timeline-branch-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #4b5563;
+  background: #f9fafb;
+  border-left: 3px solid #7b2d2d;
+  border-bottom: 1px solid #e5e7eb;
+  height: 36px;
+}
+.timeline-branch-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.timeline-branch-body {
+  position: relative;
+  min-height: 768px;
+}
+.timeline-shift {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 4px;
+  padding: 0.25rem 0.35rem;
+  color: #fff;
+  cursor: pointer;
+  overflow: hidden;
+  z-index: 2;
+  transition: opacity 0.15s;
+}
+.timeline-shift:hover {
+  opacity: 0.85;
+}
+.timeline-shift-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timeline-shift-time {
+  font-size: 0.6rem;
+  opacity: 0.9;
+  line-height: 1.2;
+}
+.timeline-now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #dc2626;
+  z-index: 3;
+  pointer-events: none;
+}
+.timeline-now-line::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dc2626;
 }
 </style>
 
@@ -3688,6 +4812,56 @@ onMounted(async () => {
   background: #f5ede8;
   border-radius: 6px;
   border-left: 3px solid #7b1d1d;
+}
+
+.date-mode-pills {
+  display: flex;
+  gap: 2px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 2px;
+}
+.date-pill {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  text-align: center;
+}
+.date-pill:hover {
+  color: #5d4037;
+}
+.date-pill.active {
+  background: #fff;
+  color: #5d4037;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.range-sep {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  padding: 0 0.25rem;
+}
+.range-validation-error {
+  font-size: 0.72rem;
+  color: #dc2626;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: #fef2f2;
+  border-radius: 4px;
+}
+.result-count-label {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  font-weight: 600;
 }
 
 .reset-card {

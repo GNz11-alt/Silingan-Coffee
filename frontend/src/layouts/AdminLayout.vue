@@ -162,12 +162,36 @@
             >{{ unreadCount }}</span
           >
         </button>
-        <NotificationPanel
-          v-if="showNotifPanel"
-          :branch-id="null"
-          @close="showNotifPanel = false"
-          @update-count="unreadCount = $event"
-        />
+        <Teleport to="body">
+          <NotificationPanel
+            v-if="showNotifPanel"
+            :branch-id="null"
+            @close="showNotifPanel = false"
+            @update-count="unreadCount = $event"
+          />
+        </Teleport>
+
+                <Teleport to="body">
+          <div v-if="showLogoutModal" class="cpw-overlay" @click.self="showLogoutModal = false">
+            <div class="cpw-box">
+              <div class="cpw-header">
+                <h6>Confirm Logout</h6>
+                <button class="cpw-close" @click="showLogoutModal = false">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div class="cpw-body">
+                <p style="font-size: 14px; color: #495057; margin: 0;">
+                  Are you sure you want to log out?
+                </p>
+              </div>
+              <div class="cpw-footer">
+                <button class="cpw-cancel" @click="showLogoutModal = false">Cancel</button>
+                <button class="cpw-submit" @click="confirmLogout">Logout</button>
+              </div>
+            </div>
+          </div>
+        </Teleport>
 
         <button
           class="nav-item change-pw-btn"
@@ -343,8 +367,9 @@ const isMobileOpen = ref(false);
 const unreadCount = ref(0);
 const showNotifPanel = ref(false);
 const showChangePwModal = ref(false);
-const { fetchNotifications } = useNotifications();
+const { fetchNotificationBundle, subscribeToNotifications } = useNotifications();
 let notifGenInterval = null;
+let unsubscribeNotif = null;
 
 // Clock
 const now = ref(new Date());
@@ -502,13 +527,20 @@ const toggleNotifications = () => {
   showNotifPanel.value = !showNotifPanel.value;
 };
 
+const showLogoutModal = ref(false);
+
+// Replaces your existing logout — now just opens the modal
 const logout = () => {
+  showLogoutModal.value = true;
+};
+
+// Called when user confirms
+const confirmLogout = () => {
   localStorage.removeItem("isLoggedIn");
   localStorage.removeItem("username");
   localStorage.removeItem("role");
   localStorage.removeItem("branch");
   localStorage.removeItem("userId");
-  localStorage.removeItem("loginTime");
   router.push("/login");
 };
 
@@ -524,8 +556,13 @@ onMounted(async () => {
     now.value = new Date();
   }, 1000);
 
-  const notifs = await fetchNotifications(null);
-  unreadCount.value = notifs.length;
+  const notifs = await fetchNotificationBundle(null);
+  unreadCount.value = (notifs.unread || []).length;
+
+  // Real-time badge updates
+  unsubscribeNotif = subscribeToNotifications("admin", null, () => {
+    unreadCount.value += 1;
+  });
 
   // Generate notifications on mount
   generateAllNotifications({ role: "admin" });
@@ -542,6 +579,7 @@ onMounted(async () => {
 onUnmounted(() => {
   clearInterval(clockInterval);
   if (notifGenInterval) clearInterval(notifGenInterval);
+  if (unsubscribeNotif) unsubscribeNotif();
 });
 </script>
 

@@ -322,13 +322,12 @@
                     v-for="shift in day.shifts"
                     :key="shift.id"
                     class="shift-badge"
-                    :class="{ 'shift-badge--mine': shift.isMine }"
-                    :style="{ background: shift.color }"
+                    style="background: #5d4037"
                     @click.stop="selectedShift = shift"
                     title="View shift details"
                   >
-                    <div class="shift-badge-time">{{ shift.startTime }}</div>
-                    <div class="shift-badge-name">{{ shift.label }}</div>
+                  <div class="shift-badge-role">{{ shift.employeeName }}</div>
+                    <div class="shift-badge-time">{{ shift.startTime }}–{{ shift.endTime }}</div>
                   </div>
                 </div>
               </div>
@@ -339,30 +338,51 @@
         <!-- Upcoming Shifts -->
         <div class="section mt-4">
           <div class="section-header">
-            <div>
+            <div class="d-flex align-items-center gap-2">
               <h3>Upcoming Shifts</h3>
-              <p class="section-subtitle">Next 10 scheduled shifts</p>
+              <span class="shift-count-pill">{{ filteredUpcomingShifts.length }}</span>
             </div>
           </div>
-          <div v-if="upcomingShifts.length === 0" class="empty-state">
-            <Calendar :size="32" />
-            <p>No upcoming shifts found.</p>
+
+          <!-- Date filter strip -->
+          <div class="date-filter-strip mb-3">
+            <button
+              v-for="opt in dateFilterOptions"
+              :key="opt.key"
+              class="date-filter-btn"
+              :class="{ active: dateFilter === opt.key }"
+              @click="dateFilter = opt.key"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+
+          <div v-if="filteredUpcomingShifts.length === 0" class="empty-state">
+            <i class="bi bi-calendar3" style="font-size:2rem;display:block;margin-bottom:0.75rem;opacity:0.5;"></i>
+            <p>{{ emptyFilterMessage }}</p>
+            <button class="btn-avail btn-sm mt-2" @click="setAvailabilityShortcut">
+              <i class="bi bi-clock"></i> Set availability
+            </button>
           </div>
           <div v-else class="shifts-list">
-            <div v-for="(shift, i) in upcomingShifts" :key="i" class="shift-item">
-              <div
-                class="shift-item-dot"
-                :class="shift.Status === 'Active' ? 'active' : 'inactive'"
-              ></div>
-              <div class="shift-item-info">
-                <div class="shift-item-date">
+            <div v-for="(shift, i) in filteredUpcomingShifts" :key="i" class="sched-list-card">
+              <div class="sched-list-status-dot" :class="statusDotClass(shift.Status)"></div>
+              <div class="sched-list-info">
+                <div class="sched-list-name">
                   {{ formatShiftDate(shift.WorkDate) }}
                 </div>
-                <div class="shift-item-meta">
+                <div class="sched-list-meta">
                   {{ shift.TimeIn }} – {{ shift.TimeOut }} • {{ shift.Branch }}
                 </div>
               </div>
               <span class="shift-status-badge" :class="shiftStatusClass(shift.Status)">{{ shift.Status }}</span>
+              <button
+                class="sched-list-action-btn"
+                title="Request change"
+                @click="requestChangeForShiftFromCard(shift)"
+              >
+                <i class="bi bi-arrow-left-right"></i>
+              </button>
             </div>
           </div>
         </div>
@@ -454,7 +474,6 @@ import {
 } from "lucide-vue-next";
 // Cache constants — add above export default
 const CACHE_KEY_SCHEDULE = "cache_staff_schedule";
-const CACHE_KEY_ALL_SCHEDULES = "cache_staff_all_schedules";
 const CACHE_KEY_AVAILABILITY = "cache_staff_availability";
 const CACHE_KEY_INQUIRIES = "cache_staff_inquiries";
 const CACHE_TTL = 30 * 60 * 1000;
@@ -518,16 +537,7 @@ export default {
       // Schedule tab
       loadingSchedule: false,
       mySchedules: [],
-      allEmployeeSchedules: [], // All schedules for the month to show other employees
       monthOffset: 0, // 0 = current month, -1 = last month, +1 = next month
-      avatarColors: [
-        "#2D5A7B",
-        "#2D7B4F",
-        "#7B6B2D",
-        "#5A2D7B",
-        "#7B2D5A",
-        "#B8533A",
-      ],
 
       // Availability tab
       loadingAvail: false,
@@ -559,6 +569,15 @@ export default {
       // Toast
       toast: { message: "", type: "success" },
       toastInstance: null,
+
+      // Date filter for Upcoming Shifts
+      dateFilter: "today",
+      dateFilterOptions: [
+        { key: "today", label: "Today" },
+        { key: "week",  label: "This week" },
+        { key: "month", label: "This month" },
+        { key: "range", label: "Range" },
+      ],
     };
   },
 
@@ -613,28 +632,20 @@ export default {
         const isToday = d.getTime() === today.getTime();
         const isOtherMonth = d.getMonth() !== monthStart.getMonth();
 
-        // Collect all shifts for this day
-        const allShiftsForDay = this.allEmployeeSchedules.filter(
+        // Collect own shifts for this day
+        const myShiftsForDay = this.mySchedules.filter(
           (s) => s.WorkDate === dateStr,
         );
-        const shifts = allShiftsForDay.map((s) => {
-          const isMine = s.EmployeeId === this.employeeId;
+        const shifts = myShiftsForDay.map((s) => {
           return {
-            id: s.EmployeeId + dateStr,
-            employeeId: s.EmployeeId,
-            employeeName: s.Name,
+            id: "my-" + dateStr + "-" + (s.TimeIn || "00:00"),
+            employeeId: this.employeeId,
+            employeeName: this.currentEmployee?.Name || "",
             startTime: s.TimeIn,
             endTime: s.TimeOut,
-            label: isMine
-              ? "Me"
-              : s.Name?.split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase() || "",
-            isMine,
-            color: isMine
-              ? "#5d4037"
-              : this.avatarColors[s.EmployeeId % this.avatarColors.length],
+            label: s.Position || "My shift",
+            isMine: true,
+            color: "#5d4037",
             shiftDate: s.WorkDate,
             role: s.Position,
             branch: s.Branch,
@@ -665,12 +676,66 @@ export default {
         .sort();
     },
 
-    upcomingShifts() {
+    // Date range helpers for filter
+    weekStart() {
+      const d = new Date();
+      const day = d.getDay(); // 0=Sun
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+      const monday = new Date(d.setDate(diff));
+      return monday.toISOString().slice(0, 10);
+    },
+    weekEnd() {
+      const d = new Date(this.weekStart + "T00:00:00");
+      d.setDate(d.getDate() + 6);
+      return d.toISOString().slice(0, 10);
+    },
+    monthStartStr() {
+      const d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+    },
+    monthEndStr() {
+      const d = new Date();
+      return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
+    },
+
+    filteredUpcomingShifts() {
       const today = this.todayISO;
+      let startDate = today;
+      let endDate = today;
+
+      switch (this.dateFilter) {
+        case "today":
+          startDate = today;
+          endDate = today;
+          break;
+        case "week":
+          startDate = this.weekStart;
+          endDate = this.weekEnd;
+          break;
+        case "month":
+          startDate = this.monthStartStr;
+          endDate = this.monthEndStr;
+          break;
+        case "range":
+        default:
+          startDate = today;
+          endDate = this.monthEndStr;
+          break;
+      }
+
       return this.mySchedules
-        .filter((s) => s.WorkDate >= today)
-        .sort((a, b) => a.WorkDate.localeCompare(b.WorkDate))
-        .slice(0, 10);
+        .filter((s) => s.WorkDate >= startDate && s.WorkDate <= endDate)
+        .sort((a, b) => a.WorkDate.localeCompare(b.WorkDate));
+    },
+
+    emptyFilterMessage() {
+      const labels = {
+        today: "today",
+        week: "this week",
+        month: "this month",
+        range: "this range",
+      };
+      return `No shifts ${labels[this.dateFilter] || "found"}.`;
     },
 
     filteredAvailability() {
@@ -705,7 +770,6 @@ export default {
       sessionStorage.removeItem("page_refreshed");
       [
         CACHE_KEY_SCHEDULE,
-        CACHE_KEY_ALL_SCHEDULES,
         CACHE_KEY_AVAILABILITY,
         CACHE_KEY_INQUIRIES,
       ].forEach((k) => sessionStorage.removeItem(k));
@@ -723,7 +787,6 @@ export default {
     await this.loadEmployee();
     await Promise.all([
       this.loadSchedule(),
-      this.loadAllSchedules(),
       this.loadAvailability(),
       this.loadInquiries(),
     ]);
@@ -854,43 +917,6 @@ export default {
         this.showToast("Failed to load schedule.", "error");
       } finally {
         this.loadingSchedule = false;
-      }
-    },
-
-    async loadAllSchedules() {
-      const branchId = this.currentEmployee?.BranchAssigned;
-      if (!branchId) return;
-      const cached = loadCache(CACHE_KEY_ALL_SCHEDULES);
-      if (cached) {
-        this.allEmployeeSchedules = cached;
-        return;
-      }
-      try {
-        const { data, error } = await supabase
-          .from("schedule")
-          .select(
-            '*, branch!inner("BranchName"), employee!inner(EmployeeId, FirstName, LastName)',
-          )
-          .eq("BranchId", branchId)
-          .neq("Status", "Cancelled")
-          .neq("Status", "Archived")
-          .order("ShiftDate", { ascending: true });
-        if (error) throw error;
-        this.allEmployeeSchedules = (data || []).map((s) => ({
-          EmployeeId: s.EmployeeId,
-          Name:
-            `${s.employee?.FirstName || ""} ${s.employee?.LastName || ""}`.trim() ||
-            "Staff",
-          WorkDate: String(s.ShiftDate || "").slice(0, 10),
-          TimeIn: s.StartTime ? s.StartTime.slice(0, 5) : "",
-          TimeOut: s.EndTime ? s.EndTime.slice(0, 5) : "",
-          Branch: s.branch?.BranchName || "",
-          Position: s.Role || "",
-          Status: s.Status || "Scheduled",
-        }));
-        saveCache(CACHE_KEY_ALL_SCHEDULES, this.allEmployeeSchedules);
-      } catch (err) {
-        console.error("loadAllSchedules:", err);
       }
     },
 
@@ -1076,6 +1102,15 @@ export default {
       return map[status] || "status-inactive";
     },
 
+    statusDotClass(status) {
+      const map = {
+        Scheduled: "dot-scheduled",
+        Completed: "dot-completed",
+        Cancelled: "dot-cancelled",
+      };
+      return map[status] || "dot-scheduled";
+    },
+
     displayStatus(status) {
       const map = {
         Pending: "Pending",
@@ -1106,14 +1141,41 @@ export default {
       });
     },
 
+    requestChangeForShiftFromCard(shift) {
+      this.inquiryForm.ShiftDate = shift.WorkDate;
+      this.activeTab = "inquiries";
+      this.$nextTick(() => {
+        const el = this.$refs.inquiryFormSection;
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        this.showToast("Fill in the change request form and submit.", "success");
+      });
+    },
+
+    setAvailabilityShortcut() {
+      this.availForm.Date = this.todayISO;
+      this.activeTab = "availability";
+      this.$nextTick(() => {
+        const el = this.$refs.availFormSection;
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    },
+
     showToast(message, type = "success") {
+      if (this.toastInstance) {
+        clearTimeout(this.toastInstance);
+      }
       this.toast = { message, type };
-      setTimeout(() => {
+      this.toastInstance = setTimeout(() => {
         this.toast.message = "";
+        this.toastInstance = null;
       }, 3500);
     },
 
     hideToast() {
+      if (this.toastInstance) {
+        clearTimeout(this.toastInstance);
+        this.toastInstance = null;
+      }
       this.toast.message = "";
     },
   },
@@ -1345,30 +1407,25 @@ export default {
 }
 
 .shift-badge {
-  padding: 0.4rem 0.5rem;
+  padding: 0.35rem 0.5rem;
   border-radius: 4px;
   color: #fff;
   font-weight: 600;
   font-size: 0.7rem;
   display: flex;
-  align-items: center;
-  gap: 0.3rem;
+  flex-direction: column;
+  gap: 0.1rem;
+  line-height: 1.2;
+}
+
+.shift-badge-role {
+  font-weight: 700;
+  font-size: 0.7rem;
 }
 
 .shift-badge-time {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   opacity: 0.9;
-}
-
-.shift-badge-name {
-  font-weight: 700;
-  font-size: 0.7rem;
-  margin-left: auto;
-}
-
-.shift-badge--mine {
-  outline: 2px solid #fff;
-  outline-offset: -2px;
 }
 
 .btn-avail {
@@ -1925,10 +1982,6 @@ export default {
     font-size: 0.65rem;
   }
 
-  .shift-badge-time {
-    font-size: 0.6rem;
-  }
-
   .calendar-day-header {
     padding: 0.75rem 0.5rem;
     font-size: 0.8rem;
@@ -2039,6 +2092,130 @@ export default {
     max-height: 50vh;
   }
 }
+
+/* ── Date Filter Strip ─────────────────────────────────────────── */
+.date-filter-strip {
+  display: flex;
+  gap: 0.35rem;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 0.25rem;
+}
+.date-filter-btn {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.date-filter-btn:hover {
+  color: #1f2937;
+}
+.date-filter-btn.active {
+  background: #fff;
+  color: #5d4037;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* ── Shift Count Pill ─────────────────────────────────────────── */
+.shift-count-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 0.5rem;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+/* ── Schedule List Card (admin style) ─────────────────────────── */
+.sched-list-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  background: #fafafa;
+  border: 1px solid #f0ebe8;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.sched-list-card:hover {
+  background: #f5f0ed;
+}
+.sched-list-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+.sched-list-info {
+  flex: 1;
+  min-width: 0;
+}
+.sched-list-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.sched-list-meta {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+/* ── Status Dot ───────────────────────────────────────────────── */
+.sched-list-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sched-list-status-dot.dot-scheduled {
+  background: #f59e0b;
+}
+.sched-list-status-dot.dot-completed {
+  background: #10b981;
+}
+.sched-list-status-dot.dot-cancelled {
+  background: #ef4444;
+}
+
+/* ── Action Button ────────────────────────────────────────────── */
+.sched-list-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.sched-list-action-btn:hover {
+  background: #e5e7eb;
+  color: #5d4037;
+}
+
 </style>
 
 <!-- Global styles for teleported modals — scoped doesn't reach body-level elements -->

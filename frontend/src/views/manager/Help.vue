@@ -144,27 +144,42 @@
       </div>
     </div>
 
-    <!-- ── ADDITIONAL RESOURCES ────────────────────────────── -->
-    <div class="resources-panel mt-4">
-      <div class="panel-title mb-1">Additional Resources</div>
-      <div class="panel-sub mb-3">More ways to learn and get help</div>
-      <div class="resources-list">
-        <div class="resource-item">
-          <div class="resource-icon-wrap">
-            <component :is="BookOpen" :size="20" />
-          </div>
-          <div class="resource-text">
-            <div class="resource-title">User Manual</div>
-            <div class="resource-sub">
-              Complete documentation for all modules
+          <!-- ── ADDITIONAL RESOURCES ────────────────────────────── -->
+          <div class="resources-panel mt-4">
+            <div class="panel-title mb-1">Additional Resources</div>
+            <div class="panel-sub mb-3">More ways to learn and get help</div>
+            <div class="resources-list">
+              <!-- User Manual → opens booklet viewer -->
+              <div class="resource-item" @click="showManual = true">
+                <div class="resource-icon-wrap">
+                  <component :is="BookOpen" :size="20" />
+                </div>
+                <div class="resource-text">
+                  <div class="resource-title">User Manual</div>
+                  <div class="resource-sub">
+                    Complete documentation for all modules
+                  </div>
+                </div>
+                <span class="resource-arrow">→</span>
+              </div>
             </div>
           </div>
-          <span class="resource-arrow">→</span>
+
+          <!-- ── BOOKLET VIEWER ──────────────────────────────────── -->
+          <!--
+            Replace SUPABASE_PDF_URL with your actual public Supabase Storage URL.
+            Example:
+              https://abcdefgh.supabase.co/storage/v1/object/public/manuals/user-manual.pdf
+
+            To update the manual, just upload a new PDF to the same path in Supabase Storage.
+            The viewer will always fetch the latest version on open.
+          -->
+          <BookletViewer
+            v-model="showManual"
+            pdf-url="https://shotdzuirteocjrxiwwq.supabase.co/storage/v1/object/public/manuals/UserManual%20(1).pdf"
+          />
         </div>
-      </div>
-    </div>
-  </div>
-</template>
+      </template>
 
 <script setup>
 import { ref, computed } from "vue";
@@ -181,6 +196,9 @@ import {
   Mail,
   BookOpen,
 } from "lucide-vue-next";
+
+import BookletViewer from "@/components/BookletViewer.vue"; 
+const showManual = ref(false);
 
 const lastBackupStatus = ref("—");
 const searchQuery = ref("");
