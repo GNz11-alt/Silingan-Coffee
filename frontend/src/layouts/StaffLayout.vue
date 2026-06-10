@@ -86,15 +86,6 @@
         </router-link>
 
         <router-link
-          to="/staff/backup"
-          class="nav-item"
-          :class="{ active: $route.path === '/staff/backup' }"
-        >
-          <component :is="Database" class="nav-icon" :size="20" />
-          <span v-show="!isSidebarCollapsed">Backup & Restore</span>
-        </router-link>
-
-        <router-link
           to="/staff/help"
           class="nav-item"
           :class="{ active: $route.path === '/staff/help' }"

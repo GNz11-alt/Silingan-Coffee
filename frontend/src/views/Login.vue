@@ -179,6 +179,7 @@
               type="text"
               v-model="forgotUsername"
               placeholder="Enter your username"
+              @keyup.enter="submitForgotPassword"
             />
           </div>
         </div>
@@ -324,11 +325,11 @@ const handleLogin = async () => {
     .eq("id", data.id);
 
   if (data.role === "admin") {
-    router.push("/admin/dashboard");
+    router.replace("/admin/dashboard");
   } else if (data.role === "manager") {
-    router.push("/manager/dashboard");
+    router.replace("/manager/dashboard");
   } else if (data.role === "staff") {
-    router.push("/staff/dashboard");
+    router.replace("/staff/dashboard");
   }
 };
 

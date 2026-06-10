@@ -1185,6 +1185,8 @@ onMounted(loadAll);
 
 .table-wrap {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 480px;
   margin: 0 -20px;
   padding: 0 20px;
 }
@@ -1195,6 +1197,9 @@ onMounted(loadAll);
 }
 .backup-table th {
   background: #f8f9fa;
+  position: sticky; 
+  top: 0; 
+  z-index: 1;
   color: #6c757d;
   font-weight: 600;
   font-size: 12px;

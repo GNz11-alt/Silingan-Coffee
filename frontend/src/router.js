@@ -196,11 +196,6 @@ const routes = [
         component: () => import("./views/staff/Menu.vue"),
       },
       {
-        path: "backup",
-        name: "StaffBackup",
-        component: () => import("./views/staff/Backup.vue"),
-      },
-      {
         path: "help",
         name: "StaffHelp",
         component: () => import("./views/staff/Help.vue"),
@@ -234,6 +229,15 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const isLoggedIn = localStorage.getItem("isLoggedIn");
   const role = localStorage.getItem("role");
+
+  // If already logged in, block going back to login or landing
+  if (isLoggedIn && (to.path === "/login" || to.path === "/")) {
+    if (role === "admin") next("/admin/dashboard");
+    else if (role === "manager") next("/manager/dashboard");
+    else if (role === "staff") next("/staff/dashboard");
+    else next("/login");
+    return;
+  }
 
   // If not logged in and trying to access protected page
   if (!isLoggedIn && to.path !== "/login" && to.path !== "/") {
