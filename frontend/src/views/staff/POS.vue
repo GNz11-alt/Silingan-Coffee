@@ -1117,17 +1117,41 @@ const fetchDiscounts = async (force = false) => {
 
 const fetchTransactions = async (force = false) => {
   loadingTransactions.value = true;
-  if (!force) { const cached = readCache(CACHE_KEYS.transactions); if (cached) { transactions.value = cached; loadingTransactions.value = false; return; } }
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const tom = new Date(today); tom.setDate(tom.getDate() + 1);
-  const { data } = await supabase.from("orders").select(`
-    OrderId, TotalAmount, DiscountId, DiscountedAmount, FinalAmount,
-    cashpaid, changegiven, PaymentMethod, Status, CreatedAt,
-    transaction_number, cancel_reason, discount_id_number, order_type,
-    discount ( discountid, discountname, discounttype, discountvalue ),
-    orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
-  `).gte("CreatedAt", today.toISOString()).lt("CreatedAt", tom.toISOString()).order("CreatedAt", { ascending: false });
-  if (data) { transactions.value = data; writeCache(CACHE_KEYS.transactions, transactions.value, CACHE_TTL.transactions); }
+  
+  // Always bust cache for today's transactions when force=true
+  if (force) {
+    sessionStorage.removeItem(CACHE_KEYS.transactions);
+  } else {
+    const cached = readCache(CACHE_KEYS.transactions);
+    if (cached) {
+      transactions.value = cached;
+      loadingTransactions.value = false;
+      return;
+    }
+  }
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const { data } = await supabase
+    .from("orders")
+    .select(`
+      OrderId, TotalAmount, DiscountId, DiscountedAmount, FinalAmount,
+      cashpaid, changegiven, PaymentMethod, Status, CreatedAt,
+      transaction_number, cancel_reason, discount_id_number, order_type,
+      discount ( discountid, discountname, discounttype, discountvalue ),
+      orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
+    `)
+    .gte("CreatedAt", today.toISOString())
+    .lt("CreatedAt", tomorrow.toISOString())
+    .order("CreatedAt", { ascending: false });
+    
+  if (data) { 
+    transactions.value = data;
+    writeCache(CACHE_KEYS.transactions, transactions.value, CACHE_TTL.transactions);
+  }
   loadingTransactions.value = false;
 };
 
