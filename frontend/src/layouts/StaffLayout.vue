@@ -936,6 +936,8 @@ input[type="password"]::-ms-reveal {
   flex: 1;
   margin-left: 280px;
   transition: margin-left 0.3s ease;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .dashboard.sidebar-collapsed .main-content {

@@ -2141,6 +2141,14 @@ onMounted(async () => {
   align-items: center;
   margin-bottom: 24px;
 }
+.page-header,
+.stats-grid,
+.branch-selector,
+.fefo-alert,
+.eoq-panel,
+.tabs-row {
+  max-width: 100%;
+}
 .ph-left h1 {
   font-size: 26px;
   font-weight: 800;
@@ -2196,8 +2204,20 @@ onMounted(async () => {
   box-sizing: border-box;
   transition: border-color 0.2s;
 }
-* { box-sizing: border-box; }
-.inventory-content { overflow-x: hidden; }
+* {
+  box-sizing: border-box;
+}
+.inventory-content {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.inventory-content {
+  overflow-x: hidden;
+  width: 100%;
+}
+.inventory-content {
+  overflow-x: hidden;
+}
 .branch-dropdown:focus,
 .filter-select:focus {
   border-color: #8b4513;
@@ -2312,6 +2332,17 @@ onMounted(async () => {
   padding: 10px 14px;
   border: 1px solid #e9d5ff;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.fefo-alert {
+  overflow: hidden;
+}
+
+.expire-btn {
+  flex-shrink: 0;
+  max-width: 100%;
 }
 .fefo-item-info {
   flex: 1;
@@ -2402,6 +2433,10 @@ onMounted(async () => {
   margin: 0;
   opacity: 0.8;
 }
+.header-actions {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
 .eoq-list {
   display: flex;
   flex-direction: column;
@@ -2471,6 +2506,7 @@ onMounted(async () => {
   border-radius: 10px;
   padding: 4px;
   width: fit-content;
+  max-width: 100%;
 }
 .tab-btn {
   display: flex;
@@ -3601,8 +3637,13 @@ onMounted(async () => {
 /* ─── RESPONSIVE ───────────────────────────────────────── */
 
 @media (max-width: 768px) {
-.inventory-content { padding: 14px; max-width: 100vw; overflow-x: hidden; }
-
+  .inventory-content {
+    padding: 14px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
   /* Stats — always 2 columns */
   .stats-grid {
     grid-template-columns: 1fr 1fr;
@@ -3709,11 +3750,11 @@ onMounted(async () => {
   }
 
   /* Table — only THIS scrolls horizontally */
-.table-container {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  max-width: 100%;
-}
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
   .inventory-table {
     min-width: 600px;
   }

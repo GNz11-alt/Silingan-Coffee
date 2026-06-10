@@ -395,22 +395,30 @@
                 class="date-pill"
                 :class="{ active: schedDateMode === 'all' }"
                 @click="schedDateMode = 'all'"
-              >All Dates</button>
+              >
+                All Dates
+              </button>
               <button
                 class="date-pill"
                 :class="{ active: schedDateMode === 'today' }"
                 @click="setTodayFilter"
-              >Today</button>
+              >
+                Today
+              </button>
               <button
                 class="date-pill"
                 :class="{ active: schedDateMode === 'single' }"
                 @click="schedDateMode = 'single'"
-              >Single</button>
+              >
+                Single
+              </button>
               <button
                 class="date-pill"
                 :class="{ active: schedDateMode === 'range' }"
                 @click="schedDateMode = 'range'"
-              >Range</button>
+              >
+                Range
+              </button>
             </div>
 
             <!-- Single date input -->
@@ -478,7 +486,9 @@
 
             <!-- Result count label -->
             <div class="result-count-label mb-1">
-              {{ filteredSchedules.length }} schedule{{ filteredSchedules.length !== 1 ? 's' : '' }}
+              {{ filteredSchedules.length }} schedule{{
+                filteredSchedules.length !== 1 ? "s" : ""
+              }}
             </div>
 
             <div class="sched-card-list">
@@ -531,10 +541,7 @@
                         >{{ sched.status }}</span
                       >
                       <div class="d-flex gap-1">
-                        <button
-                          class="icon-btn"
-                          @click="openEditModal(sched)"
-                        >
+                        <button class="icon-btn" @click="openEditModal(sched)">
                           <i class="bi bi-pencil-square"></i>
                         </button>
                         <button
@@ -547,8 +554,8 @@
                     </div>
                   </div>
                 </div>
-            </template>
-            <template v-else>
+              </template>
+              <template v-else>
                 <div
                   v-for="sched in filteredSchedules"
                   :key="sched.id"
@@ -579,10 +586,7 @@
                       >{{ sched.status }}</span
                     >
                     <div class="d-flex gap-1">
-                      <button
-                        class="icon-btn"
-                        @click="openEditModal(sched)"
-                      >
+                      <button class="icon-btn" @click="openEditModal(sched)">
                         <i class="bi bi-pencil-square"></i>
                       </button>
                       <button
@@ -701,7 +705,10 @@
                     >
                     <span class="overflow-pill-avatars">
                       <span
-                        v-for="s in day.shifts.slice(overflowThreshold, overflowThreshold + 3)"
+                        v-for="s in day.shifts.slice(
+                          overflowThreshold,
+                          overflowThreshold + 3,
+                        )"
                         :key="s.id"
                         class="overflow-pill-avatar"
                         :style="{ background: avatarColor(s.employeeId) }"
@@ -719,14 +726,23 @@
           <!-- Timeline -->
           <div v-if="schedViewMode === 'timeline'" class="timeline-container">
             <div class="timeline-nav mb-2">
-              <button class="btn btn-ghost btn-sm" @click="timelineDateOffset -= 1">
+              <button
+                class="btn btn-ghost btn-sm"
+                @click="timelineDateOffset -= 1"
+              >
                 <i class="bi bi-chevron-left"></i>
               </button>
               <span class="timeline-date-label">{{ timelineDateLabel }}</span>
-              <button class="btn btn-ghost btn-sm" @click="timelineDateOffset = 0">
+              <button
+                class="btn btn-ghost btn-sm"
+                @click="timelineDateOffset = 0"
+              >
                 Today
               </button>
-              <button class="btn btn-ghost btn-sm" @click="timelineDateOffset += 1">
+              <button
+                class="btn btn-ghost btn-sm"
+                @click="timelineDateOffset += 1"
+              >
                 <i class="bi bi-chevron-right"></i>
               </button>
             </div>
@@ -764,20 +780,25 @@
                       class="timeline-shift"
                       :style="{
                         top: timeToPosition(shift.startTime) + 'px',
-                        height: timeToHeight(shift.startTime, shift.endTime) + 'px',
+                        height:
+                          timeToHeight(shift.startTime, shift.endTime) + 'px',
                         background: avatarColor(shift.employeeId),
                       }"
                       @click.stop="showShiftDetail = shift"
                       :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
                     >
                       <div
-                        v-if="timeToHeight(shift.startTime, shift.endTime) >= 28"
+                        v-if="
+                          timeToHeight(shift.startTime, shift.endTime) >= 28
+                        "
                         class="timeline-shift-name"
                       >
                         {{ shift.employeeName }}
                       </div>
                       <div
-                        v-if="timeToHeight(shift.startTime, shift.endTime) >= 28"
+                        v-if="
+                          timeToHeight(shift.startTime, shift.endTime) >= 28
+                        "
                         class="timeline-shift-time"
                       >
                         {{ shift.startTime }}–{{ shift.endTime }}
@@ -1060,15 +1081,16 @@
             <p>
               Archive the schedule for
               <strong>{{ deleteTarget?.employeeName }}</strong> on
-              <strong>{{ formatDate(deleteTarget?.shiftDate) }}</strong>?
+              <strong>{{ formatDate(deleteTarget?.shiftDate) }}</strong
+              >?
             </p>
             <p
               v-if="deleteTarget && isPastDate(deleteTarget.shiftDate)"
               class="text-warning"
             >
               <i class="bi bi-exclamation-triangle me-1"></i>
-              This schedule has already passed. Archiving will send it to
-              Backup & Restore.
+              This schedule has already passed. Archiving will send it to Backup
+              & Restore.
             </p>
           </div>
           <div class="modal-panel-footer">
@@ -1182,7 +1204,10 @@
             <div class="day-detail-header-actions">
               <button
                 class="btn btn-sm btn-primary-brand"
-                @click="openCreateModal(showDayDetail.dateStr); closeDayDetail()"
+                @click="
+                  openCreateModal(showDayDetail.dateStr);
+                  closeDayDetail();
+                "
               >
                 <i class="bi bi-plus-lg me-1"></i> Schedule
               </button>
@@ -1194,7 +1219,7 @@
           <div class="modal-panel-body modal-panel-body--day-detail">
             <template v-if="showDayDetail.shifts.length">
               <div class="day-detail-timeline-wrap">
-              <div class="day-detail-timeline-grid">
+                <div class="day-detail-timeline-grid">
                   <div class="dtd-time-col">
                     <div
                       v-for="h in dayDetailHours"
@@ -1218,7 +1243,9 @@
                         :style="{ background: group.color }"
                       ></span>
                       {{ group.branchName }}
-                      <span class="dtd-branch-count">{{ group.shifts.length }}</span>
+                      <span class="dtd-branch-count">{{
+                        group.shifts.length
+                      }}</span>
                     </div>
                     <div
                       class="dtd-branch-body"
@@ -1230,47 +1257,74 @@
                         class="dtd-shift"
                         :style="{
                           top: timeToPosition(shift.startTime) + 'px',
-                          height: timeToHeight(shift.startTime, shift.endTime) + 'px',
+                          height:
+                            timeToHeight(shift.startTime, shift.endTime) + 'px',
                           background: avatarColor(shift.employeeId),
                         }"
-                        @click.stop="showShiftDetail = shift; closeDayDetail()"
+                        @click.stop="
+                          showShiftDetail = shift;
+                          closeDayDetail();
+                        "
                         :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
                       >
                         <div
                           class="dtd-shift-pattern"
-                          :style="{ backgroundImage: patternSVG(ACCENT_VARIANTS[empVariantIndex(shift.employeeId)].pattern) }"
+                          :style="{
+                            backgroundImage: patternSVG(
+                              ACCENT_VARIANTS[empVariantIndex(shift.employeeId)]
+                                .pattern,
+                            ),
+                          }"
                         ></div>
                         <div
                           class="dtd-shift-stripe"
-                          :style="{ background: ACCENT_VARIANTS[empVariantIndex(shift.employeeId)].accent }"
+                          :style="{
+                            background:
+                              ACCENT_VARIANTS[empVariantIndex(shift.employeeId)]
+                                .accent,
+                          }"
                         ></div>
                         <div class="dtd-shift-content">
                           <div class="dtd-shift-name">
                             {{ shift.employeeName }}
                           </div>
                           <div
-                            v-if="timeToHeight(shift.startTime, shift.endTime) >= 48"
+                            v-if="
+                              timeToHeight(shift.startTime, shift.endTime) >= 48
+                            "
                             class="dtd-shift-time"
                           >
                             {{ shift.startTime }}–{{ shift.endTime }}
                           </div>
                           <div
-                            v-if="timeToHeight(shift.startTime, shift.endTime) >= 72"
+                            v-if="
+                              timeToHeight(shift.startTime, shift.endTime) >= 72
+                            "
                             class="dtd-shift-role-pill"
-                            :style="{ background: ROLE_PILL_COLORS[shift.role] || 'rgba(255,255,255,0.5)' }"
+                            :style="{
+                              background:
+                                ROLE_PILL_COLORS[shift.role] ||
+                                'rgba(255,255,255,0.5)',
+                            }"
                           >
                             {{ shift.role }}
                           </div>
                         </div>
                         <div class="dtd-shift-actions">
                           <button
-                            @click.stop="openEditModal(shift); closeDayDetail()"
+                            @click.stop="
+                              openEditModal(shift);
+                              closeDayDetail();
+                            "
                             title="Edit"
                           >
                             <i class="bi bi-pencil"></i>
                           </button>
                           <button
-                            @click.stop="confirmDelete(shift); closeDayDetail()"
+                            @click.stop="
+                              confirmDelete(shift);
+                              closeDayDetail();
+                            "
                             title="Archive"
                           >
                             <i class="bi bi-trash3"></i>
@@ -1288,7 +1342,10 @@
                 <p>No shifts scheduled for this day.</p>
                 <button
                   class="btn btn-primary-brand btn-sm"
-                  @click="openCreateModal(showDayDetail.dateStr); closeDayDetail()"
+                  @click="
+                    openCreateModal(showDayDetail.dateStr);
+                    closeDayDetail();
+                  "
                 >
                   <i class="bi bi-plus-lg me-1"></i> Create Schedule
                 </button>
@@ -1581,11 +1638,15 @@ const SHIFT_OVERFLOW = 3;
 const windowWidth = ref(window.innerWidth);
 let resizeCleanup = null;
 onMounted(() => {
-  const onResize = () => { windowWidth.value = window.innerWidth; };
+  const onResize = () => {
+    windowWidth.value = window.innerWidth;
+  };
   window.addEventListener("resize", onResize);
   resizeCleanup = () => window.removeEventListener("resize", onResize);
 });
-onUnmounted(() => { resizeCleanup?.(); });
+onUnmounted(() => {
+  resizeCleanup?.();
+});
 const overflowThreshold = computed(() =>
   windowWidth.value < 600 ? 2 : SHIFT_OVERFLOW,
 );
@@ -2197,7 +2258,8 @@ const filteredSchedules = computed(() => {
       s.role.toLowerCase().includes(q);
     let matchDate = true;
     if (dateRange.start && dateRange.end) {
-      matchDate = s.shiftDate >= dateRange.start && s.shiftDate <= dateRange.end;
+      matchDate =
+        s.shiftDate >= dateRange.start && s.shiftDate <= dateRange.end;
     }
     const matchBranch =
       !schedBranchFilter.value ||
@@ -2254,7 +2316,10 @@ const dayDetailDateLabel = computed(() => {
   if (!showDayDetail.value) return "";
   const d = new Date(showDayDetail.value.dateStr);
   return d.toLocaleDateString("en-PH", {
-    weekday: "long", month: "long", day: "numeric", year: "numeric",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   });
 });
 
@@ -2273,8 +2338,8 @@ const dayDetailHours = computed(() => {
   return hours;
 });
 
-const dayDetailTimelineHeight = computed(() =>
-  dayDetailHours.value.length * TLINE_ROW_HEIGHT,
+const dayDetailTimelineHeight = computed(
+  () => dayDetailHours.value.length * TLINE_ROW_HEIGHT,
 );
 
 const schedulesByDate = computed(() =>
@@ -2307,7 +2372,10 @@ const timelineDateLabel = computed(() => {
   const d = new Date();
   d.setDate(d.getDate() + timelineDateOffset.value);
   return d.toLocaleDateString("en-PH", {
-    weekday: "short", month: "short", day: "numeric", year: "numeric",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 });
 
@@ -2374,30 +2442,34 @@ function patternSVG(type) {
 }
 
 const ROLE_PILL_COLORS = {
-  "Barista": "rgba(255,255,255,0.9)",
-  "Cashier": "rgba(255,193,7,0.85)",
+  Barista: "rgba(255,255,255,0.9)",
+  Cashier: "rgba(255,193,7,0.85)",
   "Kitchen Staff": "rgba(255,152,0,0.85)",
   "Cleaning Staff": "rgba(0,188,212,0.85)",
-  "Server": "rgba(233,30,99,0.85)",
-  "Supervisor": "rgba(76,175,80,0.85)",
+  Server: "rgba(233,30,99,0.85)",
+  Supervisor: "rgba(76,175,80,0.85)",
 };
 
 const timeToPosition = (time) => {
   const [h, m] = time.split(":").map(Number);
-  return ((h + m / 60) - TLINE_AXIS_START) * TLINE_ROW_HEIGHT;
+  return (h + m / 60 - TLINE_AXIS_START) * TLINE_ROW_HEIGHT;
 };
 
 const timeToHeight = (start, end) => {
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
-  let dur = (eh + em / 60) - (sh + sm / 60);
-  if (dur <= 0) dur = TLINE_AXIS_END - TLINE_AXIS_START - (sh + sm / 60 - TLINE_AXIS_START);
+  let dur = eh + em / 60 - (sh + sm / 60);
+  if (dur <= 0)
+    dur = TLINE_AXIS_END - TLINE_AXIS_START - (sh + sm / 60 - TLINE_AXIS_START);
   return Math.max(dur * TLINE_ROW_HEIGHT, 20);
 };
 
 const currentTimeTop = computed(() => {
   const now = new Date();
-  return ((now.getHours() + now.getMinutes() / 60) - TLINE_AXIS_START) * TLINE_ROW_HEIGHT;
+  return (
+    (now.getHours() + now.getMinutes() / 60 - TLINE_AXIS_START) *
+    TLINE_ROW_HEIGHT
+  );
 });
 
 // Calendar view computed properties
@@ -3131,6 +3203,8 @@ onMounted(async () => {
   background: #fafafa;
   min-height: 100vh;
   font-family: "Inter", sans-serif;
+  overflow-x: hidden;
+  min-width: 0;
 }
 .page-title {
   font-size: 26px;
@@ -3367,8 +3441,12 @@ onMounted(async () => {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
-  overflow: hidden;
+  overflow-x: auto;
   box-shadow: var(--shadow);
+}
+.calendar-header,
+.calendar-grid {
+  min-width: 840px;
 }
 
 .calendar-header {
@@ -3409,6 +3487,9 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   cursor: pointer;
+  min-height: 120px;
+  min-width: 0;
+  padding: 0.75rem;
 }
 
 .calendar-day:nth-child(7n) {
@@ -3483,6 +3564,10 @@ onMounted(async () => {
   font-weight: 700;
   font-size: 0.7rem;
   margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70px;
 }
 
 /* Overflow pill */
@@ -3668,7 +3753,7 @@ onMounted(async () => {
   line-height: 1;
   padding: 1px 5px;
   border-radius: 8px;
-  color: rgba(0,0,0,0.75);
+  color: rgba(0, 0, 0, 0.75);
   margin-top: 2px;
 }
 .dtd-shift-actions {
@@ -4049,6 +4134,9 @@ onMounted(async () => {
   gap: 1.25rem;
   align-items: flex-start;
   min-height: calc(100vh - 140px);
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* LEFT PANEL */
@@ -4841,7 +4929,7 @@ onMounted(async () => {
 .date-pill.active {
   background: #fff;
   color: #5d4037;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 .range-sep {
   display: flex;

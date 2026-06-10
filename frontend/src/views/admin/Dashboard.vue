@@ -328,82 +328,114 @@ const fetchDashboardData = async () => {
 
   activeBranches.value = branchData?.length || 0;
 
-  // Fetch raw inventory grouped by branch + product
+  // Fetch all transactions (in and out) to compute true net stock
   const { data: rawInventory } = await supabase
     .from("rawproducttransaction")
-    .select("branchid, rawproductid, quantity, rawproduct(reorderlevel)")
-    .eq("transactiontype", "in")
+    .select(
+      "branchid, rawproductid, transactiontype, quantity, rawproduct(reorderlevel)",
+    )
     .gt("quantity", 0);
 
-  // Group quantity by branchid + rawproductid
-  const branchItemStock = {};
+  // Net stock per rawproductid (across all branches, matching inventory page logic)
+  const itemStock = {};
   for (const row of rawInventory ?? []) {
-    const key = `${row.branchid}__${row.rawproductid}`;
-    if (!branchItemStock[key]) {
-      branchItemStock[key] = {
-        branchid: row.branchid,
-        rawproductid: row.rawproductid,
+    const id = row.rawproductid;
+    if (!itemStock[id]) {
+      itemStock[id] = {
+        rawproductid: id,
         quantity: 0,
         reorderlevel: row.rawproduct?.reorderlevel ?? null,
       };
     }
-    branchItemStock[key].quantity += row.quantity;
+    itemStock[id].quantity +=
+      row.transactiontype === "in" ? (row.quantity ?? 0) : -(row.quantity ?? 0);
   }
 
-  const branchStockList = Object.values(branchItemStock);
+  // Clamp negatives to 0
+  for (const item of Object.values(itemStock)) {
+    item.quantity = Math.max(0, item.quantity);
+  }
 
-  // Global low stock count
+  const stockList = Object.values(itemStock);
+
   const { data: allProducts } = await supabase
     .from("rawproduct")
     .select("rawproductid")
     .neq("status", "Archived");
 
   const totalItems = allProducts?.length ?? 0;
-  lowStockCount.value = branchStockList.filter(
-    (i) => i.reorderlevel && i.quantity <= i.reorderlevel && i.quantity > 0,
+  lowStockCount.value = stockList.filter(
+    (i) =>
+      i.reorderlevel != null && i.quantity > 0 && i.quantity <= i.reorderlevel,
   ).length;
   lowStockPercent.value =
     totalItems > 0 ? (lowStockCount.value / totalItems) * 100 : 0;
 
   // Build branch performance
   if (branchData) {
-    branchPerformance.value = branchData.map((branch) => {
-      const branchOrders = (ordersData || []).filter(
-        (o) => o.BranchId === branch.BranchId,
-      );
-      const revenue = branchOrders.reduce(
-        (sum, o) => sum + Number(o.FinalAmount),
-        0,
-      );
+    branchPerformance.value = await Promise.all(
+      branchData.map(async (branch) => {
+        const branchOrders = (ordersData || []).filter(
+          (o) => o.BranchId === branch.BranchId,
+        );
+        const revenue = branchOrders.reduce(
+          (sum, o) => sum + Number(o.FinalAmount),
+          0,
+        );
 
-      const branchItems = branchStockList.filter(
-        (i) => i.branchid === branch.BranchId,
-      );
+        const { data: branchTxData } = await supabase
+          .from("rawproducttransaction")
+          .select(
+            "rawproductid, transactiontype, quantity, rawproduct(reorderlevel)",
+          )
+          .eq("branchid", branch.BranchId)
+          .gt("quantity", 0);
 
-      const zeroStockCount = branchItems.filter((i) => i.quantity <= 0).length;
-      const branchLowStock = branchItems.filter(
-        (i) => i.reorderlevel && i.quantity <= i.reorderlevel && i.quantity > 0,
-      ).length;
+        const branchItemMap = {};
+        for (const row of branchTxData ?? []) {
+          const id = row.rawproductid;
+          if (!branchItemMap[id]) {
+            branchItemMap[id] = {
+              quantity: 0,
+              reorderlevel: row.rawproduct?.reorderlevel ?? null,
+            };
+          }
+          branchItemMap[id].quantity +=
+            row.transactiontype === "in"
+              ? (row.quantity ?? 0)
+              : -(row.quantity ?? 0);
+          branchItemMap[id].quantity = Math.max(0, branchItemMap[id].quantity);
+        }
 
-      let status = "good";
-      let statusText = "no low stock items";
+        const branchItems = Object.values(branchItemMap);
+        const zeroStockCount = branchItems.filter(
+          (i) => i.quantity <= 0,
+        ).length;
+        const branchLowStock = branchItems.filter(
+          (i) =>
+            i.reorderlevel && i.quantity > 0 && i.quantity <= i.reorderlevel,
+        ).length;
 
-      if (zeroStockCount > 0) {
-        status = "critical";
-        statusText = `${zeroStockCount} Out of Stock`;
-      } else if (branchLowStock > 0) {
-        status = "warning";
-        statusText = `${branchLowStock} low stock item${branchLowStock > 1 ? "s" : ""}`;
-      }
+        let status = "good";
+        let statusText = "no low stock items";
 
-      return {
-        name: branch.BranchName,
-        revenue,
-        orders: branchOrders.length,
-        status,
-        statusText,
-      };
-    });
+        if (zeroStockCount > 0) {
+          status = "critical";
+          statusText = `${zeroStockCount} Out of Stock`;
+        } else if (branchLowStock > 0) {
+          status = "warning";
+          statusText = `${branchLowStock} low stock item${branchLowStock > 1 ? "s" : ""}`;
+        }
+
+        return {
+          name: branch.BranchName,
+          revenue,
+          orders: branchOrders.length,
+          status,
+          statusText,
+        };
+      }),
+    );
   }
 
   // Fetch total employees
@@ -739,38 +771,87 @@ onMounted(() => {
 }
 
 @media (min-width: 769px) {
-  .stats-grid { grid-template-columns: repeat(3, 1fr); }
-  .branch-grid { grid-template-columns: repeat(3, 1fr); }
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .branch-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (min-width: 1024px) {
-  .stats-grid { grid-template-columns: repeat(5, 1fr); }
-  .branch-grid { grid-template-columns: repeat(5, 1fr); }
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .branch-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
-  .dashboard-content { padding: 14px; overflow-x: hidden; }
+  .dashboard-content {
+    padding: 14px;
+    overflow-x: hidden;
+  }
 
   /* Stats and branch — always 2 col */
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .stat-card { padding: 12px; gap: 8px; min-width: 0; }
-  .stat-info { min-width: 0; }
-  .stat-info h3 { font-size: 11px; }
-  .stat-value { font-size: 18px; }
-  .stat-trend { font-size: 10px; }
-  .stat-icon svg { width: 20px; height: 20px; }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 12px;
+    gap: 8px;
+    min-width: 0;
+  }
+  .stat-info {
+    min-width: 0;
+  }
+  .stat-info h3 {
+    font-size: 11px;
+  }
+  .stat-value {
+    font-size: 18px;
+  }
+  .stat-trend {
+    font-size: 10px;
+  }
+  .stat-icon svg {
+    width: 20px;
+    height: 20px;
+  }
 
-  .branch-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .branch-card { padding: 14px; }
-  .branch-info h4 { font-size: 13px; }
-  .branch-revenue { font-size: 15px; }
+  .branch-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .branch-card {
+    padding: 14px;
+  }
+  .branch-info h4 {
+    font-size: 13px;
+  }
+  .branch-revenue {
+    font-size: 15px;
+  }
 
   /* Bottom section stacks */
-  .bottom-section { grid-template-columns: 1fr; gap: 16px; }
-  .recent-orders, .quick-actions { padding: 16px; }
+  .bottom-section {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .recent-orders,
+  .quick-actions {
+    padding: 16px;
+  }
 
   /* Orders list tighter */
-  .order-info { gap: 8px; flex-wrap: wrap; }
-  .order-time { min-width: unset; }
+  .order-info {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .order-time {
+    min-width: unset;
+  }
 }
 </style>

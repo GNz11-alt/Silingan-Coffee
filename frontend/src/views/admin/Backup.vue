@@ -379,30 +379,6 @@ const backupPassword = ref("");
 const backupPasswordError = ref("");
 const showBackupPassword = ref(false);
 
-const CACHE_KEY_EMPLOYEES = "cache_backup_employees";
-const CACHE_KEY_SCHEDULES = "cache_backup_schedules";
-const CACHE_KEY_INVENTORY = "cache_backup_inventory";
-const CACHE_KEY_SALES = "cache_backup_sales";
-const CACHE_KEY_MENU = "cache_backup_menu";
-const CACHE_TTL = 5 * 60 * 1000;
-
-const saveCache = (key, data) =>
-  sessionStorage.setItem(
-    key,
-    JSON.stringify({ data, expiresAt: Date.now() + CACHE_TTL }),
-  );
-
-const loadCache = (key) => {
-  const raw = sessionStorage.getItem(key);
-  if (!raw) return null;
-  const parsed = JSON.parse(raw);
-  if (Date.now() > parsed.expiresAt) {
-    sessionStorage.removeItem(key);
-    return null;
-  }
-  return parsed.data;
-};
-
 // ── State ──────────────────────────────────────────────────
 const isLoading = ref(false);
 const isBackingUp = ref(false);
@@ -496,10 +472,16 @@ const allItems = computed(() => {
     });
   });
 
-  return items.map((item, idx) => ({
-    ...item,
-    archiveId: buildArchiveId(idx),
-  }));
+  return items
+    .sort((a, b) => {
+      const da = a.archivedDate ? new Date(a.archivedDate) : new Date(0);
+      const db = b.archivedDate ? new Date(b.archivedDate) : new Date(0);
+      return db - da;
+    })
+    .map((item, idx) => ({
+      ...item,
+      archiveId: buildArchiveId(idx),
+    }));
 });
 
 const totalArchived = computed(() => allItems.value.length);
@@ -528,18 +510,13 @@ const resolveManagerBranch = async () => {
 
 // ── Fetch ──────────────────────────────────────────────────
 const fetchArchivedEmployees = async () => {
-  const cached = loadCache(CACHE_KEY_EMPLOYEES);
-  if (cached) {
-    archivedEmployees.value = cached;
-    return;
-  }
   let query = supabase
     .from("employee")
     .select(
       "EmployeeId, FirstName, LastName, Email, Position, Department, HourlyRate, DateHired, BranchAssigned, Status, ArchivedAt, ArchivedBy",
     )
     .eq("Status", "Archived")
-    .order("EmployeeId", { ascending: true });
+    .order("ArchivedAt", { ascending: false });
   if (managerBranchId.value)
     query = query.eq("BranchAssigned", managerBranchId.value);
   const { data } = await query;
@@ -558,16 +535,10 @@ const fetchArchivedEmployees = async () => {
       archivedAt: e.ArchivedAt,
       archivedBy: e.ArchivedBy,
     }));
-    saveCache(CACHE_KEY_EMPLOYEES, archivedEmployees.value);
   }
 };
 
 const fetchArchivedSchedules = async () => {
-  const cached = loadCache(CACHE_KEY_SCHEDULES);
-  if (cached) {
-    archivedSchedules.value = cached;
-    return;
-  }
   let query = supabase
     .from("schedule")
     .select(
@@ -593,23 +564,17 @@ const fetchArchivedSchedules = async () => {
       archivedAt: s.ArchivedAt,
       archivedBy: s.ArchivedBy,
     }));
-    saveCache(CACHE_KEY_SCHEDULES, archivedSchedules.value);
   }
 };
 
 const fetchArchivedInventory = async () => {
-  const cached = loadCache(CACHE_KEY_INVENTORY);
-  if (cached) {
-    archivedInventory.value = cached;
-    return;
-  }
   const { data } = await supabase
     .from("rawproduct")
     .select(
       "rawproductid, name, category, unit, status, archivedDate, archivedBy",
     )
     .eq("status", "Archived")
-    .order("rawproductid", { ascending: true });
+    .order("archivedDate", { ascending: false });
   if (data) {
     archivedInventory.value = data.map((i) => ({
       id: i.rawproductid,
@@ -618,23 +583,17 @@ const fetchArchivedInventory = async () => {
       archivedDate: i.archivedDate,
       archivedBy: i.archivedBy || currentUser,
     }));
-    saveCache(CACHE_KEY_INVENTORY, archivedInventory.value);
   }
 };
 
 const fetchArchivedSales = async () => {
-  const cached = loadCache(CACHE_KEY_SALES);
-  if (cached) {
-    archivedSales.value = cached;
-    return;
-  }
   let query = supabase
     .from("orders")
     .select(
       "OrderId, FinalAmount, Status, CreatedAt, BranchId, branch(BranchName)",
     )
     .eq("Status", "cancelled")
-    .order("OrderId", { ascending: true });
+    .order("CreatedAt", { ascending: false });
   if (managerBranchId.value)
     query = query.eq("BranchId", managerBranchId.value);
   const { data } = await query;
@@ -646,23 +605,17 @@ const fetchArchivedSales = async () => {
       archivedDate: s.CreatedAt,
       archivedBy: currentUser,
     }));
-    saveCache(CACHE_KEY_SALES, archivedSales.value);
   }
 };
 
 const fetchArchivedMenuItems = async () => {
-  const cached = loadCache(CACHE_KEY_MENU);
-  if (cached) {
-    archivedMenuItems.value = cached;
-    return;
-  }
   let query = supabase
     .from("product")
     .select(
       "ProductId, ProductName, Category, Price, Status, ArchivedAt, ArchivedBy",
     )
     .eq("Status", "Archived")
-    .order("ProductId", { ascending: true });
+    .order("ArchivedAt", { ascending: false });
   const { data } = await query;
   if (data) {
     archivedMenuItems.value = data.map((p) => ({
@@ -672,23 +625,12 @@ const fetchArchivedMenuItems = async () => {
       archivedDate: p.ArchivedAt,
       archivedBy: p.ArchivedBy || currentUser,
     }));
-    saveCache(CACHE_KEY_MENU, archivedMenuItems.value);
   }
 };
 
 const loadAll = async () => {
-  const allCached =
-    loadCache(CACHE_KEY_EMPLOYEES) &&
-    loadCache(CACHE_KEY_SCHEDULES) &&
-    loadCache(CACHE_KEY_INVENTORY) &&
-    loadCache(CACHE_KEY_SALES) &&
-    loadCache(CACHE_KEY_MENU);
-
-  if (!allCached) {
-    await resolveManagerBranch();
-    isLoading.value = true;
-  }
-
+  isLoading.value = true;
+  await resolveManagerBranch();
   await Promise.all([
     fetchArchivedEmployees(),
     fetchArchivedSchedules(),
@@ -696,7 +638,6 @@ const loadAll = async () => {
     fetchArchivedSales(),
     fetchArchivedMenuItems(),
   ]);
-
   isLoading.value = false;
 };
 
@@ -855,7 +796,6 @@ const doRestore = async () => {
       .eq("EmployeeId", item._raw.id);
     if (error) showToast("Failed to restore staff.", "error");
     else {
-      sessionStorage.removeItem(CACHE_KEY_EMPLOYEES);
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedEmployees();
     }
@@ -866,7 +806,6 @@ const doRestore = async () => {
       .eq("ScheduleId", item._raw.id);
     if (error) showToast("Failed to restore schedule.", "error");
     else {
-      sessionStorage.removeItem(CACHE_KEY_SCHEDULES);
       showToast("Schedule restored successfully.", "success");
       await fetchArchivedSchedules();
     }
@@ -877,7 +816,6 @@ const doRestore = async () => {
       .eq("rawproductid", item._raw.id);
     if (error) showToast("Failed to restore product.", "error");
     else {
-      sessionStorage.removeItem(CACHE_KEY_INVENTORY);
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedInventory();
     }
@@ -888,7 +826,6 @@ const doRestore = async () => {
       .eq("OrderId", item._raw.id);
     if (error) showToast("Failed to restore sale.", "error");
     else {
-      sessionStorage.removeItem(CACHE_KEY_SALES);
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedSales();
     }
@@ -899,7 +836,6 @@ const doRestore = async () => {
       .eq("ProductId", item._raw.id);
     if (error) showToast("Failed to restore menu item.", "error");
     else {
-      sessionStorage.removeItem(CACHE_KEY_MENU);
       showToast(`${item.name} restored successfully.`, "success");
       await fetchArchivedMenuItems();
     }
@@ -1193,8 +1129,8 @@ onMounted(loadAll);
 }
 .backup-table th {
   background: #f8f9fa;
-  position: sticky; 
-  top: 0; 
+  position: sticky;
+  top: 0;
   z-index: 1;
   color: #6c757d;
   font-weight: 600;

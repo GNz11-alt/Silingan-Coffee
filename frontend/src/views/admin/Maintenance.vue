@@ -273,36 +273,6 @@ import {
   AlertTriangle,
 } from "lucide-vue-next";
 
-// ── Cache helpers ─────────────────────────────────────────
-const CACHE_TTL = 30 * 60 * 1000;
-const CACHE_KEY_STATS = "cache_maint_stats";
-const CACHE_KEY_USERS = "cache_maint_users";
-const CACHE_KEY_BACKUPS = "cache_maint_backups";
-const CACHE_KEY_TASKS = "cache_maint_tasks";
-const CACHE_KEY_LOGINS = "cache_maint_logins";
-
-const saveCache = (key, data) =>
-  sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
-
-const loadCache = (key) => {
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (Date.now() - parsed.timestamp > CACHE_TTL) {
-      sessionStorage.removeItem(key);
-      return null;
-    }
-    return parsed.data;
-  } catch {
-    return null;
-  }
-};
-
-window.addEventListener("beforeunload", () => {
-  sessionStorage.setItem("maint_refreshed", "1");
-});
-
 // ── State ─────────────────────────────────────────────────
 const branches = ref([]);
 const sslValid = ref(window.location.protocol === "https:");
@@ -378,15 +348,8 @@ const timeAgo = (iso) => {
   return `${days} day${days > 1 ? "s" : ""} ago`;
 };
 
-// ── Fetchers (all cached) ─────────────────────────────────
-const fetchStats = async (force = false) => {
-  if (!force) {
-    const cached = loadCache(CACHE_KEY_STATS);
-    if (cached) {
-      stats.value = cached;
-      return;
-    }
-  }
+// ── Fetchers ──────────────────────────────────────────────
+const fetchStats = async () => {
   isLoadingStats.value = true;
   await supabase.rpc("refresh_system_stats");
   const { data, error } = await supabase
@@ -399,25 +362,16 @@ const fetchStats = async (force = false) => {
     showToast("Failed to load system stats.", "error");
     return;
   }
-  const mapped = {
+  stats.value = {
     health_label: data.health_label,
     uptime_percent: data.uptime_percent,
     uptime_label: data.uptime_label,
     storage_used_gb: parseFloat((data.storage_used_gb * 1024).toFixed(2)),
     storage_total_gb: parseFloat((data.storage_total_gb * 1024).toFixed(2)),
   };
-  stats.value = mapped;
-  saveCache(CACHE_KEY_STATS, mapped);
 };
 
-const fetchFailedLogins = async (force = false) => {
-  if (!force) {
-    const cached = loadCache(CACHE_KEY_LOGINS);
-    if (cached !== null) {
-      failedLogins.value = cached;
-      return;
-    }
-  }
+const fetchFailedLogins = async () => {
   const since = new Date(Date.now() - 86_400_000).toISOString();
   const { count, error } = await supabase
     .from("failed_logins")
@@ -425,20 +379,10 @@ const fetchFailedLogins = async (force = false) => {
     .gte("attempted_at", since);
   if (!error) {
     failedLogins.value = count ?? 0;
-    saveCache(CACHE_KEY_LOGINS, failedLogins.value);
   }
 };
 
-const fetchUsers = async (force = false) => {
-  if (!force) {
-    const cached = loadCache(CACHE_KEY_USERS);
-    if (cached) {
-      userList.value = cached.userList;
-      totalUsers.value = cached.totalUsers;
-      branches.value = cached.branches;
-      return;
-    }
-  }
+const fetchUsers = async () => {
   isLoadingUsers.value = true;
   const [{ data, error }, { count }, { data: empData }, { data: branchData }] =
     await Promise.all([
@@ -479,7 +423,7 @@ const fetchUsers = async (force = false) => {
     empMap[key] = e;
   }
 
-  const mappedUsers = data.map((u) => {
+  userList.value = data.map((u) => {
     const emp = empMap[u.username];
     const fallbackName = u.username.includes("@")
       ? u.username.split("@")[0]
@@ -494,26 +438,10 @@ const fetchUsers = async (force = false) => {
       lastActivePretty: timeAgo(u.last_active),
     };
   });
-
-  userList.value = mappedUsers;
   totalUsers.value = count ?? 0;
-  saveCache(CACHE_KEY_USERS, {
-    userList: mappedUsers,
-    totalUsers: totalUsers.value,
-    branches: mappedBranches,
-  });
 };
 
-const fetchBackupHistory = async (force = false) => {
-  if (!force) {
-    const cached = loadCache(CACHE_KEY_BACKUPS);
-    if (cached) {
-      backupHistory.value = cached.backupHistory;
-      lastBackupStatus.value = cached.lastBackupStatus;
-      lastBackupTime.value = cached.lastBackupTime;
-      return;
-    }
-  }
+const fetchBackupHistory = async () => {
   isLoadingBackups.value = true;
   const { data, error } = await supabase
     .from("backup_logs")
@@ -526,7 +454,7 @@ const fetchBackupHistory = async (force = false) => {
     return;
   }
 
-  const mapped = data.map((b) => ({
+  backupHistory.value = data.map((b) => ({
     id: b.id,
     date: formatDate(b.created_at),
     type: b.type,
@@ -534,35 +462,11 @@ const fetchBackupHistory = async (force = false) => {
     backedUpBy: b.backed_up_by ?? "—",
     status: b.status,
   }));
-  const lbStatus = data.length ? data[0].status : "—";
-  const lbTime = data.length ? timeAgo(data[0].created_at) : "—";
-
-  backupHistory.value = mapped;
-  lastBackupStatus.value = lbStatus;
-  lastBackupTime.value = lbTime;
-  saveCache(CACHE_KEY_BACKUPS, {
-    backupHistory: mapped,
-    lastBackupStatus: lbStatus,
-    lastBackupTime: lbTime,
-  });
+  lastBackupStatus.value = data.length ? data[0].status : "—";
+  lastBackupTime.value = data.length ? timeAgo(data[0].created_at) : "—";
 };
 
-const fetchTasks = async (force = false) => {
-  if (!force) {
-    const cached = loadCache(CACHE_KEY_TASKS);
-    if (cached) {
-      tasks.value = cached;
-      const optTask = tasks.value.find((t) => t.name === "Optimize Database");
-      if (optTask) {
-        const daysSince = optTask._last_run_at
-          ? (Date.now() - new Date(optTask._last_run_at).getTime()) / 86_400_000
-          : Infinity;
-        lastOptimization.value = optTask.lastRun;
-        showOptimizationAlert.value = daysSince >= 7;
-      }
-      return;
-    }
-  }
+const fetchTasks = async () => {
   isLoadingTasks.value = true;
   const { data, error } = await supabase
     .from("maintenance_tasks")
@@ -574,7 +478,7 @@ const fetchTasks = async (force = false) => {
     return;
   }
 
-  const mapped = data.map((t) => ({
+  tasks.value = data.map((t) => ({
     id: t.id,
     name: t.name,
     description: t.description,
@@ -582,10 +486,8 @@ const fetchTasks = async (force = false) => {
     running: false,
     _last_run_at: t.last_run_at,
   }));
-  tasks.value = mapped;
-  saveCache(CACHE_KEY_TASKS, mapped);
 
-  const optTask = mapped.find((t) => t.name === "Optimize Database");
+  const optTask = tasks.value.find((t) => t.name === "Optimize Database");
   if (optTask) {
     const daysSince = optTask._last_run_at
       ? (Date.now() - new Date(optTask._last_run_at).getTime()) / 86_400_000
@@ -595,7 +497,7 @@ const fetchTasks = async (force = false) => {
   }
 };
 
-// ── Mutations (force-refresh cache after) ────────────────
+// ── Mutations ─────────────────────────────────────────────
 const runOptimization = async () => {
   optimizing.value = true;
   const now = new Date().toISOString();
@@ -617,8 +519,7 @@ const runOptimization = async () => {
   lastOptimization.value = "Just now";
   showOptimizationAlert.value = false;
   showToast("Query statistics updated successfully.");
-  sessionStorage.removeItem(CACHE_KEY_TASKS);
-  await fetchTasks(true);
+  await fetchTasks();
 };
 
 const runTask = async (task) => {
@@ -657,22 +558,10 @@ const runTask = async (task) => {
     showOptimizationAlert.value = false;
   }
   showToast(`${task.name} completed successfully.`);
-  sessionStorage.removeItem(CACHE_KEY_TASKS);
 };
 
 // ── Mount ─────────────────────────────────────────────────
 onMounted(() => {
-  if (sessionStorage.getItem("maint_refreshed")) {
-    sessionStorage.removeItem("maint_refreshed");
-    [
-      CACHE_KEY_STATS,
-      CACHE_KEY_USERS,
-      CACHE_KEY_BACKUPS,
-      CACHE_KEY_TASKS,
-      CACHE_KEY_LOGINS,
-    ].forEach((k) => sessionStorage.removeItem(k));
-  }
-
   fetchStats();
   fetchFailedLogins();
   fetchUsers();
@@ -962,7 +851,6 @@ onMounted(() => {
   color: #721c24;
 }
 
-/* ── Scrollable table wrapper (shared) ─────────────────────── */
 .scrollable-table-wrap {
   max-height: 460px;
   overflow-y: auto;
@@ -970,10 +858,8 @@ onMounted(() => {
   border: 1px solid #e9ecef;
 }
 
-/* ── Tables ─────────────────────────────────────────────────── */
 .history-table {
   width: 100%;
-  /* border-separate + border-spacing:0 is required for sticky thead to work */
   border-collapse: separate;
   border-spacing: 0;
   font-size: 13px;
@@ -1004,31 +890,18 @@ onMounted(() => {
   background: #fafafa;
 }
 
-/* column widths */
 .history-table th:nth-child(1),
-.history-table td:nth-child(1) {
-  width: 15%;
-}
+.history-table td:nth-child(1) { width: 15%; }
 .history-table th:nth-child(2),
-.history-table td:nth-child(2) {
-  width: 22%;
-}
+.history-table td:nth-child(2) { width: 22%; }
 .history-table th:nth-child(3),
-.history-table td:nth-child(3) {
-  width: 15%;
-}
+.history-table td:nth-child(3) { width: 15%; }
 .history-table th:nth-child(4),
-.history-table td:nth-child(4) {
-  width: 10%;
-}
+.history-table td:nth-child(4) { width: 10%; }
 .history-table th:nth-child(5),
-.history-table td:nth-child(5) {
-  width: 12%;
-}
+.history-table td:nth-child(5) { width: 12%; }
 .history-table th:nth-child(6),
-.history-table td:nth-child(6) {
-  width: 14%;
-}
+.history-table td:nth-child(6) { width: 14%; }
 
 .tasks-list {
   display: flex;
@@ -1114,26 +987,14 @@ onMounted(() => {
 }
 
 @keyframes slideUp {
-  from {
-    transform: translateY(16px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
 
 @media (max-width: 768px) {
-  .maintenance-page {
-    padding: 16px;
-  }
-  .two-col {
-    grid-template-columns: 1fr;
-  }
-  .stats-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+  .maintenance-page { padding: 16px; }
+  .two-col { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
   .tab-bar {
     overflow-x: auto;
     flex-wrap: nowrap;
@@ -1150,8 +1011,6 @@ onMounted(() => {
 }
 
 @media (max-width: 480px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
+  .stats-grid { grid-template-columns: 1fr; }
 }
 </style>
