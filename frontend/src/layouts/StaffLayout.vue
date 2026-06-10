@@ -122,6 +122,27 @@
             @update-count="unreadCount = $event"
           />
         </Teleport>
+                <Teleport to="body">
+          <div v-if="showLogoutModal" class="cpw-overlay" @click.self="showLogoutModal = false">
+            <div class="cpw-box">
+              <div class="cpw-header">
+                <h6>Confirm Logout</h6>
+                <button class="cpw-close" @click="showLogoutModal = false">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div class="cpw-body">
+                <p style="font-size: 14px; color: #495057; margin: 0;">
+                  Are you sure you want to log out?
+                </p>
+              </div>
+              <div class="cpw-footer">
+                <button class="cpw-cancel" @click="showLogoutModal = false">Cancel</button>
+                <button class="cpw-submit" @click="confirmLogout">Logout</button>
+              </div>
+            </div>
+          </div>
+        </Teleport>
 
         <button
           class="nav-item change-pw-btn"
@@ -332,7 +353,15 @@ const toggleNotifications = () => {
   showNotifPanel.value = !showNotifPanel.value;
 };
 
+const showLogoutModal = ref(false);
+
+// Replaces your existing logout — now just opens the modal
 const logout = () => {
+  showLogoutModal.value = true;
+};
+
+// Called when user confirms
+const confirmLogout = () => {
   localStorage.removeItem("isLoggedIn");
   localStorage.removeItem("username");
   localStorage.removeItem("role");
