@@ -141,6 +141,8 @@ import SearchResults from "@/components/SearchResults.vue";
 
 const { branches } = useBranches();
 
+const selectedBranchName = "All Branches";
+
 const { allItems, isLoading: dataLoading, error: searchError } = useSearchData();
 const router = useRouter();
 

@@ -114,12 +114,14 @@
             >{{ unreadCount }}</span
           >
         </button>
-        <NotificationPanel
-          v-if="showNotifPanel"
-          :branch-id="userBranchId"
-          @close="showNotifPanel = false"
-          @update-count="unreadCount = $event"
-        />
+        <Teleport to="body">
+          <NotificationPanel
+            v-if="showNotifPanel"
+            :branch-id="userBranchId ? Number(userBranchId) : null"
+            @close="showNotifPanel = false"
+            @update-count="unreadCount = $event"
+          />
+        </Teleport>
 
         <button
           class="nav-item change-pw-btn"
@@ -312,11 +314,11 @@ const currentDate = computed(() =>
 
 const router = useRouter();
 const isSidebarCollapsed = ref(false);
-const branch = ref("");
 const unreadCount = ref(0);
 const showNotifPanel = ref(false);
-const { fetchNotifications } = useNotifications();
+const { fetchNotificationBundle, subscribeToNotifications } = useNotifications();
 let notifGenInterval = null;
+let unsubscribeNotif = null;
 
 const { isAdmin, userBranchId, userBranchName, resolveBranch } =
   useUserBranch();
@@ -480,11 +482,16 @@ onMounted(async () => {
 
   await resolveBranch();
 
-  const notifs = await fetchNotifications(null);
-  unreadCount.value = notifs.length;
+  const branchNum = userBranchId.value ? Number(userBranchId.value) : null;
+  const notifs = await fetchNotificationBundle(branchNum);
+  unreadCount.value = (notifs.unread || []).length;
+
+  // Real-time badge updates
+  unsubscribeNotif = subscribeToNotifications("staff", branchNum, () => {
+    unreadCount.value += 1;
+  });
 
   // Generate notifications for this branch
-  const branchNum = userBranchId.value ? Number(userBranchId.value) : null;
   generateAllNotifications({ branchId: branchNum, role: "staff" });
 
   notifGenInterval = setInterval(
@@ -498,6 +505,7 @@ onMounted(async () => {
 onUnmounted(() => {
   clearInterval(clockInterval);
   if (notifGenInterval) clearInterval(notifGenInterval);
+  if (unsubscribeNotif) unsubscribeNotif();
 });
 </script>
 
