@@ -1,6 +1,6 @@
 <template>
   <div class="notif-overlay" @click.self="$emit('close')">
-    <div class="notif-panel">
+    <div class="notif-panel" @click.stop>
       <div class="notif-header">
         <span class="notif-title">Notifications</span>
         <div class="notif-header-actions">
@@ -21,30 +21,40 @@
       </div>
 
       <div v-if="loading" class="notif-loading">
-        <div class="spinner-border spinner-border-sm text-muted"></div>
+        <div class="notif-spinner"></div>
       </div>
 
-      <div v-else-if="!notifications.length" class="notif-empty">
-        <i class="bi" :class="tab === 'new' ? 'bi-bell-slash' : 'bi-clock-history'" fs-4></i>
+      <div v-else-if="!visibleNotifications.length" class="notif-empty">
+        <i :class="['bi', 'fs-4', tab === 'new' ? 'bi-bell-slash' : 'bi-clock-history']"></i>
         <p>{{ tab === 'new' ? 'No new notifications' : 'No notification history' }}</p>
       </div>
 
-      <div v-else class="notif-list">
+      <!-- Scrollable list with sentinel for lazy-load -->
+      <div v-else class="notif-list" ref="listEl" @scroll.passive="onScroll">
         <div
-          v-for="n in notifications"
+          v-for="n in visibleNotifications"
           :key="n.id"
           class="notif-item"
-          :class="{ 'notif-item--read': n.is_read }"
+          :class="{
+            'notif-item--read': n.is_read,
+            'notif-item--clickable': !n.is_read || n.link
+          }"
           @click="openDetail(n)"
         >
           <div class="notif-item-top">
-            <span v-if="!n.is_read" class="notif-dot"></span>
+            <span v-if="!n.is_read" class="notif-dot" :class="{ 'notif-dot--critical': n.severity === 'critical' }"></span>
             <span class="notif-severity" :class="'sev--' + n.severity">{{ n.severity }}</span>
             <span class="notif-category">{{ n.category }}</span>
           </div>
           <div class="notif-item-title">{{ n.title }}</div>
           <div class="notif-item-msg">{{ n.message }}</div>
           <div class="notif-item-time">{{ timeAgo(n.created_at) }}</div>
+        </div>
+
+        <!-- Load-more sentinel shown when there are more items to reveal -->
+        <div v-if="hasMore" class="notif-load-more">
+          <div v-if="loadingMore" class="notif-spinner notif-spinner--sm"></div>
+          <button v-else class="notif-load-more-btn" @click="loadMore">Load more</button>
         </div>
       </div>
     </div>
@@ -77,6 +87,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useNotifications } from '@/composables/useNotifications.js'
 import { useRouter } from 'vue-router'
 
+// How many items to show per "page" in the list
+const PAGE_SIZE = 10
+
 const props = defineProps({
   branchId: { type: Number, default: null },
 })
@@ -88,19 +101,57 @@ const {
   markAsRead,
   markAllAsRead,
 } = useNotifications()
-const notifications = ref([])
+
 const loading = ref(true)
+const loadingMore = ref(false)
 const tab = ref('new')
 const unreadCount = ref(0)
 const detail = ref(null)
 const unread = ref([])
 const history = ref([])
 const lastUpdated = ref(0)
+const listEl = ref(null)
+
+// How many items from the active list are currently rendered
+const visibleCount = ref(PAGE_SIZE)
+
+// The full list for the active tab
+const activeList = computed(() => tab.value === 'new' ? unread.value : history.value)
+
+// Slice of the full list that is currently visible
+const visibleNotifications = computed(() => activeList.value.slice(0, visibleCount.value))
+
+// True when there are still items beyond the visible window
+const hasMore = computed(() => visibleCount.value < activeList.value.length)
+
+// Human-readable labels for known route segments
+const LINK_LABELS = {
+  inventory: 'Inventory',
+  sales: 'Sales',
+  dashboard: 'Dashboard',
+  reports: 'Reports',
+  schedule: 'My Schedule',
+  'shift-management': 'Shift Management',
+  menu: 'Menu',
+  pos: 'Point of Sale',
+}
 
 const linkLabel = computed(() => {
   if (!detail.value?.link) return ''
   const parts = detail.value.link.split('/')
-  return parts[parts.length - 1] || 'Module'
+  const segment = parts[parts.length - 1] || ''
+  return LINK_LABELS[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
+})
+
+const lastUpdatedLabel = computed(() => {
+  if (!lastUpdated.value) return 'Never'
+  return new Date(lastUpdated.value).toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 })
 
 onMounted(async () => {
@@ -109,7 +160,25 @@ onMounted(async () => {
 
 async function switchTab(t) {
   tab.value = t
-  notifications.value = t === 'new' ? unread.value : history.value
+  visibleCount.value = PAGE_SIZE
+}
+
+/** Reveal the next page of already-fetched items. */
+async function loadMore() {
+  if (!hasMore.value || loadingMore.value) return
+  loadingMore.value = true
+  // Small delay so the spinner is visible for a frame — purely cosmetic
+  await new Promise(r => setTimeout(r, 120))
+  visibleCount.value += PAGE_SIZE
+  loadingMore.value = false
+}
+
+/** Trigger load-more when the user scrolls near the bottom of the list. */
+function onScroll() {
+  if (!listEl.value || !hasMore.value || loadingMore.value) return
+  const el = listEl.value
+  const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 60
+  if (nearBottom) loadMore()
 }
 
 function timeAgo(dateStr) {
@@ -131,9 +200,10 @@ function openDetail(n) {
   detail.value = n
   if (!n.is_read) {
     markAsRead(n.id)
+    n.is_read = true
     unreadCount.value = Math.max(0, unreadCount.value - 1)
     if (tab.value === 'new') {
-      notifications.value = notifications.value.filter(x => x.id !== n.id)
+      unread.value = unread.value.filter(x => x.id !== n.id)
     }
     emit('update-count', unreadCount.value)
   }
@@ -146,6 +216,7 @@ function closeDetail() {
 function goToLink() {
   if (detail.value?.link) {
     router.push(detail.value.link)
+    emit('close')
   }
   detail.value = null
 }
@@ -154,28 +225,16 @@ async function markAll() {
   await markAllAsRead(props.branchId)
   unreadCount.value = 0
   unread.value = []
-  notifications.value = tab.value === 'new' ? [] : history.value
   emit('update-count', 0)
 }
 
-const lastUpdatedLabel = computed(() => {
-  if (!lastUpdated.value) return 'Never'
-  return new Date(lastUpdated.value).toLocaleString('en-PH', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-})
-
 async function loadNotifications({ force }) {
   loading.value = true
+  visibleCount.value = PAGE_SIZE
   const bundle = await fetchNotificationBundle(props.branchId, { force })
   unread.value = bundle.unread || []
   history.value = bundle.all || []
   unreadCount.value = unread.value.length
-  notifications.value = tab.value === 'new' ? unread.value : history.value
   lastUpdated.value = bundle.lastRefresh || Date.now()
   loading.value = false
   emit('update-count', unreadCount.value)
@@ -194,11 +253,11 @@ async function refreshNow() {
   background: transparent;
 }
 .notif-panel {
-  position: absolute;
-  top: 60px;
+  position: fixed;
+  top: 80px;
   right: 20px;
   width: 380px;
-  max-height: 500px;
+  max-height: 520px;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.18);
@@ -206,6 +265,7 @@ async function refreshNow() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  z-index: 1001;
 }
 .notif-header {
   display: flex;
@@ -301,7 +361,43 @@ async function refreshNow() {
   justify-content: center;
   padding: 2rem;
 }
-.notif-empty {
+.notif-spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid #e5e0dd;
+  border-top-color: #7B1D1D;
+  border-radius: 50%;
+  animation: notif-spin 0.65s linear infinite;
+}
+.notif-spinner--sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+@keyframes notif-spin {
+  to { transform: rotate(360deg); }
+}
+.notif-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-top: 1px solid #f0ebe8;
+}
+.notif-load-more-btn {
+  background: none;
+  border: 1px solid #e5e0dd;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #374151;
+  padding: 4px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notif-load-more-btn:hover {
+  background: #f0ebe8;
+}.notif-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -320,20 +416,21 @@ async function refreshNow() {
 .notif-item {
   padding: 12px 16px;
   border-bottom: 1px solid #f0ebe8;
-  cursor: pointer;
   transition: background 0.12s;
-}
-.notif-item:hover {
-  background: #faf7f5;
 }
 .notif-item:last-child {
   border-bottom: none;
 }
+.notif-item--clickable {
+  cursor: pointer;
+}
+.notif-item--clickable:hover {
+  background: #faf7f5;
+}
 .notif-item--read {
   opacity: 0.55;
 }
-.notif-item--read:hover {
-  background: transparent;
+.notif-item--read:not(.notif-item--clickable) {
   cursor: default;
 }
 .notif-item-top {
@@ -349,6 +446,18 @@ async function refreshNow() {
   background: #7B1D1D;
   flex-shrink: 0;
 }
+.notif-dot--critical {
+  width: 8px;
+  height: 8px;
+  background: #dc2626;
+  box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+  70%  { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
 .notif-severity {
   font-size: 0.62rem;
   font-weight: 700;
@@ -356,6 +465,11 @@ async function refreshNow() {
   letter-spacing: 0.03em;
   padding: 2px 6px;
   border-radius: 4px;
+}
+.sev--critical {
+  background: #fde8e8;
+  color: #7B1D1D;
+  border: 1px solid #f5c6c6;
 }
 .sev--high {
   background: #F5EDE8;

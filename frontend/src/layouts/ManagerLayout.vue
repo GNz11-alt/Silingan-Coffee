@@ -66,12 +66,12 @@
         </router-link>
 
         <router-link
-          to="/manager/schedule"
+          to="/manager/shift-management"
           class="nav-item"
-          :class="{ active: $route.path === '/manager/schedule' }"
+          :class="{ active: $route.path.startsWith('/manager/shift-management') || $route.path === '/manager/schedule' }"
         >
-          <component :is="Calendar" class="nav-icon" :size="20" />
-          <span v-show="!isSidebarCollapsed">Schedule</span>
+          <component :is="Users" class="nav-icon" :size="20" />
+          <span v-show="!isSidebarCollapsed">Shift Management</span>
         </router-link>
 
         <router-link
@@ -130,12 +130,14 @@
             >{{ unreadCount }}</span
           >
         </button>
-        <NotificationPanel
-          v-if="showNotifPanel"
-          :branch-id="userBranchId"
-          @close="showNotifPanel = false"
-          @update-count="unreadCount = $event"
-        />
+        <Teleport to="body">
+          <NotificationPanel
+            v-if="showNotifPanel"
+            :branch-id="userBranchId ? Number(userBranchId) : null"
+            @close="showNotifPanel = false"
+            @update-count="unreadCount = $event"
+          />
+        </Teleport>
 
         <button
           class="nav-item change-pw-btn"
@@ -274,7 +276,7 @@ import {
   Home,
   Package,
   BarChart3,
-  Calendar,
+  Users,
   Coffee,
   FileText,
   Database,
@@ -285,23 +287,26 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
+  KeyRound,
 } from "lucide-vue-next";
 import { useUserBranch } from "@/composables/useUserBranch.js";
+import { useSessionGuard } from "@/composables/userSessionGuard.js";
 import NotificationPanel from "@/components/NotificationPanel.vue";
 import { useNotifications } from "@/composables/useNotifications.js";
+import { generateAllNotifications } from "@/services/notificationGenerator.js";
 import { supabase } from "@/supabase.js";
-import { KeyRound } from "lucide-vue-next";
 
 const router = useRouter();
 const isSidebarCollapsed = ref(false);
-const branch = ref("");
 const unreadCount = ref(0);
 const showChangePwModal = ref(false);
 const showNotifPanel = ref(false);
-const { fetchNotifications } = useNotifications();
+const { fetchNotificationBundle, subscribeToNotifications } = useNotifications();
+let unsubscribeNotif = null;
 
 const now = ref(new Date());
 let clockInterval = null;
+let notifGenInterval = null;
 
 const cpwRules = reactive({
   length: false,
@@ -471,17 +476,46 @@ if (savedState !== null) {
   isSidebarCollapsed.value = savedState === "true";
 }
 
+useSessionGuard();
+
 onMounted(async () => {
   clockInterval = setInterval(() => {
     now.value = new Date();
   }, 1000);
 
-  const notifs = await fetchNotifications(null);
-  unreadCount.value = notifs.length;
+  await resolveBranch();
+
+  const branchNum = userBranchId.value ? Number(userBranchId.value) : null;
+
+  if (branchNum === null) {
+    console.warn('[Manager] Branch could not be resolved — localStorage "branch":', localStorage.getItem('branch'), '. Notifications will be unscoped.')
+  } else {
+    console.log('[Manager] Resolved branch:', branchNum)
+  }
+
+  const notifs = await fetchNotificationBundle(branchNum);
+  unreadCount.value = (notifs.unread || []).length;
+
+  // Real-time badge updates
+  unsubscribeNotif = subscribeToNotifications("manager", branchNum, () => {
+    unreadCount.value += 1;
+  });
+
+  // Generate notifications on mount
+  generateAllNotifications({ branchId: branchNum, role: "manager" });
+  // Regenerate every 30 minutes
+  notifGenInterval = setInterval(
+    () => {
+      generateAllNotifications({ branchId: branchNum, role: "manager" });
+    },
+    30 * 60 * 1000,
+  );
 });
 
 onUnmounted(() => {
   clearInterval(clockInterval);
+  if (notifGenInterval) clearInterval(notifGenInterval);
+  if (unsubscribeNotif) unsubscribeNotif();
 });
 </script>
 

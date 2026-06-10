@@ -140,12 +140,14 @@
             >{{ unreadCount }}</span
           >
         </button>
-        <NotificationPanel
-          v-if="showNotifPanel"
-          :branch-id="null"
-          @close="showNotifPanel = false"
-          @update-count="unreadCount = $event"
-        />
+        <Teleport to="body">
+          <NotificationPanel
+            v-if="showNotifPanel"
+            :branch-id="null"
+            @close="showNotifPanel = false"
+            @update-count="unreadCount = $event"
+          />
+        </Teleport>
 
         <button
           class="nav-item change-pw-btn"
@@ -320,8 +322,9 @@ const isSidebarCollapsed = ref(false);
 const unreadCount = ref(0);
 const showNotifPanel = ref(false);
 const showChangePwModal = ref(false);
-const { fetchNotifications } = useNotifications();
+const { fetchNotificationBundle, subscribeToNotifications } = useNotifications();
 let notifGenInterval = null;
+let unsubscribeNotif = null;
 
 // Clock
 const now = ref(new Date());
@@ -501,8 +504,13 @@ onMounted(async () => {
     now.value = new Date();
   }, 1000);
 
-  const notifs = await fetchNotifications(null);
-  unreadCount.value = notifs.length;
+  const notifs = await fetchNotificationBundle(null);
+  unreadCount.value = (notifs.unread || []).length;
+
+  // Real-time badge updates
+  unsubscribeNotif = subscribeToNotifications("admin", null, () => {
+    unreadCount.value += 1;
+  });
 
   // Generate notifications on mount
   generateAllNotifications({ role: "admin" });
@@ -519,6 +527,7 @@ onMounted(async () => {
 onUnmounted(() => {
   clearInterval(clockInterval);
   if (notifGenInterval) clearInterval(notifGenInterval);
+  if (unsubscribeNotif) unsubscribeNotif();
 });
 </script>
 
