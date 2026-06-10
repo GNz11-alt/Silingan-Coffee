@@ -1321,8 +1321,7 @@ onMounted(async () => {
 .branch-lock-notice strong { color: #14532d; }
 
 /* ─── STATS ────────────────────────────────────────────── */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 32px; }
-.stat-card { background: #ffffff; border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 16px; border: 1px solid #e9ecef; transition: all 0.2s ease; }
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }.stat-card { background: #ffffff; border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 16px; border: 1px solid #e9ecef; transition: all 0.2s ease; }
 .stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 .stat-icon { color: #8b4513; flex-shrink: 0; }
 .stat-info h3 { font-size: 13px; color: #6c757d; font-weight: 500; margin: 0 0 6px; }
@@ -1594,15 +1593,80 @@ onMounted(async () => {
 @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 /* ─── RESPONSIVE ───────────────────────────────────────── */
+@media (min-width: 769px) {
+  .stats-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
 @media (max-width: 768px) {
-  .inventory-content { padding: 16px; }
-  .stats-grid { grid-template-columns: 1fr 1fr; }
-  .form-row, .batch-form-grid { grid-template-columns: 1fr; }
+  .inventory-content { padding: 14px; overflow-x: hidden; max-width: 100vw; }
+  .page-header { margin-bottom: 12px; }
+  .ph-left h1 { font-size: 22px; }
+
+  /* Stats — always 2 col, cards shrink properly */
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat-card { padding: 12px; gap: 8px; min-width: 0; }
+  .stat-info { min-width: 0; }
+  .stat-info h3 { font-size: 11px; }
+  .stat-value { font-size: 18px; }
+  .stat-trend { font-size: 10px; }
+  .stat-icon svg { width: 20px; height: 20px; }
+
+  /* FEFO rows */
+  .fefo-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .fefo-item-info { min-width: unset; width: 100%; }
+  .fefo-expiry-info { flex-direction: row; align-items: center; gap: 8px; }
+  .expire-btn { width: 100%; padding: 8px; text-align: center; }
+
+  /* EOQ rows */
+  .eoq-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .eoq-restock-btn { width: 100%; text-align: center; padding: 8px; }
+
+  /* Tabs */
+  .tabs-row { width: 100%; box-sizing: border-box; }
+  .tab-btn { flex: 1; justify-content: center; font-size: 13px; padding: 8px 6px; }
+
+  /* Section header — stack, buttons in 2-col grid */
+  .section-header { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px; }
+  .header-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .header-actions > * { justify-content: center; font-size: 12px; padding: 8px 6px; }
+
+  /* Filters stack */
+  .filters-bar { flex-direction: column; gap: 8px; padding: 12px 14px; }
+  .search-box { width: 100%; min-width: unset; }
+  .select-wrap.sm { max-width: 100%; width: 100%; }
+
+  /* Table — only this scrolls horizontally */
+  .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+  .inventory-table { min-width: 600px; }
+
+  /* Forms */
+  .form-row { grid-template-columns: 1fr; gap: 12px; }
+  .batch-form-grid { grid-template-columns: 1fr; gap: 12px; }
   .rtc-stat-grid { grid-template-columns: 1fr 1fr; }
-  .filters-bar, .header-actions { flex-direction: column; }
-  .fefo-row, .eoq-row { flex-direction: column; align-items: flex-start; }
-  .fefo-legend { flex-wrap: wrap; gap: 8px; }
   .hasexpiry-toggle-row { flex-wrap: wrap; }
-  .hasexpiry-hint { width: 100%; }
+  .hasexpiry-hint { width: 100%; margin-top: 4px; }
+
+  /* FEFO legend */
+  .fefo-legend { flex-wrap: wrap; gap: 8px; }
+
+  /* Modals — bottom sheet */
+  .modal { align-items: flex-end; }
+  .modal-content { width: 100%; max-width: 100%; border-radius: 18px 18px 0 0; max-height: 92vh; }
+  .modal-header { padding: 16px 18px; }
+  .modal-body { padding: 16px 18px; }
+  .modal-actions { flex-direction: column-reverse; gap: 8px; }
+  .modal-actions .btn-primary,
+  .modal-actions .btn-secondary,
+  .modal-actions .btn-danger { width: 100%; justify-content: center; text-align: center; }
+
+  .item-picker-grid { grid-template-columns: 1fr 1fr; max-height: 240px; }
+  .fefo-legend { flex-wrap: wrap; gap: 8px; }
+  .toast-wrap { bottom: 14px; right: 14px; left: 14px; max-width: unset; font-size: 13px; }
+}
+
+@media (max-width: 480px) {
+  .stat-card { flex-direction: column; align-items: flex-start; }
+  .header-actions { grid-template-columns: 1fr; }
+  .tab-btn { font-size: 11px; }
 }
 </style>

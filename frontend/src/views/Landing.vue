@@ -286,8 +286,15 @@ const locations = [
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .heading { font-size: 2.5rem; }
+  .heading { font-size: 2.2rem; margin-top: -140px; }
   .van-hero-img { max-width: 100%; clip-path: inset(120px 0 0 0); }
   .hero-content { margin-top: -40px; }
+  .section-title { font-size: 1.6rem; }
+  .service-card { padding: 1.5rem; }
+}
+
+@media (max-width: 480px) {
+  .heading { font-size: 1.8rem; }
+  .section-title { font-size: 1.4rem; }
 }
 </style>

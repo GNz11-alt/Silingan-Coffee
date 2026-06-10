@@ -28,7 +28,7 @@
 
     <!-- MAIN POS LAYOUT -->
     <div class="pos-layout">
-      <!-- LEFT: Category Sidebar -->
+      <!-- LEFT: Category Sidebar (desktop only) -->
       <aside class="category-sidebar">
         <p class="sidebar-label">Category</p>
         <button
@@ -48,6 +48,20 @@
           <div class="menu-search">
             <Search :size="15" />
             <input v-model="menuSearch" placeholder="Search menu..." />
+          </div>
+          <!-- Mobile category dropdown -->
+          <div class="mobile-cat-dropdown">
+            <div class="sel-wrap">
+              <select
+                v-model="activeCategory"
+                class="mobile-cat-select"
+              >
+                <option v-for="cat in ['All', ...menuCategories]" :key="cat" :value="cat">
+                  {{ cat }}
+                </option>
+              </select>
+              <ChevronDown :size="13" class="sel-icon" />
+            </div>
           </div>
           <button
             :class="['oos-filter-btn', hideOOS ? 'active' : '']"
@@ -780,7 +794,7 @@ const transactionNumber = ref("");
 const orderType         = ref("dine_in");
 const VAT_RATE          = 0.12;
 
-// ─── Denomination state (NEW) ─────────────────────────────────────────────────
+// ─── Denomination state ───────────────────────────────────────────────────────
 const denominations = [20, 50, 100, 200, 500, 1000];
 const denomCounts   = reactive({});
 denominations.forEach((d) => (denomCounts[d] = 0));
@@ -795,16 +809,14 @@ const clearDenomCounts = () => {
   manualOverride.value = null;
 };
 
-/** Fill denominations using largest bills first to reach exactly finalTotal */
 const setExactDenoms = () => {
   clearDenomCounts();
-  let rem = Math.round(finalTotal.value * 100); // work in centavos to avoid float issues
+  let rem = Math.round(finalTotal.value * 100);
   [...denominations].reverse().forEach((d) => {
     const n = Math.floor(rem / (d * 100));
     denomCounts[d] = n;
     rem -= n * d * 100;
   });
-  // If there's leftover (e.g. total not divisible by 20), top up with the smallest bill
   if (rem > 0) denomCounts[20] += Math.ceil(rem / 2000);
 };
 
@@ -823,11 +835,9 @@ const onManualCashInput = (e) => {
 };
 
 const onCashFocus = (e) => {
-  // Strip ₱ sign so user types clean numbers
   if (cashDisplayRef.value) {
     const num = cashReceived.value.toFixed(2);
     cashDisplayRef.value.innerText = num;
-    // Place cursor at end
     const range = document.createRange();
     range.selectNodeContents(cashDisplayRef.value);
     range.collapse(false);
@@ -838,14 +848,11 @@ const onCashFocus = (e) => {
 };
 
 const onCashBlur = (e) => {
-  // Reformat with ₱ on blur
   const val = manualOverride.value ?? cashReceived.value;
   if (cashDisplayRef.value) {
     cashDisplayRef.value.innerText = `₱${val.toFixed(2)}`;
   }
 };
-
-
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const cashierName = computed(
@@ -1097,7 +1104,7 @@ const openPayment = () => {
     return;
   }
   discountIdError.value = "";
-  clearDenomCounts();          
+  clearDenomCounts();
   paymentMethod.value = "cash";
   showReceipt.value   = false;
   showPayment.value   = true;
@@ -1271,6 +1278,9 @@ onMounted(async () => {
 .history-count { background: #ef4444; color: white; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px; }
 .pos-layout { display: grid; grid-template-columns: 152px 1fr 320px; flex: 1; overflow: hidden; }
 
+/* ─── Mobile category dropdown (hidden on desktop) ──────────────────────────── */
+.mobile-cat-dropdown { display: none; }
+
 /* ─── Sidebar ───────────────────────────────────────────────────────────────── */
 .category-sidebar { background: #2a1b18; padding: 16px 8px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
 .sidebar-label { font-size: 10px; color: rgba(255,255,255,0.28); text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 8px 4px; }
@@ -1419,7 +1429,7 @@ onMounted(async () => {
 .crd-change.sufficient { color: #16a34a; }
 .crd-change.insufficient { color: #ef4444; }
 
-/* ─── Denomination grid (NEW) ───────────────────────────────────────────────── */
+/* ─── Denomination grid ─────────────────────────────────────────────────────── */
 .denom-section { display: flex; flex-direction: column; gap: 8px; }
 .denom-header-row { display: flex; align-items: center; justify-content: space-between; }
 .denom-label { font-size: 11px; font-weight: 600; color: #999; }
@@ -1587,4 +1597,126 @@ onMounted(async () => {
 /* ─── Spinner ───────────────────────────────────────────────────────────────── */
 .spin { width: 17px; height: 17px; border: 2px solid #eee; border-top-color: #c49a6c; border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE  ≤ 768px
+═══════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .pos-root { height: 100svh; }
+
+  /* Topbar */
+  .pos-topbar { padding: 0 14px; height: 48px; }
+  .topbar-meta { display: none; }
+  .brand-mark span { font-size: 13px; }
+  .history-btn { padding: 6px 10px; font-size: 12px; }
+
+  /* Stack layout: no sidebar column, menu fills width, cart sits at bottom */
+  .pos-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    overflow: hidden;
+  }
+
+  /* ── Desktop sidebar: completely hidden on mobile ── */
+  .category-sidebar { display: none; }
+
+  /* ── Mobile category dropdown: shown in the search row ── */
+  .mobile-cat-dropdown { display: block; flex-shrink: 0; }
+  .mobile-cat-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: white;
+    border: 1.5px solid #e8d5c4;
+    border-radius: 9px;
+    padding: 8px 28px 8px 11px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #31201d;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    white-space: nowrap;
+    max-width: 130px;
+  }
+  /* active/selected state tint */
+  .mobile-cat-select:focus { border-color: #c49a6c; }
+
+  /* menu-search takes remaining flex space */
+  .menu-search { max-width: 100%; flex: 1; }
+
+  /* ── Menu area ── */
+  .menu-area { padding: 10px; gap: 10px; overflow-y: auto; }
+  .menu-search-row { flex-wrap: nowrap; gap: 7px; }
+  .menu-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .menu-card-img { height: 90px; }
+  .menu-card-name { font-size: 13px; }
+  .menu-card-price { font-size: 13px; }
+
+  /* ── Cart panel: taller bottom sheet so order lines show clearly ── */
+  .cart-panel {
+    border-left: none;
+    border-top: 2px solid #ede8e2;
+    max-height: 55vh;
+    min-height: 180px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* cart-items scrolls independently inside the panel */
+  .cart-items {
+    padding: 8px 12px;
+    max-height: 22vh;
+    overflow-y: auto;
+  }
+
+  .cart-panel-header { padding: 10px 14px; }
+  .cart-totals { padding: 8px 12px; }
+  .cart-discount { padding: 8px 12px; }
+  .checkout-btn { margin: 8px 12px 10px; }
+  .order-type-row { padding: 6px 12px; }
+
+  /* Modals slide up from bottom on mobile */
+  .overlay { align-items: flex-end; padding: 0; }
+  .oos-modal,
+  .size-modal,
+  .payment-modal,
+  .confirm-modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 18px 18px 0 0;
+    max-height: 90vh;
+  }
+  .history-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 18px 18px 0 0;
+  }
+
+  /* Payment modal internals */
+  .payment-view, .receipt-view { padding: 18px 16px; }
+  .denom-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .denom-btn { min-height: 50px; padding: 8px 4px; }
+  .denom-face { font-size: 13px; }
+  .receipt-btns { flex-direction: column; gap: 8px; }
+  .rbtn-back, .rbtn-print, .rbtn-confirm { width: 100%; }
+
+  /* History modal */
+  .hm-stats { grid-template-columns: repeat(3, 1fr); }
+  .hm-table-wrap { overflow-x: auto; }
+  .hm-table { min-width: 600px; }
+}
+
+@media (max-width: 480px) {
+  .menu-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .menu-card-img { height: 75px; }
+  .menu-card-name { font-size: 12px; }
+  .menu-card-info { padding: 6px 8px 8px; }
+  .size-options { grid-template-columns: 1fr 1fr; }
+  .denom-grid { grid-template-columns: repeat(3, 1fr); }
+  .mobile-cat-select { max-width: 110px; font-size: 11px; }
+  .oos-filter-btn { padding: 8px 9px; font-size: 11px; }
+}
 </style>

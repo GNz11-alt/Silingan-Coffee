@@ -1,6 +1,28 @@
 <template>
   <div class="dashboard" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
-    <aside class="sidebar">
+    <!-- Mobile top bar -->
+    <header class="mobile-topbar">
+      <button class="hamburger-btn" @click="isMobileOpen = true">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="mobile-brand">
+        <img
+          src="@/assets/images/logo.png"
+          alt="Silingan Coffee"
+          class="mobile-logo"
+        />
+        <span>Silingan Coffee</span>
+      </div>
+    </header>
+
+    <!-- Mobile backdrop -->
+    <div
+      v-if="isMobileOpen"
+      class="sidebar-backdrop"
+      @click="isMobileOpen = false"
+    ></div>
+
+    <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }">
       <div class="sidebar-top">
         <button class="toggle-btn" @click="toggleSidebar">
           <component
@@ -30,7 +52,7 @@
         </div>
       </div>
 
-      <nav class="sidebar-nav">
+      <nav class="sidebar-nav" @click="isMobileOpen = false">
         <router-link
           to="/staff/search"
           class="nav-item"
@@ -312,6 +334,7 @@ const currentDate = computed(() =>
 
 const router = useRouter();
 const isSidebarCollapsed = ref(false);
+const isMobileOpen = ref(false);
 const branch = ref("");
 const unreadCount = ref(0);
 const showNotifPanel = ref(false);
@@ -813,7 +836,9 @@ onUnmounted(() => {
 }
 
 @keyframes cpw-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 input::-ms-reveal,
@@ -877,5 +902,133 @@ input[type="password"]::-ms-reveal {
 
 .dashboard.sidebar-collapsed .main-content {
   margin-left: 80px;
+}
+
+/* ── Mobile top bar ─────────────────────────────────────── */
+.mobile-topbar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: #31201d;
+  color: #fff;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  z-index: 200;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.hamburger-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+.hamburger-btn span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+  border-radius: 2px;
+}
+.mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+.mobile-logo {
+  width: 26px;
+  height: 26px;
+  filter: invert(1);
+}
+
+/* ── Mobile backdrop ────────────────────────────────────── */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 150;
+}
+
+/* ── Tablet ─────────────────────────────────────────────── */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .sidebar {
+    width: 80px;
+  }
+  .dashboard.sidebar-collapsed .sidebar {
+    width: 80px;
+  }
+  .brand-text,
+  .datetime-section,
+  .sidebar-nav span,
+  .sidebar-bottom span,
+  .notification-badge {
+    display: none !important;
+  }
+  .sidebar-nav .nav-item,
+  .sidebar-bottom .nav-item {
+    justify-content: center;
+    gap: 0;
+    padding: 12px;
+  }
+  .toggle-btn {
+    display: none;
+  }
+  .main-content {
+    margin-left: 80px !important;
+  }
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .mobile-topbar {
+    display: flex;
+  }
+  .sidebar-backdrop {
+    display: block;
+  }
+  .sidebar {
+    transform: translateX(-100%);
+    transition:
+      transform 0.3s ease,
+      width 0.3s ease;
+    z-index: 160;
+    width: 280px !important;
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .dashboard.sidebar-collapsed .sidebar {
+    width: 280px;
+  }
+  .dashboard.sidebar-collapsed .sidebar .brand-text,
+  .dashboard.sidebar-collapsed .sidebar .datetime-section,
+  .dashboard.sidebar-collapsed .sidebar .sidebar-nav span,
+  .dashboard.sidebar-collapsed .sidebar .sidebar-bottom span {
+    display: block !important;
+  }
+  .dashboard.sidebar-collapsed .sidebar .nav-item {
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 12px 16px;
+  }
+  .main-content {
+    margin-left: 0 !important;
+    padding-top: 56px;
+  }
+  .toggle-btn {
+    display: none;
+  }
 }
 </style>

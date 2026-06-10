@@ -130,7 +130,6 @@ import {
   DollarSign,
   ShoppingBag,
   AlertCircle,
-  ClipboardList,
   ShoppingCart,
   Package,
   Calendar,
@@ -154,15 +153,18 @@ const branchLabel = ref("");
 
 const formatCurrency = (value) =>
   "₱" +
-  Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(value || 0).toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const formatTime = (iso) =>
   iso
-    ? new Date(iso + 'Z').toLocaleTimeString('en-PH', {
-        hour: '2-digit',
-        minute: '2-digit',
+    ? new Date(iso + "Z").toLocaleTimeString("en-PH", {
+        hour: "2-digit",
+        minute: "2-digit",
       })
-    : '—';
+    : "—";
 
 const fetchDashboardData = async () => {
   isLoading.value = true;
@@ -170,7 +172,8 @@ const fetchDashboardData = async () => {
 
   await resolveBranch();
   const branchId = userBranchId.value;
-  branchLabel.value = userBranchName.value || localStorage.getItem("branch") || "";
+  branchLabel.value =
+    userBranchName.value || localStorage.getItem("branch") || "";
 
   if (branchId) {
     const { data: ordersData } = await supabase
@@ -295,9 +298,9 @@ onMounted(() => {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 32px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
 }
 .stat-card {
   background: #ffffff;
@@ -453,15 +456,88 @@ onMounted(() => {
   color: #8b4513;
 }
 
+@media (min-width: 769px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .branch-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .branch-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .dashboard-content {
-    padding: 16px;
+    padding: 14px;
+    overflow-x: hidden;
   }
+
+  /* Stats and branch — always 2 col */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 12px;
+    gap: 8px;
+    min-width: 0;
+  }
+  .stat-info {
+    min-width: 0;
+  }
+  .stat-info h3 {
+    font-size: 11px;
+  }
+  .stat-value {
+    font-size: 18px;
+  }
+  .stat-trend {
+    font-size: 10px;
+  }
+  .stat-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .branch-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .branch-card {
+    padding: 14px;
+  }
+  .branch-info h4 {
+    font-size: 13px;
+  }
+  .branch-revenue {
+    font-size: 15px;
+  }
+
+  /* Bottom section stacks */
   .bottom-section {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
-  .stats-grid {
-    grid-template-columns: 1fr;
+  .recent-orders,
+  .quick-actions {
+    padding: 16px;
+  }
+
+  /* Orders list tighter */
+  .order-info {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .order-time {
+    min-width: unset;
   }
 }
 </style>

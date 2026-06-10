@@ -200,4 +200,14 @@ import {
 .system-features { margin-top: 20px; font-size: 12px; color: #6C757D; border-top: 1px solid #E9ECEF; padding-top: 12px; }
 
 @media (max-width: 1024px) { .main-layout { grid-template-columns: 1fr; } }
+
+@media (max-width: 768px) {
+  .dashboard-content { padding: 16px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .welcome-header { flex-direction: column; gap: 12px; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
 </style>

@@ -23,7 +23,10 @@
           <h3>Total Revenue</h3>
           <p class="stat-value">
             ₱{{
-              totalRevenue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              totalRevenue.toLocaleString("en-PH", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
             }}
           </p>
           <span class="stat-trend positive"
@@ -162,189 +165,198 @@
       </div>
 
       <template v-else>
-        <table class="main-table">
-          <thead>
-            <tr>
-              <th @click="setSort('OrderId')" class="sortable">
-                Order ID
-                <SortIcon field="OrderId" :current="sortBy" :dir="sortDir" />
-              </th>
-              <th @click="setSort('CreatedAt')" class="sortable">
-                Date
-                <SortIcon field="CreatedAt" :current="sortBy" :dir="sortDir" />
-              </th>
-              <th v-if="!isManager">Branch</th>
-              <th>Items</th>
-              <th>Discount</th>
-              <th @click="setSort('TotalAmount')" class="sortable">
-                Subtotal
-                <SortIcon
-                  field="TotalAmount"
-                  :current="sortBy"
-                  :dir="sortDir"
-                />
-              </th>
-              <th @click="setSort('FinalAmount')" class="sortable">
-                Total
-                <SortIcon
-                  field="FinalAmount"
-                  :current="sortBy"
-                  :dir="sortDir"
-                />
-              </th>
-              <th>Payment</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="tr in pagedTransactions" :key="tr.OrderId">
-              <tr
-                :class="{ 'expanded-row': expandedId === tr.OrderId }"
-                @click="toggleExpand(tr.OrderId)"
-              >
-                <td>
-                  <span class="id-tag">#{{ tr.OrderId }}</span>
-                </td>
-                <td class="date-cell">
-                  <span class="date-main">{{
-                    formatDateShort(tr.CreatedAt)
-                  }}</span>
-                  <span class="date-time">{{ formatTime(tr.CreatedAt) }}</span>
-                </td>
-                <td v-if="!isManager">
-                  <span class="branch-pill">{{
-                    getBranchName(tr.BranchId)
-                  }}</span>
-                </td>
-                <td class="items-preview">
-                  <span
-                    v-for="(item, i) in (tr.orderitem ?? []).slice(0, 2)"
-                    :key="i"
-                    class="item-chip"
-                  >
-                    {{ item.Quantity }}x {{ item.product?.ProductName ?? "—" }}
-                  </span>
-                  <span
-                    v-if="(tr.orderitem ?? []).length > 2"
-                    class="more-chip"
-                  >
-                    +{{ tr.orderitem.length - 2 }} more
-                  </span>
-                </td>
-                <td>
-                  <span v-if="tr.discount" class="discount-badge">
-                    {{ tr.discount.discountname }}
-                    <em
-                      >({{
-                        tr.discount.discounttype === "percentage"
-                          ? tr.discount.discountvalue + "%"
-                          : "₱" + tr.discount.discountvalue
-                      }})</em
-                    >
-                  </span>
-                  <span v-else class="no-discount">—</span>
-                </td>
-                <td class="amount-cell">
-                  ₱{{ (tr.TotalAmount ?? 0).toFixed(2) }}
-                </td>
-                <td class="total-cell">
-                  ₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}
-                </td>
-                <td>
-                  <span :class="['payment-badge', tr.PaymentMethod]">{{
-                    tr.PaymentMethod ?? "—"
-                  }}</span>
-                </td>
-                <td>
-                  <span :class="['status-badge', tr.Status]">{{
-                    tr.Status
-                  }}</span>
-                </td>
-                <td>
-                  <ChevronDown
-                    :size="16"
-                    :class="[
-                      'expand-icon',
-                      { rotated: expandedId === tr.OrderId },
-                    ]"
+        <div class="table-scroll-wrap">
+          <table class="main-table">
+            <thead>
+              <tr>
+                <th @click="setSort('OrderId')" class="sortable">
+                  Order ID
+                  <SortIcon field="OrderId" :current="sortBy" :dir="sortDir" />
+                </th>
+                <th @click="setSort('CreatedAt')" class="sortable">
+                  Date
+                  <SortIcon
+                    field="CreatedAt"
+                    :current="sortBy"
+                    :dir="sortDir"
                   />
-                </td>
+                </th>
+                <th v-if="!isManager">Branch</th>
+                <th>Items</th>
+                <th>Discount</th>
+                <th @click="setSort('TotalAmount')" class="sortable">
+                  Subtotal
+                  <SortIcon
+                    field="TotalAmount"
+                    :current="sortBy"
+                    :dir="sortDir"
+                  />
+                </th>
+                <th @click="setSort('FinalAmount')" class="sortable">
+                  Total
+                  <SortIcon
+                    field="FinalAmount"
+                    :current="sortBy"
+                    :dir="sortDir"
+                  />
+                </th>
+                <th>Payment</th>
+                <th>Status</th>
+                <th></th>
               </tr>
+            </thead>
+            <tbody>
+              <template v-for="tr in pagedTransactions" :key="tr.OrderId">
+                <tr
+                  :class="{ 'expanded-row': expandedId === tr.OrderId }"
+                  @click="toggleExpand(tr.OrderId)"
+                >
+                  <td>
+                    <span class="id-tag">#{{ tr.OrderId }}</span>
+                  </td>
+                  <td class="date-cell">
+                    <span class="date-main">{{
+                      formatDateShort(tr.CreatedAt)
+                    }}</span>
+                    <span class="date-time">{{
+                      formatTime(tr.CreatedAt)
+                    }}</span>
+                  </td>
+                  <td v-if="!isManager">
+                    <span class="branch-pill">{{
+                      getBranchName(tr.BranchId)
+                    }}</span>
+                  </td>
+                  <td class="items-preview">
+                    <span
+                      v-for="(item, i) in (tr.orderitem ?? []).slice(0, 2)"
+                      :key="i"
+                      class="item-chip"
+                    >
+                      {{ item.Quantity }}x
+                      {{ item.product?.ProductName ?? "—" }}
+                    </span>
+                    <span
+                      v-if="(tr.orderitem ?? []).length > 2"
+                      class="more-chip"
+                    >
+                      +{{ tr.orderitem.length - 2 }} more
+                    </span>
+                  </td>
+                  <td>
+                    <span v-if="tr.discount" class="discount-badge">
+                      {{ tr.discount.discountname }}
+                      <em
+                        >({{
+                          tr.discount.discounttype === "percentage"
+                            ? tr.discount.discountvalue + "%"
+                            : "₱" + tr.discount.discountvalue
+                        }})</em
+                      >
+                    </span>
+                    <span v-else class="no-discount">—</span>
+                  </td>
+                  <td class="amount-cell">
+                    ₱{{ (tr.TotalAmount ?? 0).toFixed(2) }}
+                  </td>
+                  <td class="total-cell">
+                    ₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}
+                  </td>
+                  <td>
+                    <span :class="['payment-badge', tr.PaymentMethod]">{{
+                      tr.PaymentMethod ?? "—"
+                    }}</span>
+                  </td>
+                  <td>
+                    <span :class="['status-badge', tr.Status]">{{
+                      tr.Status
+                    }}</span>
+                  </td>
+                  <td>
+                    <ChevronDown
+                      :size="16"
+                      :class="[
+                        'expand-icon',
+                        { rotated: expandedId === tr.OrderId },
+                      ]"
+                    />
+                  </td>
+                </tr>
 
-              <!-- Expanded detail row -->
-              <tr v-if="expandedId === tr.OrderId" class="detail-row">
-                <td :colspan="isManager ? 9 : 10">
-                  <div class="detail-panel">
-                    <div class="detail-cols">
-                      <div class="detail-col">
-                        <h4>Order Items</h4>
-                        <table class="inner-table">
-                          <thead>
-                            <tr>
-                              <th>Product</th>
-                              <th>Qty</th>
-                              <th>Unit Price</th>
-                              <th>Subtotal</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr
-                              v-for="item in tr.orderitem"
-                              :key="item.OrderItemId"
-                            >
-                              <td>{{ item.product?.ProductName ?? "—" }}</td>
-                              <td>{{ item.Quantity }}</td>
-                              <td>₱{{ (item.UnitPrice ?? 0).toFixed(2) }}</td>
-                              <td>₱{{ (item.Subtotal ?? 0).toFixed(2) }}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                      <div class="detail-col summary-col">
-                        <h4>Payment Summary</h4>
-                        <div class="summary-rows">
-                          <div class="s-row">
-                            <span>Subtotal</span
-                            ><span
-                              >₱{{ (tr.TotalAmount ?? 0).toFixed(2) }}</span
-                            >
-                          </div>
-                          <div class="s-row" v-if="tr.discount">
-                            <span
-                              >Discount ({{ tr.discount.discountname }})</span
-                            >
-                            <span class="s-discount"
-                              >-₱{{
-                                (tr.DiscountedAmount ?? 0).toFixed(2)
-                              }}</span
-                            >
-                          </div>
-                          <div class="s-row total">
-                            <span>Total</span
-                            ><span
-                              >₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}</span
-                            >
-                          </div>
-                          <div class="s-row" v-if="tr.cashpaid">
-                            <span>Cash Paid</span
-                            ><span>₱{{ (tr.cashpaid ?? 0).toFixed(2) }}</span>
-                          </div>
-                          <div class="s-row green" v-if="tr.changegiven">
-                            <span>Change</span
-                            ><span
-                              >₱{{ (tr.changegiven ?? 0).toFixed(2) }}</span
-                            >
+                <!-- Expanded detail row -->
+                <tr v-if="expandedId === tr.OrderId" class="detail-row">
+                  <td :colspan="isManager ? 9 : 10">
+                    <div class="detail-panel">
+                      <div class="detail-cols">
+                        <div class="detail-col">
+                          <h4>Order Items</h4>
+                          <table class="inner-table">
+                            <thead>
+                              <tr>
+                                <th>Product</th>
+                                <th>Qty</th>
+                                <th>Unit Price</th>
+                                <th>Subtotal</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr
+                                v-for="item in tr.orderitem"
+                                :key="item.OrderItemId"
+                              >
+                                <td>{{ item.product?.ProductName ?? "—" }}</td>
+                                <td>{{ item.Quantity }}</td>
+                                <td>₱{{ (item.UnitPrice ?? 0).toFixed(2) }}</td>
+                                <td>₱{{ (item.Subtotal ?? 0).toFixed(2) }}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        <div class="detail-col summary-col">
+                          <h4>Payment Summary</h4>
+                          <div class="summary-rows">
+                            <div class="s-row">
+                              <span>Subtotal</span
+                              ><span
+                                >₱{{ (tr.TotalAmount ?? 0).toFixed(2) }}</span
+                              >
+                            </div>
+                            <div class="s-row" v-if="tr.discount">
+                              <span
+                                >Discount ({{ tr.discount.discountname }})</span
+                              >
+                              <span class="s-discount"
+                                >-₱{{
+                                  (tr.DiscountedAmount ?? 0).toFixed(2)
+                                }}</span
+                              >
+                            </div>
+                            <div class="s-row total">
+                              <span>Total</span
+                              ><span
+                                >₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}</span
+                              >
+                            </div>
+                            <div class="s-row" v-if="tr.cashpaid">
+                              <span>Cash Paid</span
+                              ><span>₱{{ (tr.cashpaid ?? 0).toFixed(2) }}</span>
+                            </div>
+                            <div class="s-row green" v-if="tr.changegiven">
+                              <span>Change</span
+                              ><span
+                                >₱{{ (tr.changegiven ?? 0).toFixed(2) }}</span
+                              >
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
 
         <!-- Pagination -->
         <div class="pagination-bar">
@@ -726,8 +738,8 @@ onMounted(async () => {
 /* STATS */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
   margin-bottom: 24px;
 }
 .stat-card {
@@ -1243,23 +1255,149 @@ onMounted(async () => {
 }
 
 /* RESPONSIVE */
+@media (min-width: 769px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .sales-container {
-    padding: 16px;
+    padding: 14px;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
-  .stats-row {
-    grid-template-columns: 1fr 1fr;
-  }
-  .detail-cols {
-    grid-template-columns: 1fr;
-  }
+
+  /* Header */
   .page-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
   }
+  .header-text h1 {
+    font-size: 22px;
+  }
+  .launch-pos-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Stats — always 2 col */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    padding: 12px;
+    gap: 8px;
+    min-width: 0;
+  }
+  .stat-info {
+    min-width: 0;
+  }
+  .stat-info h3 {
+    font-size: 11px;
+  }
+  .stat-info .stat-value {
+    font-size: 18px;
+  }
+  .stat-trend {
+    font-size: 10px;
+  }
+  .stat-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Filters */
   .filters-bar {
+    padding: 14px;
+    gap: 10px;
     flex-direction: column;
+  }
+  .filter-group {
+    width: 100%;
+  }
+  .select-wrap select {
+    width: 100%;
+    min-width: unset;
+    box-sizing: border-box;
+  }
+  .date-input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .search-group {
+    width: 100%;
+    min-width: unset;
+  }
+  .search-input {
+    width: 100%;
+  }
+  .clear-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Table section — header and pagination stay fixed */
+  .table-section {
+    padding: 14px;
+    overflow-x: visible;
+  }
+  .table-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .table-header-row h3 {
+    font-size: 16px;
+  }
+
+  /* Only the table scrolls */
+  .table-scroll-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+  .main-table {
+    min-width: 700px;
+  }
+
+  /* Expanded detail */
+  .detail-cols {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .detail-panel {
+    padding: 14px;
+  }
+
+  /* Pagination */
+  .pagination-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+  .page-label {
+    font-size: 13px;
+  }
+
+  /* POS modal full screen on mobile */
+  .pos-modal-wrap {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .stat-info .stat-value {
+    font-size: 16px;
   }
 }
 </style>
