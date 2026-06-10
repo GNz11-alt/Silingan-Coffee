@@ -41,6 +41,7 @@
               v-model="username"
               placeholder="Enter your username"
               required
+              autocomplete="username"
             />
           </div>
         </div>
@@ -66,6 +67,7 @@
               v-model="password"
               placeholder="Enter your password"
               required
+              autocomplete="current-password"
               @input="validatePassword"
             />
             <button

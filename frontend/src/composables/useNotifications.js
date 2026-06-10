@@ -169,7 +169,6 @@ export function useNotifications() {
     const role = roleOverride || getRole();
     if (!role) return;
 
-    // Duplicate prevention: skip if same category+title+role+branch already exists today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

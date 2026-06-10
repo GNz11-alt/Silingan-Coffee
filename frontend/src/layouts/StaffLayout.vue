@@ -136,6 +136,12 @@
     </aside>
 
     <main class="main-content">
+      <Teleport to="body">
+        <div v-if="cpw.loading || cpw.success" class="cpw-fullscreen-overlay">
+          <div class="cpw-spinner"></div>
+          <p>{{ cpw.success ? cpw.success : "Updating password..." }}</p>
+        </div>
+      </Teleport>
       <router-view v-slot="{ Component }">
         <KeepAlive :include="['StaffSchedule', 'StaffPOS']">
           <component :is="Component" :key="$route.name" />
@@ -443,9 +449,8 @@ const doChangePassword = async () => {
     })
     .eq("id", userCheck.id);
 
-  cpw.loading = false;
-
   if (updateError) {
+    cpw.loading = false;
     cpw.error = "Failed to update password. Please try again.";
     return;
   }
@@ -479,12 +484,15 @@ onMounted(async () => {
   unreadCount.value = notifs.length;
 
   // Generate notifications for this branch
-  const branchNum = userBranchId.value ? Number(userBranchId.value) : null
-  generateAllNotifications({ branchId: branchNum, role: 'staff' });
+  const branchNum = userBranchId.value ? Number(userBranchId.value) : null;
+  generateAllNotifications({ branchId: branchNum, role: "staff" });
 
-  notifGenInterval = setInterval(() => {
-    generateAllNotifications({ branchId: branchNum, role: 'staff' });
-  }, 30 * 60 * 1000);
+  notifGenInterval = setInterval(
+    () => {
+      generateAllNotifications({ branchId: branchNum, role: "staff" });
+    },
+    30 * 60 * 1000,
+  );
 });
 
 onUnmounted(() => {
@@ -774,6 +782,40 @@ onUnmounted(() => {
   padding: 16px 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+.cpw-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 9999;
+  pointer-events: all;
+}
+
+.cpw-fullscreen-overlay p {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.cpw-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: cpw-spin 0.7s linear infinite;
+}
+
+@keyframes cpw-spin {
+  to { transform: rotate(360deg); }
+}
+
 input::-ms-reveal,
 input::-ms-clear {
   display: none;

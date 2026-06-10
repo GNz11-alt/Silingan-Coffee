@@ -165,6 +165,12 @@
     <main class="main-content">
       <router-view />
     </main>
+    <Teleport to="body">
+      <div v-if="cpw.loading || cpw.success" class="cpw-fullscreen-overlay">
+        <div class="cpw-spinner"></div>
+        <p>{{ cpw.success ? cpw.success : "Updating password..." }}</p>
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <div
@@ -326,7 +332,7 @@ const currentTime = computed(() =>
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-  })
+  }),
 );
 
 const currentDate = computed(() =>
@@ -335,7 +341,7 @@ const currentDate = computed(() =>
     year: "numeric",
     month: "long",
     day: "numeric",
-  })
+  }),
 );
 
 // Change Password state
@@ -445,9 +451,8 @@ const doChangePassword = async () => {
     })
     .eq("id", userCheck.id);
 
-  cpw.loading = false;
-
   if (updateError) {
+    cpw.loading = false;
     cpw.error = "Failed to update password. Please try again.";
     return;
   }
@@ -500,12 +505,15 @@ onMounted(async () => {
   unreadCount.value = notifs.length;
 
   // Generate notifications on mount
-  generateAllNotifications({ role: 'admin' });
+  generateAllNotifications({ role: "admin" });
 
   // Regenerate every 30 minutes
-  notifGenInterval = setInterval(() => {
-    generateAllNotifications({ role: 'admin' });
-  }, 30 * 60 * 1000);
+  notifGenInterval = setInterval(
+    () => {
+      generateAllNotifications({ role: "admin" });
+    },
+    30 * 60 * 1000,
+  );
 });
 
 onUnmounted(() => {
@@ -874,5 +882,38 @@ onUnmounted(() => {
 .cpw-submit:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+
+.cpw-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 9999;
+  pointer-events: all;
+}
+
+.cpw-fullscreen-overlay p {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.cpw-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: cpw-spin 0.7s linear infinite;
+}
+
+@keyframes cpw-spin {
+  to { transform: rotate(360deg); }
 }
 </style>

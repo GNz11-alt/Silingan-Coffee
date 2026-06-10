@@ -26,14 +26,22 @@ function sevenDaysFromNow() {
 
 async function existsToday(category, title, branchId) {
   const { start } = todayRange()
-  const { data } = await supabase
+  
+  let query = supabase
     .from('notifications')
     .select('id')
     .eq('category', category)
     .eq('title', title)
-    .eq('branch_id', branchId || null)
     .gte('created_at', start)
     .limit(1)
+
+  if (branchId != null) {
+    query = query.eq('branch_id', branchId)
+  } else {
+    query = query.is('branch_id', null)
+  }
+
+  const { data } = await query
   return data && data.length > 0
 }
 
@@ -53,7 +61,7 @@ function insertNotification({ role, branch_id, category, title, message, severit
 
 export async function checkLowStock(branchId) {
   let query = supabase
-    .from('rawproduct')
+    .from('rawproducttransaction') 
     .select('rawproductid, name, stockquantity, reorderlevel, unit')
 
   const { data: items } = await query
