@@ -131,7 +131,9 @@ import {
   ShoppingBag,
   AlertCircle,
   ClipboardList,
+  ShoppingCart,
   Package,
+  Calendar,
 } from "lucide-vue-next";
 
 const router = useRouter();

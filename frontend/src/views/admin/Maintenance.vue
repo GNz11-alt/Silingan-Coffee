@@ -76,7 +76,7 @@
             <div class="resource-row">
               <span class="resource-label">Storage Usage</span>
               <span class="resource-value">
-                {{ stats.storage_used_gb }}MB / {{ stats.storage_total_gb }}MB
+                {{ stats.storage_used_gb }} MB / {{ stats.storage_total_gb }} MB
               </span>
             </div>
             <div class="progress-bar-wrap">
@@ -403,8 +403,8 @@ const fetchStats = async (force = false) => {
     health_label: data.health_label,
     uptime_percent: data.uptime_percent,
     uptime_label: data.uptime_label,
-    storage_used_gb: Math.round(data.storage_used_gb * 1024),
-    storage_total_gb: Math.round(data.storage_total_gb * 1024),
+    storage_used_gb: parseFloat((data.storage_used_gb * 1024).toFixed(2)),
+    storage_total_gb: parseFloat((data.storage_total_gb * 1024).toFixed(2)),
   };
   stats.value = mapped;
   saveCache(CACHE_KEY_STATS, mapped);

@@ -249,22 +249,32 @@ const totalEmployees = ref(0);
 
 const formatCurrency = (value) =>
   "₱" +
-  Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Number(value || 0).toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 const formatTime = (iso) =>
   iso
-    ? new Date(iso + 'Z').toLocaleTimeString('en-PH', {
-        hour: '2-digit',
-        minute: '2-digit',
+    ? new Date(iso + "Z").toLocaleTimeString("en-PH", {
+        hour: "2-digit",
+        minute: "2-digit",
       })
-    : '—';
+    : "—";
 
 const fetchDashboardData = async () => {
   isLoading.value = true;
 
+  const todayDate = new Date();
+  const today = todayDate.toISOString().split("T")[0];
+  const yesterdayDate = new Date(todayDate);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = yesterdayDate.toISOString().split("T")[0];
+
   await resolveBranch();
   const branchId = userBranchId.value;
-  branchLabel.value = userBranchName.value || localStorage.getItem("branch") || "";
+  branchLabel.value =
+    userBranchName.value || localStorage.getItem("branch") || "";
 
   if (branchId) {
     const { data: ordersData } = await supabase
