@@ -35,8 +35,8 @@
         </div>
         <div class="stat-info">
           <h3>Total Orders</h3>
-          <p class="stat-value">{{ allTransactions.length }}</p>
-          <span class="stat-trend positive">all time</span>
+          <p class="stat-value">{{ completedCount }}</p>
+<span class="stat-trend positive">completed orders</span>
         </div>
       </div>
 
@@ -380,7 +380,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import {
   DollarSign,
@@ -410,6 +410,40 @@ const SortIcon = {
 const allTransactions = ref([]);
 const branches = ref([]);
 const loading = ref(false);
+
+// Add after the state declarations
+let refreshInterval = null;
+
+onMounted(async () => {
+  await Promise.all([fetchBranches(), fetchAllOrders()]);
+  const viewId = route.query.edit;
+  if (viewId) {
+    const idNum = Number(viewId);
+    const order = allTransactions.value.find((o) => o.OrderId === idNum);
+    if (order) expandedId.value = idNum;
+  }
+
+  // Refetch every 30 seconds
+  refreshInterval = setInterval(fetchAllOrders, 30_000);
+
+  // Also refetch when tab becomes visible again
+  document.addEventListener("visibilitychange", onVisibilityChange);
+});
+
+onUnmounted(() => {
+  clearInterval(refreshInterval);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+});
+
+const onVisibilityChange = () => {
+  if (document.visibilityState === "visible") fetchAllOrders();
+};
+
+
+const completedCount = computed(() =>
+  allTransactions.value.filter((t) => t.Status === "completed").length
+);
+
 
 // Filters
 const filterBranch = ref("");
@@ -453,16 +487,24 @@ const filteredTransactions = computed(() => {
   if (filterPayment.value)
     list = list.filter((t) => t.PaymentMethod === filterPayment.value);
 
-  if (filterDateFrom.value)
-    list = list.filter(
-      (t) => new Date(t.CreatedAt) >= new Date(filterDateFrom.value),
-    );
+if (filterDateFrom.value)
+  list = list.filter((t) => {
+    const d = t.CreatedAt?.includes("+") || t.CreatedAt?.endsWith("Z")
+      ? t.CreatedAt
+      : t.CreatedAt + "+08:00";
+    return new Date(d) >= new Date(filterDateFrom.value);
+  });
 
-  if (filterDateTo.value) {
-    const to = new Date(filterDateTo.value);
-    to.setHours(23, 59, 59, 999);
-    list = list.filter((t) => new Date(t.CreatedAt) <= to);
-  }
+if (filterDateTo.value) {
+  const to = new Date(filterDateTo.value);
+  to.setHours(23, 59, 59, 999);
+  list = list.filter((t) => {
+    const d = t.CreatedAt?.includes("+") || t.CreatedAt?.endsWith("Z")
+      ? t.CreatedAt
+      : t.CreatedAt + "+08:00";
+    return new Date(d) <= to;
+  });
+}
 
   if (filterSearch.value) {
     const q = filterSearch.value.toLowerCase();
@@ -503,7 +545,9 @@ const pagedTransactions = computed(() =>
 );
 
 const totalRevenue = computed(() =>
-  filteredTransactions.value.reduce((s, t) => s + (t.FinalAmount ?? 0), 0),
+  filteredTransactions.value
+    .filter((t) => t.Status !== "cancelled")  // add this
+    .reduce((s, t) => s + (t.FinalAmount ?? 0), 0)
 );
 const avgSale = computed(() =>
   filteredTransactions.value.length
@@ -581,20 +625,28 @@ const getBranchName = (id) => {
   return b ? b.BranchName : id ? `Branch ${id}` : "—";
 };
 
+const parseManila = (iso) => {
+  if (!iso) return null;
+  return new Date(
+    iso.includes("+") || iso.endsWith("Z") ? iso : iso + "+08:00"
+  );
+};
+
 const formatDateShort = (iso) => {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-PH", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+  const d = parseManila(iso);
+  if (!d) return "—";
+  return d.toLocaleDateString("en-PH", {
+    timeZone: "Asia/Manila",
+    month: "short", day: "numeric", year: "numeric",
   });
 };
 
 const formatTime = (iso) => {
-  if (!iso) return "";
-  return new Date(iso).toLocaleTimeString("en-PH", {
-    hour: "2-digit",
-    minute: "2-digit",
+  const d = parseManila(iso);
+  if (!d) return "";
+  return d.toLocaleTimeString("en-PH", {
+    timeZone: "Asia/Manila",
+    hour: "2-digit", minute: "2-digit",
   });
 };
 
