@@ -413,6 +413,33 @@ import { supabase } from "@/supabase";
 import { useUserBranch } from "@/composables/useUserBranch.js";
 import POSView from "@/views/staff/POS.vue";
 
+// Add at the end of script setup
+import { onUnmounted } from 'vue';
+
+// Auto-refresh every 30 seconds
+let refreshInterval;
+
+const refreshData = async () => {
+  await fetchAllOrders();
+};
+
+onMounted(async () => {
+  await Promise.all([fetchBranches(), fetchAllOrders()]);
+  const viewId = route.query.edit;
+  if (viewId) {
+    const idNum = Number(viewId);
+    const order = allTransactions.value.find((o) => o.OrderId === idNum);
+    if (order) expandedId.value = idNum;
+  }
+  
+  // Set up auto-refresh
+  refreshInterval = setInterval(refreshData, 30000);
+});
+
+onUnmounted(() => {
+  if (refreshInterval) clearInterval(refreshInterval);
+});
+
 const route = useRoute();
 
 // ── Sort icon inline component ──────────────────────────────────────────────
@@ -479,13 +506,12 @@ const filteredTransactions = computed(() => {
   if (filterStatus.value)
     list = list.filter((t) => t.Status === filterStatus.value);
 
-  if (filterPayment.value)
-    list = list.filter((t) => t.PaymentMethod === filterPayment.value);
+  // In filteredTransactions computed:
+if (filterDateFrom.value)
+  list = list.filter((t) => compareDates(t.CreatedAt, filterDateFrom.value, true));
 
-  if (filterDateFrom.value)
-    list = list.filter(
-      (t) => new Date(t.CreatedAt) >= new Date(filterDateFrom.value),
-    );
+if (filterDateTo.value)
+  list = list.filter((t) => compareDates(t.CreatedAt, filterDateTo.value, false));
 
   if (filterDateTo.value) {
     const to = new Date(filterDateTo.value);
@@ -623,6 +649,51 @@ const fetchAllOrders = async () => {
 const getBranchName = (id) => {
   const b = branches.value.find((b) => b.BranchId === id);
   return b ? b.BranchName : id ? `Branch ${id}` : "—";
+};
+
+// Helper function for consistent date comparison
+const compareDates = (dateStr, filterDate, isFrom = true) => {
+  const date = new Date(dateStr);
+  const filter = new Date(filterDate);
+  
+  if (isFrom) {
+    // Set both to start of day for "from" comparison
+    date.setHours(0, 0, 0, 0);
+    filter.setHours(0, 0, 0, 0);
+    return date >= filter;
+  } else {
+    // For "to" comparison, include the entire day
+    date.setHours(0, 0, 0, 0);
+    filter.setHours(23, 59, 59, 999);
+    return date <= filter;
+  }
+};
+
+// Add this helper to both components
+const formatDateForDisplay = (isoString) => {
+  if (!isoString) return '—';
+  const date = new Date(isoString);
+  // Use UTC methods to avoid timezone shifts
+  return date.toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'Asia/Manila'
+  });
+};
+
+const formatDateTimeForStorage = () => {
+  // Use Asia/Manila timezone for consistent storage
+  return new Date().toLocaleString('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).replace(',', '').replace(/\//g, '-');
 };
 
 const formatDateShort = (iso) => {

@@ -399,7 +399,6 @@
 
           <!-- ── CASH PAYMENT ── -->
           <div v-if="paymentMethod === 'cash'" class="cash-fields">
-            <!-- Running total display -->
             <div class="cash-received-display">
               <div class="crd-label">Cash Received</div>
                 <input
@@ -426,7 +425,6 @@
               </div>
             </div>
 
-            <!-- Denomination grid -->
             <div class="denom-section">
               <div class="denom-header-row">
                 <span class="denom-label"></span>
@@ -458,12 +456,10 @@
               </div>
             </div>
 
-            <!-- Exact button -->
             <button class="exact-btn" @click="setExactDenoms">
               Exact — ₱{{ finalTotal.toFixed(2) }}
             </button>
 
-            <!-- Breakdown summary (only when cash > 0) -->
             <div class="cash-calc" v-if="cashReceived > 0">
               <div class="cc-row"><span>Total Due</span><span>₱{{ finalTotal.toFixed(2) }}</span></div>
               <div class="cc-row"><span>Cash</span><span>₱{{ cashReceived.toFixed(2) }}</span></div>
@@ -669,14 +665,11 @@ import {
   Coffee, History, Search, ShoppingCart, Plus, Minus, Trash2, X, Tag,
   ChevronDown, CreditCard, Banknote, Smartphone, ArrowLeft, Cookie, Layers,
   UtensilsCrossed, Sandwich, Leaf, Printer, XCircle, AlertTriangle,
-  ShoppingBag, Eye, RotateCcw, Check,
+  ShoppingBag, Eye, RotateCcw,
 } from "lucide-vue-next";
 import { supabase } from "@/supabase";
 import {
-  normaliseNeeded,
   checkStockForProduct,
-  buildFEFODeductionRows,
-  suggestRecipeUnit,
   formatQtyDisplay,
 } from "@/composables/inventoryUtils.js";
 
@@ -691,12 +684,14 @@ const getSizeType = (cat) => {
   if (c.includes("cream") && c.includes("frap")) return "iced";
   return "none";
 };
+
 const getSizeLabels = (cat) => {
   const t = getSizeType(cat);
   if (t === "hot") return ["Small", "Regular"];
   if (t === "iced") return ["Regular", "Big"];
   return [];
 };
+
 const buildSizeOptions = (item) => {
   const t = getSizeType(item.Category);
   const sp = item.size_prices || {};
@@ -710,12 +705,28 @@ const buildSizeOptions = (item) => {
   ];
   return [];
 };
+
 const getBasePrice = (item) => {
   const t = getSizeType(item.Category);
   const sp = item.size_prices || {};
   if (t === "hot")  return (sp.Small   || item.Price)?.toFixed(2) ?? "0.00";
   if (t === "iced") return (sp.Regular || item.Price)?.toFixed(2) ?? "0.00";
   return item.Price?.toFixed(2) ?? "0.00";
+};
+
+// Size multiplier
+const SIZE_MULTIPLIERS = {
+  "Small": 1.0,
+  "Regular": 1.25,
+  "Big": 1.375,
+};
+
+const getSizeMultiplier = (sizeLabel) => {
+  if (!sizeLabel) return 1;
+  for (const [key, mult] of Object.entries(SIZE_MULTIPLIERS)) {
+    if (sizeLabel.includes(key)) return mult;
+  }
+  return 1;
 };
 
 // ─── Cache config ─────────────────────────────────────────────────────────────
@@ -743,60 +754,61 @@ const writeCache = (key, data, ttl) => {
 const bustCache = (...keys) => keys.forEach((k) => sessionStorage.removeItem(k));
 
 // ─── State ────────────────────────────────────────────────────────────────────
-const menu              = ref([]);
-const discounts         = ref([]);
-const transactions      = ref([]);
-const loadingMenu       = ref(false);
+const menu = ref([]);
+const discounts = ref([]);
+const transactions = ref([]);
+const loadingMenu = ref(false);
 const loadingTransactions = ref(false);
-const cart              = ref([]);
-const selectedDiscount  = ref(null);
-const discountIdNumber  = ref("");
-const discountIdError   = ref("");
-const activeCategory    = ref("All");
-const menuSearch        = ref("");
-const hideOOS           = ref(false);
-const showPayment       = ref(false);
-const showReceipt       = ref(false);
-const showHistory       = ref(false);
-const paymentMethod     = ref("cash");
-const saving            = ref(false);
-const currentUser       = ref(null);
-const branchRecord      = ref(null);
-const employeeRecord    = ref(null);
+const cart = ref([]);
+const selectedDiscount = ref(null);
+const discountIdNumber = ref("");
+const discountIdError = ref("");
+const activeCategory = ref("All");
+const menuSearch = ref("");
+const hideOOS = ref(false);
+const showPayment = ref(false);
+const showReceipt = ref(false);
+const showHistory = ref(false);
+const paymentMethod = ref("cash");
+const saving = ref(false);
+const currentUser = ref(null);
+const branchRecord = ref(null);
+const employeeRecord = ref(null);
+const branchId = ref(null);
 
 // Stock & recipe state
-const rawMaterialStock  = ref({});
-const inventoryUnitMap  = ref({});
-const productRecipes    = ref([]);
+const rawMaterialStock = ref({});
+const inventoryUnitMap = ref({});
+const productRecipes = ref([]);
 
 // OOS alert
-const showOosAlert   = ref(false);
+const showOosAlert = ref(false);
 const oosProductName = ref("");
 const oosIngredients = ref([]);
 
 // Size picker
-const showSizePicker  = ref(false);
-const sizePickerItem  = ref(null);
-const sizeOptions     = ref([]);
+const showSizePicker = ref(false);
+const sizePickerItem = ref(null);
+const sizeOptions = ref([]);
 
 // Cancel order
-const showCancelConfirm  = ref(false);
-const cancelTarget       = ref(null);
-const cancellingId       = ref(null);
-const cancelReason       = ref("");
-const cancelReasonError  = ref("");
+const showCancelConfirm = ref(false);
+const cancelTarget = ref(null);
+const cancellingId = ref(null);
+const cancelReason = ref("");
+const cancelReasonError = ref("");
 const cancelReasonPresets = [
   "Customer request", "Wrong order entered", "Item unavailable",
   "Customer left", "Duplicate order",
 ];
 
 const transactionNumber = ref("");
-const orderType         = ref("dine_in");
-const VAT_RATE          = 0.12;
+const orderType = ref("dine_in");
+const VAT_RATE = 0.12;
 
-// ─── Denomination state ───────────────────────────────────────────────────────
+// ─── Denomination state (NEW) ─────────────────────────────────────────────────
 const denominations = [20, 50, 100, 200, 500, 1000];
-const denomCounts   = reactive({});
+const denomCounts = reactive({});
 denominations.forEach((d) => (denomCounts[d] = 0));
 
 const addDenom = (d) => {
@@ -820,7 +832,6 @@ const setExactDenoms = () => {
   if (rem > 0) denomCounts[20] += Math.ceil(rem / 2000);
 };
 
-const cashDisplayRef = ref(null);
 const manualOverride = ref(null);
 
 const cashReceived = computed(() =>
@@ -835,9 +846,11 @@ const onManualCashInput = (e) => {
 };
 
 const onCashFocus = (e) => {
+  // Strip ₱ sign so user types clean numbers
   if (cashDisplayRef.value) {
     const num = cashReceived.value.toFixed(2);
     cashDisplayRef.value.innerText = num;
+    // Place cursor at end
     const range = document.createRange();
     range.selectNodeContents(cashDisplayRef.value);
     range.collapse(false);
@@ -848,19 +861,22 @@ const onCashFocus = (e) => {
 };
 
 const onCashBlur = (e) => {
+  // Reformat with ₱ on blur
   const val = manualOverride.value ?? cashReceived.value;
   if (cashDisplayRef.value) {
     cashDisplayRef.value.innerText = `₱${val.toFixed(2)}`;
   }
 };
 
+
+
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const cashierName = computed(
   () => currentUser.value?.username ?? localStorage.getItem("username") ?? "Staff"
 );
-const branchId      = computed(() => branchRecord.value?.BranchId ?? null);
 const branchAddress = computed(() => branchRecord.value?.Location ?? "");
-const currentDate   = new Date().toLocaleDateString("en-PH", {
+const currentDate = new Date().toLocaleString("en-PH", {
+  timeZone: "Asia/Manila",
   weekday: "short", month: "short", day: "numeric", year: "numeric",
 });
 const menuCategories = computed(() =>
@@ -887,9 +903,9 @@ const afterDiscountAmount = computed(() => Math.max(0, cartSubtotal.value - disc
 const vatAmount = computed(() =>
   parseFloat(((afterDiscountAmount.value * VAT_RATE) / (1 + VAT_RATE)).toFixed(2))
 );
-const finalTotal    = computed(() => afterDiscountAmount.value);
-const changeAmount  = computed(() => cashReceived.value - finalTotal.value);
-const totalRevenue  = computed(() =>
+const finalTotal = computed(() => afterDiscountAmount.value);
+const changeAmount = computed(() => cashReceived.value - finalTotal.value);
+const totalRevenue = computed(() =>
   transactions.value.filter((t) => t.Status !== "cancelled").reduce((s, t) => s + (t.FinalAmount ?? 0), 0)
 );
 const avgSale = computed(() => {
@@ -914,8 +930,8 @@ function getOOSShortLabel(item) {
 }
 
 // ─── Cart helpers ─────────────────────────────────────────────────────────────
-const makeCartKey   = (item, size) => `${item.ProductId}-${size ?? "none"}`;
-const isInCart      = (id) => cart.value.some((i) => i.ProductId === id);
+const makeCartKey = (item, size) => `${item.ProductId}-${size ?? "none"}`;
+const isInCart = (id) => cart.value.some((i) => i.ProductId === id);
 const getCartTotalQty = (id) =>
   cart.value.filter((i) => i.ProductId === id).reduce((s, i) => s + i.qty, 0);
 
@@ -960,7 +976,7 @@ const increaseQty = (i) => {
   }
   item.qty++;
 };
-const decreaseQty   = (i) => { if (cart.value[i].qty > 1) cart.value[i].qty--; else removeFromCart(i); };
+const decreaseQty = (i) => { if (cart.value[i].qty > 1) cart.value[i].qty--; else removeFromCart(i); };
 const removeFromCart = (i) => cart.value.splice(i, 1);
 
 // ─── Transaction number ───────────────────────────────────────────────────────
@@ -975,19 +991,27 @@ const generateTransactionNumber = () => {
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 const fetchCurrentUser = async () => {
-  const username  = localStorage.getItem("username");
+  const username = localStorage.getItem("username");
   const branchSlug = localStorage.getItem("branch");
   if (!username) return;
   const { data: u } = await supabase.from("users").select("id, username, role, branch").eq("username", username).single();
   if (u) currentUser.value = u;
+  
+  // Resolve branch ID
   if (branchSlug && branchSlug !== "all") {
     const { data: bd } = await supabase.from("branch").select("BranchId, BranchName, Location").eq("BranchName", branchSlug).maybeSingle();
-    if (bd) { branchRecord.value = bd; }
-    else {
+    if (bd) { 
+      branchRecord.value = bd;
+      branchId.value = bd.BranchId;
+    } else {
       const { data: bl } = await supabase.from("branch").select("BranchId, BranchName, Location").ilike("Location", "%" + branchSlug + "%").maybeSingle();
-      if (bl) branchRecord.value = bl;
+      if (bl) {
+        branchRecord.value = bl;
+        branchId.value = bl.BranchId;
+      }
     }
   }
+  
   if (u?.employee_id) {
     const { data: emp } = await supabase.from("employee").select("EmployeeId").eq("EmployeeId", u.employee_id).maybeSingle();
     if (emp) { employeeRecord.value = emp; return; }
@@ -1000,10 +1024,10 @@ const fetchCurrentUser = async () => {
 
 const fetchMenu = async (force = false) => {
   if (!force) {
-    const cachedMenu     = readCache(CACHE_KEYS.menu);
-    const cachedRecipes  = readCache(CACHE_KEYS.recipes);
-    const cachedStock    = readCache(CACHE_KEYS.stock);
-    const cachedUnitMap  = readCache(CACHE_KEYS.unitMap);
+    const cachedMenu = readCache(CACHE_KEYS.menu);
+    const cachedRecipes = readCache(CACHE_KEYS.recipes);
+    const cachedStock = readCache(CACHE_KEYS.stock);
+    const cachedUnitMap = readCache(CACHE_KEYS.unitMap);
     if (cachedMenu && cachedRecipes && cachedStock && cachedUnitMap) {
       menu.value = cachedMenu;
       productRecipes.value = cachedRecipes;
@@ -1019,19 +1043,21 @@ const fetchMenu = async (force = false) => {
   if (error) { loadingMenu.value = false; return; }
   menu.value = products ?? [];
   writeCache(CACHE_KEYS.menu, menu.value, CACHE_TTL.menu);
+  
   const { data: recipes } = await supabase.from("recipe").select(`
     recipeid, finishedproductid, rawproductid, quantityneeded, unit,
     rawproduct!inner ( rawproductid, name, unit, status )
   `).neq("rawproduct.status", "Archived");
   productRecipes.value = (recipes ?? []).map((r) => ({ ...r, rawproduct: r.rawproduct }));
   writeCache(CACHE_KEYS.recipes, productRecipes.value, CACHE_TTL.recipes);
+  
   await fetchRawStock();
   loadingMenu.value = false;
 };
 
 const fetchRawStock = async (force = false) => {
   if (!force) {
-    const cachedStock   = readCache(CACHE_KEYS.stock);
+    const cachedStock = readCache(CACHE_KEYS.stock);
     const cachedUnitMap = readCache(CACHE_KEYS.unitMap);
     if (cachedStock && cachedUnitMap) {
       rawMaterialStock.value = cachedStock;
@@ -1039,22 +1065,48 @@ const fetchRawStock = async (force = false) => {
       return;
     }
   }
+  
   const bid = branchId.value;
-  let query = supabase.from("rawproducttransaction").select("rawproductid, transactiontype, quantity").gt("quantity", 0);
-  if (bid) query = query.eq("branchid", bid);
-  const { data: txns } = await query;
-  if (!txns) return;
-  const stock = {};
-  for (const t of txns) {
-    const delta = t.transactiontype === "in" ? t.quantity : -t.quantity;
-    stock[t.rawproductid] = (stock[t.rawproductid] ?? 0) + delta;
+  if (!bid) {
+    console.warn("No branch ID available for stock fetch");
+    return;
   }
+  
+  // Get all IN transactions for this branch
+  const { data: inTxns } = await supabase
+    .from("rawproducttransaction")
+    .select("rawproductid, quantity")
+    .eq("branchid", bid)
+    .eq("transactiontype", "in")
+    .gt("quantity", 0);
+  
+  // Get all OUT transactions for this branch
+  const { data: outTxns } = await supabase
+    .from("rawproducttransaction")
+    .select("rawproductid, quantity")
+    .eq("branchid", bid)
+    .eq("transactiontype", "out")
+    .gt("quantity", 0);
+  
+  // Calculate net stock
+  const stock = {};
+  
+  for (const t of inTxns ?? []) {
+    stock[t.rawproductid] = (stock[t.rawproductid] ?? 0) + t.quantity;
+  }
+  
+  for (const t of outTxns ?? []) {
+    stock[t.rawproductid] = (stock[t.rawproductid] ?? 0) - t.quantity;
+  }
+  
   rawMaterialStock.value = stock;
-  writeCache(CACHE_KEYS.stock, rawMaterialStock.value, CACHE_TTL.stock);
+  
   const { data: rps } = await supabase.from("rawproduct").select("rawproductid, unit").neq("status", "Archived");
   const umap = {};
   (rps ?? []).forEach((r) => { umap[r.rawproductid] = r.unit; });
   inventoryUnitMap.value = umap;
+  
+  writeCache(CACHE_KEYS.stock, rawMaterialStock.value, CACHE_TTL.stock);
   writeCache(CACHE_KEYS.unitMap, inventoryUnitMap.value, CACHE_TTL.stock);
 };
 
@@ -1066,17 +1118,42 @@ const fetchDiscounts = async (force = false) => {
 
 const fetchTransactions = async (force = false) => {
   loadingTransactions.value = true;
-  if (!force) { const cached = readCache(CACHE_KEYS.transactions); if (cached) { transactions.value = cached; loadingTransactions.value = false; return; } }
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const tom = new Date(today); tom.setDate(tom.getDate() + 1);
-  const { data } = await supabase.from("orders").select(`
-    OrderId, TotalAmount, DiscountId, DiscountedAmount, FinalAmount,
-    cashpaid, changegiven, PaymentMethod, Status, CreatedAt,
-    transaction_number, cancel_reason, discount_id_number, order_type,
-    discount ( discountid, discountname, discounttype, discountvalue ),
-    orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
-  `).gte("CreatedAt", today.toISOString()).lt("CreatedAt", tom.toISOString()).order("CreatedAt", { ascending: false });
-  if (data) { transactions.value = data; writeCache(CACHE_KEYS.transactions, transactions.value, CACHE_TTL.transactions); }
+  
+  // Always bust cache for today's transactions when force=true
+  if (force) {
+    sessionStorage.removeItem(CACHE_KEYS.transactions);
+  } else {
+    const cached = readCache(CACHE_KEYS.transactions);
+    if (cached) {
+      transactions.value = cached;
+      loadingTransactions.value = false;
+      return;
+    }
+  }
+  
+const today = new Date();
+const todayStr = today.toLocaleDateString("en-CA"); // gives YYYY-MM-DD in local time
+const tomorrow = new Date(today);
+tomorrow.setDate(tomorrow.getDate() + 1);
+const tomorrowStr = tomorrow.toLocaleDateString("en-CA");
+  
+  const { data } = await supabase
+    .from("orders")
+    .select(`
+      OrderId, TotalAmount, DiscountId, DiscountedAmount, FinalAmount,
+      cashpaid, changegiven, PaymentMethod, Status, CreatedAt,
+      transaction_number, cancel_reason, discount_id_number, order_type,
+      discount ( discountid, discountname, discounttype, discountvalue ),
+      orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
+    `)
+  .gte("CreatedAt", todayStr)
+  .lt("CreatedAt", tomorrowStr)
+  .order("CreatedAt", { ascending: false });
+    
+  if (data) { 
+    transactions.value = data;
+    writeCache(CACHE_KEYS.transactions, transactions.value, CACHE_TTL.transactions);
+  }
   loadingTransactions.value = false;
 };
 
@@ -1086,15 +1163,197 @@ const openHistory = async () => { showHistory.value = true; await fetchTransacti
 const onDiscountChange = () => { discountIdNumber.value = ""; discountIdError.value = ""; };
 const getDiscountIdLabel = (d) => {
   const n = d?.discountname?.toLowerCase() ?? "";
-  if (n.includes("pwd"))    return "PWD ID Number";
+  if (n.includes("pwd")) return "PWD ID Number";
   if (n.includes("senior")) return "Senior Citizen ID Number";
   return "Discount ID Number";
 };
 const getDiscountIdPlaceholder = (d) => {
   const n = d?.discountname?.toLowerCase() ?? "";
-  if (n.includes("pwd"))    return "e.g. PWD-2024-000001";
+  if (n.includes("pwd")) return "e.g. PWD-2024-000001";
   if (n.includes("senior")) return "e.g. SC-2024-000001";
   return "Enter ID / card number";
+};
+
+// Add this helper function at the top with other helpers
+const roundQuantityByUnit = (quantity, unit) => {
+  // For count-based items, always round to nearest whole number
+  if (unit === 'pcs' || unit === 'pc' || unit === 'piece' || unit === 'pieces') {
+    return Math.round(quantity);
+  }
+  // For weight/volume items, keep up to 4 decimal places
+  return Math.round(quantity * 10000) / 10000;
+};
+
+// Validate that pcs items are whole numbers
+const validatePcsQuantities = async (deductionRows) => {
+  // Get all raw product units in one query
+  const rawProductIds = [...new Set(deductionRows.map(r => r.rawproductid))];
+  const { data: products } = await supabase
+    .from("rawproduct")
+    .select("rawproductid, unit")
+    .in("rawproductid", rawProductIds);
+  
+  const unitMap = {};
+  (products || []).forEach(p => {
+    unitMap[p.rawproductid] = p.unit;
+  });
+  
+  for (const row of deductionRows) {
+    const unit = unitMap[row.rawproductid];
+    if (unit === 'pcs' || unit === 'pc' || unit === 'piece' || unit === 'pieces') {
+      // Check if it's a whole number (within 0.001 tolerance)
+      const isWhole = Math.abs(row.quantity - Math.round(row.quantity)) < 0.001;
+      if (!isWhole) {
+        console.error(`Invalid quantity for pcs item: ${row.rawproductid} has ${row.quantity} ${unit}`);
+        throw new Error(`Cannot deduct fractional quantity for ${unit} item. ${row.quantity} is not a whole number.`);
+      }
+      // Round to nearest integer
+      row.quantity = Math.round(row.quantity);
+    }
+  }
+  return deductionRows;
+};
+
+// ─── FEFO Inventory Deduction ─────────────────────────────────────────────────
+const deductInventoryFEFO = async (cartItems, bid) => {
+  console.log("=== FEFO DEDUCTION START ===");
+  console.log("Branch ID:", bid);
+  
+  if (!bid) {
+    console.error("❌ No branch ID provided for inventory deduction!");
+    return;
+  }
+  
+  try {
+    const productIds = [...new Set(cartItems.map(i => i.ProductId))];
+    const { data: recipes, error: recipeError } = await supabase
+      .from("recipe")
+      .select(`
+        finishedproductid, 
+        rawproductid, 
+        quantityneeded, 
+        unit,
+        rawproduct!inner ( rawproductid, name, unit )
+      `)
+      .in("finishedproductid", productIds);
+    
+    if (recipeError) {
+      console.error("❌ Failed to fetch recipes:", recipeError);
+      return;
+    }
+    
+    if (!recipes || recipes.length === 0) {
+      console.warn("⚠️ No recipes found for products:", productIds);
+      return;
+    }
+    
+    console.log(`✓ Found ${recipes.length} recipe lines`);
+    
+    const deductionRows = [];
+    
+    for (const cartItem of cartItems) {
+      const multiplier = getSizeMultiplier(cartItem.size);
+      const effectiveQty = cartItem.qty * multiplier;
+      
+      console.log(`Processing ${cartItem.ProductName}: qty=${cartItem.qty}, size=${cartItem.size}, multiplier=${multiplier}, effective=${effectiveQty}`);
+      
+      const productRecipesFiltered = recipes.filter(r => r.finishedproductid === cartItem.ProductId);
+      
+      for (const recipe of productRecipesFiltered) {
+        // Get the raw material's unit to determine rounding
+        const rawMaterialUnit = recipe.rawproduct?.unit || recipe.unit || 'g';
+        
+        // Calculate total needed
+        let totalNeeded = recipe.quantityneeded * effectiveQty;
+        
+        // Round based on unit type
+        totalNeeded = roundQuantityByUnit(totalNeeded, rawMaterialUnit);
+        
+        console.log(`  Need ${totalNeeded} ${rawMaterialUnit} of ${recipe.rawproduct?.name || recipe.rawproductid}`);
+        
+        // Get batches for this raw material (FEFO order - earliest expiry first)
+        const { data: batches, error: batchError } = await supabase
+          .from("rawproducttransaction")
+          .select("rawtransactionid, rawproductid, branchid, quantity, expirationdate")
+          .eq("rawproductid", recipe.rawproductid)
+          .eq("branchid", bid)
+          .eq("transactiontype", "in")
+          .gt("quantity", 0)
+          .order("expirationdate", { ascending: true });
+        
+        if (batchError) {
+          console.error(`Failed to get batches for ${recipe.rawproductid}:`, batchError);
+          continue;
+        }
+        
+        if (!batches || batches.length === 0) {
+          console.error(`❌ No stock available for rawmaterial ${recipe.rawproductid} in branch ${bid}`);
+          throw new Error(`Insufficient stock for raw material`);
+        }
+        
+        let remainingToDeduct = totalNeeded;
+        
+        for (const batch of batches) {
+          if (remainingToDeduct <= 0.001) break;
+          
+          const batchQty = Number(batch.quantity);
+          let deductFromBatch = Math.min(batchQty, remainingToDeduct);
+          
+          // Round based on unit type
+          deductFromBatch = roundQuantityByUnit(deductFromBatch, rawMaterialUnit);
+          
+          if (deductFromBatch <= 0) continue;
+          
+          deductionRows.push({
+            rawproductid: recipe.rawproductid,
+            branchid: bid,
+            transactiontype: "out",
+            quantity: deductFromBatch,
+            expirationdate: batch.expirationdate,
+            reason: `POS Sale - ${cartItem.ProductName}`,
+            notes: `Order: ${cartItem.ProductName} x${cartItem.qty}${cartItem.size ? ` (${cartItem.size})` : ''}`
+          });
+          
+          remainingToDeduct -= deductFromBatch;
+          remainingToDeduct = roundQuantityByUnit(remainingToDeduct, rawMaterialUnit);
+        }
+        
+        if (remainingToDeduct > 0.001) {
+          console.error(`❌ Insufficient stock for ${recipe.rawproductid}. Need ${totalNeeded}, short by ${remainingToDeduct}`);
+          throw new Error(`Insufficient stock for raw material`);
+        }
+      }
+    }
+    
+    console.log(`📦 Generated ${deductionRows.length} deduction transactions`);
+    
+    if (deductionRows.length === 0) {
+      console.warn("⚠️ No deduction rows generated");
+      return;
+    }
+    
+    // Validate that pcs items have whole numbers
+    const validatedRows = await validatePcsQuantities(deductionRows);
+    
+    // Log sample for debugging
+    console.log("Sample deduction:", validatedRows[0]);
+    
+    const { error: insertError } = await supabase
+      .from("rawproducttransaction")
+      .insert(validatedRows);
+    
+    if (insertError) {
+      console.error("❌ Failed to insert deduction rows:", insertError);
+      throw new Error(insertError.message);
+    }
+    
+    console.log("✅ Inventory deduction successful!");
+    bustCache(CACHE_KEYS.stock, CACHE_KEYS.unitMap);
+    
+  } catch (err) {
+    console.error("❌ FEFO deduction error:", err.message);
+    throw err;
+  }
 };
 
 // ─── Payment ──────────────────────────────────────────────────────────────────
@@ -1106,8 +1365,8 @@ const openPayment = () => {
   discountIdError.value = "";
   clearDenomCounts();
   paymentMethod.value = "cash";
-  showReceipt.value   = false;
-  showPayment.value   = true;
+  showReceipt.value = false;
+  showPayment.value = true;
 };
 
 const goToInvoicePreview = () => {
@@ -1117,7 +1376,7 @@ const goToInvoicePreview = () => {
       showPayment.value = false;
       oosProductName.value = item.ProductName;
       oosIngredients.value = shortages;
-      showOosAlert.value   = true;
+      showOosAlert.value = true;
       return;
     }
   }
@@ -1127,81 +1386,77 @@ const goToInvoicePreview = () => {
 
 const finishTransaction = async () => {
   if (saving.value) return;
+  
   for (const item of cart.value) {
     const shortages = getShortages(item.ProductId, item.qty);
     if (shortages.length > 0) {
-      showPayment.value = false; showReceipt.value = false;
-      oosProductName.value = item.ProductName; oosIngredients.value = shortages; showOosAlert.value = true;
+      showPayment.value = false;
+      showReceipt.value = false;
+      oosProductName.value = item.ProductName;
+      oosIngredients.value = shortages;
+      showOosAlert.value = true;
       return;
     }
   }
+  
   saving.value = true;
+  
   try {
+    // First, deduct inventory
+    await deductInventoryFEFO(cart.value, branchId.value);
+    
+    // Then create the order
     const payload = {
-      PaymentMethod:    paymentMethod.value,
-      Status:           "completed",
-      TotalAmount:      cartSubtotal.value,
-      DiscountId:       selectedDiscount.value?.discountid ?? null,
+      PaymentMethod: paymentMethod.value,
+      Status: "completed",
+      TotalAmount: cartSubtotal.value,
+      DiscountId: selectedDiscount.value?.discountid ?? null,
       DiscountedAmount: discountAmount.value,
-      FinalAmount:      finalTotal.value,
-      cashpaid:         paymentMethod.value === "cash" ? cashReceived.value : finalTotal.value,
-      changegiven:      paymentMethod.value === "cash" ? Math.max(0, changeAmount.value) : 0,
+      FinalAmount: finalTotal.value,
+      cashpaid: paymentMethod.value === "cash" ? cashReceived.value : finalTotal.value,
+      changegiven: paymentMethod.value === "cash" ? Math.max(0, changeAmount.value) : 0,
       transaction_number: transactionNumber.value,
       discount_id_number: selectedDiscount.value ? discountIdNumber.value.trim() || null : null,
-      vat_amount:       vatAmount.value,
-      order_type:       orderType.value,
+      vat_amount: vatAmount.value,
+      order_type: orderType.value,
     };
-    if (branchId.value)                    payload.BranchId  = branchId.value;
-    if (employeeRecord.value?.EmployeeId)  payload.CashierId = employeeRecord.value.EmployeeId;
-
+    
+    if (branchId.value) payload.BranchId = branchId.value;
+    if (employeeRecord.value?.EmployeeId) payload.CashierId = employeeRecord.value.EmployeeId;
+    
     const { data: order, error: oErr } = await supabase.from("orders").insert(payload).select().single();
     if (oErr) throw new Error(oErr.message);
-
+    
     const { error: iErr } = await supabase.from("orderitem").insert(
       cart.value.map((i) => ({
-        OrderId: order.OrderId, ProductId: i.ProductId,
-        Quantity: i.qty, UnitPrice: i.effectivePrice, Subtotal: i.qty * i.effectivePrice,
+        OrderId: order.OrderId,
+        ProductId: i.ProductId,
+        Quantity: i.qty,
+        UnitPrice: i.effectivePrice,
+        Subtotal: i.qty * i.effectivePrice,
       }))
     );
     if (iErr) throw new Error(iErr.message);
-
-    await deductInventoryFEFO(cart.value, branchId.value);
-    bustCache(CACHE_KEYS.stock, CACHE_KEYS.unitMap, CACHE_KEYS.transactions);
+    
+    // Refresh data
     await fetchRawStock(true);
+    await fetchMenu(true);
     await fetchTransactions(true);
-
-    cart.value           = [];
+    
+    // Reset state
+    cart.value = [];
     selectedDiscount.value = null;
     discountIdNumber.value = "";
-    orderType.value       = "dine_in";
+    orderType.value = "dine_in";
     clearDenomCounts();
     showPayment.value = false;
     showReceipt.value = false;
+    
   } catch (err) {
-    alert("Failed: " + err.message);
+    console.error("Transaction failed:", err);
+    alert("Transaction failed: " + err.message);
   } finally {
     saving.value = false;
-  }
-};
-
-const deductInventoryFEFO = async (cartItems, bid) => {
-  try {
-    const getBatches = async (rawproductid, branchid) => {
-      let q = supabase.from("rawproducttransaction")
-        .select("rawtransactionid, rawproductid, branchid, quantity, expirationdate")
-        .eq("rawproductid", rawproductid).eq("transactiontype", "in").gt("quantity", 0);
-      if (branchid) q = q.eq("branchid", branchid);
-      const { data } = await q;
-      return data ?? [];
-    };
-    const insertRows = await buildFEFODeductionRows(cartItems, productRecipes.value, inventoryUnitMap.value, getBatches, bid);
-    if (insertRows.length === 0) return;
-    const { error } = await supabase.from("rawproducttransaction").insert(
-      insertRows.map(({ source_batch_id, ...row }) => row)
-    );
-    if (error) console.error("FEFO deduction error (order saved):", error.message);
-  } catch (err) {
-    console.error("FEFO deduction error:", err.message);
   }
 };
 
@@ -1218,16 +1473,23 @@ const printReceipt = () => {
 
 // ─── Cancel ───────────────────────────────────────────────────────────────────
 const confirmCancelOrder = (order) => {
-  cancelTarget.value = order; cancelReason.value = ""; cancelReasonError.value = "";
+  cancelTarget.value = order;
+  cancelReason.value = "";
+  cancelReasonError.value = "";
   showCancelConfirm.value = true;
 };
 const closeCancelModal = () => {
-  showCancelConfirm.value = false; cancelTarget.value = null;
-  cancelReason.value = ""; cancelReasonError.value = "";
+  showCancelConfirm.value = false;
+  cancelTarget.value = null;
+  cancelReason.value = "";
+  cancelReasonError.value = "";
 };
 const doCancelOrder = async () => {
   if (!cancelTarget.value) return;
-  if (!cancelReason.value.trim()) { cancelReasonError.value = "Please provide a reason for cancellation."; return; }
+  if (!cancelReason.value.trim()) {
+    cancelReasonError.value = "Please provide a reason for cancellation.";
+    return;
+  }
   cancellingId.value = cancelTarget.value.OrderId;
   try {
     const { error } = await supabase.from("orders")
@@ -1235,7 +1497,10 @@ const doCancelOrder = async () => {
       .eq("OrderId", cancelTarget.value.OrderId);
     if (error) throw new Error(error.message);
     const tx = transactions.value.find((t) => t.OrderId === cancelTarget.value.OrderId);
-    if (tx) { tx.Status = "cancelled"; tx.cancel_reason = cancelReason.value.trim(); }
+    if (tx) {
+      tx.Status = "cancelled";
+      tx.cancel_reason = cancelReason.value.trim();
+    }
     bustCache(CACHE_KEYS.transactions);
     closeCancelModal();
   } catch (err) {
@@ -1250,14 +1515,20 @@ const getCatIcon = (cat) => {
   if (!cat || cat === "All") return Layers;
   const c = cat.toLowerCase();
   if (c.includes("hot") || c.includes("iced") || c.includes("non") || c.includes("frap")) return Coffee;
-  if (c.includes("smoothie"))  return Leaf;
-  if (c.includes("sandwich"))  return Sandwich;
+  if (c.includes("smoothie")) return Leaf;
+  if (c.includes("sandwich")) return Sandwich;
   if (c.includes("pastry") || c.includes("rice") || c.includes("pika")) return Cookie;
   return UtensilsCrossed;
 };
-const formatTime = (iso) =>
-  iso ? new Date(iso + "Z").toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" }) : "—";
+const formatTime = (iso) => {
+  if (!iso) return "—";
+  // The DB stores Manila time without timezone info.
+  // Force it to be interpreted as Asia/Manila.
+  const date = new Date(iso.includes("+") || iso.endsWith("Z") ? iso : iso + "+08:00");
+  return date.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
+};
 
+// ─── Init ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   await fetchCurrentUser();
   await Promise.all([fetchMenu(), fetchDiscounts(), fetchTransactions()]);

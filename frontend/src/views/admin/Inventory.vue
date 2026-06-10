@@ -30,47 +30,47 @@
       </div>
     </div>
 
-    <!-- Stats -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon"><Package :size="28" stroke-width="1.5" /></div>
-        <div class="stat-info">
-          <h3>Total Items</h3>
-          <p class="stat-value">{{ allBranchStats.total }}</p>
-          <span class="stat-trend">tracked materials</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon warn">
-          <AlertCircle :size="28" stroke-width="1.5" />
-        </div>
-        <div class="stat-info">
-          <h3>Low Stock</h3>
-          <p class="stat-value">{{ allBranchStats.low }}</p>
-          <span class="stat-trend warning">below reorder point</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon danger-icon">
-          <XCircle :size="28" stroke-width="1.5" />
-        </div>
-        <div class="stat-info">
-          <h3>Out of Stock</h3>
-          <p class="stat-value">{{ allBranchStats.out }}</p>
-          <span class="stat-trend danger">zero quantity</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon expiry-icon">
-          <CalendarX :size="28" stroke-width="1.5" />
-        </div>
-        <div class="stat-info">
-          <h3>Expiring Soon</h3>
-          <p class="stat-value">{{ allBranchStats.expiring }}</p>
-          <span class="stat-trend expiring">batches within 7 days</span>
-        </div>
-      </div>
+   <!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon"><Package :size="28" stroke-width="1.5" /></div>
+    <div class="stat-info">
+      <h3>Total Items</h3>
+      <p class="stat-value">{{ branchSpecificStats.total }}</p>
+      <span class="stat-trend">tracked materials</span>
     </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon warn">
+      <AlertCircle :size="28" stroke-width="1.5" />
+    </div>
+    <div class="stat-info">
+      <h3>Low Stock</h3>
+      <p class="stat-value">{{ branchSpecificStats.low }}</p>
+      <span class="stat-trend warning">below reorder point</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon danger-icon">
+      <XCircle :size="28" stroke-width="1.5" />
+    </div>
+    <div class="stat-info">
+      <h3>Out of Stock</h3>
+      <p class="stat-value">{{ branchSpecificStats.out }}</p>
+      <span class="stat-trend danger">zero quantity</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon expiry-icon">
+      <CalendarX :size="28" stroke-width="1.5" />
+    </div>
+    <div class="stat-info">
+      <h3>Expiring Soon</h3>
+      <p class="stat-value">{{ branchSpecificStats.expiring }}</p>
+      <span class="stat-trend expiring">batches within 7 days</span>
+    </div>
+  </div>
+</div>
 
     <!-- FEFO Alert -->
     <div v-if="expiringBatches.length > 0" class="fefo-alert">
@@ -1531,17 +1531,55 @@ const eoqItems = computed(() =>
   ),
 );
 
-const allBranchStats = computed(() => ({
-  total: allRawItems.value.length,
-  low: allRawItems.value.filter(
-    (i) =>
-      i.reorderlevel != null &&
-      i.stockquantity > 0 &&
-      i.stockquantity <= i.reorderlevel,
-  ).length,
-  out: allRawItems.value.filter((i) => (i.stockquantity ?? 0) <= 0).length,
-  expiring: expiringBatches.value.length,
-}));
+// Replace the existing allBranchStats computed property (around line 560-575) with this:
+
+const branchSpecificStats = computed(() => {
+  // Filter items based on selected branch
+  let itemsWithBranchStock = allRawItems.value.map(item => {
+    let batches = allBatches.value.filter(b => b.rawproductid === item.rawproductid);
+    
+    // Apply branch filter if selected
+    if (selectedBranchId.value) {
+      batches = batches.filter(b => b.branchid === selectedBranchId.value);
+    }
+    
+    const branchStock = batches.reduce((sum, b) => {
+      const qty = b.transactiontype === "in" ? (b.quantity ?? 0) : -(b.quantity ?? 0);
+      return sum + qty;
+    }, 0);
+    
+    return {
+      ...item,
+      branchStockQuantity: Math.max(0, branchStock)
+    };
+  });
+  
+  // Calculate stats based on branch-specific stock
+  const lowCount = itemsWithBranchStock.filter(i => 
+    i.reorderlevel != null && 
+    i.branchStockQuantity > 0 && 
+    i.branchStockQuantity <= i.reorderlevel
+  ).length;
+  
+  const outCount = itemsWithBranchStock.filter(i => i.branchStockQuantity <= 0).length;
+  
+  // Count expiring batches for selected branch
+  let expiringCount = 0;
+  let batchesToCheck = allBatches.value;
+  if (selectedBranchId.value) {
+    batchesToCheck = batchesToCheck.filter(b => b.branchid === selectedBranchId.value);
+  }
+  expiringCount = batchesToCheck.filter(b => 
+    b.expirationdate && getDaysUntilExpiry(b.expirationdate) <= 7
+  ).length;
+  
+  return {
+    total: itemsWithBranchStock.length,
+    low: lowCount,
+    out: outCount,
+    expiring: expiringCount
+  };
+});
 
 const restockPreviewItem = computed(() => {
   if (restockTarget.value) return restockTarget.value;
@@ -1608,12 +1646,19 @@ const fetchRawMaterials = async () => {
   }
 
   const items = data ?? [];
+  
+  // Calculate branch-specific stock for each item
   items.forEach((item) => {
     let batches = allBatches.value.filter(
       (b) => b.rawproductid === item.rawproductid,
     );
-    if (selectedBranchId.value)
+    
+    // Apply branch filter if selected
+    if (selectedBranchId.value) {
       batches = batches.filter((b) => b.branchid === selectedBranchId.value);
+    }
+    
+    // Calculate stock sum for the selected branch (or all if no branch selected)
     item.stockquantity = Math.max(
       0,
       batches.reduce((sum, b) => {
@@ -1629,6 +1674,7 @@ const fetchRawMaterials = async () => {
     hasexpiry: item.hasexpiry ?? true,
     _dailyUsage: dailyUsageMap[item.rawproductid] ?? 0,
   }));
+  
   const activeIds = new Set(allRawItems.value.map((i) => i.rawproductid));
   allBatches.value = allBatches.value.filter((b) =>
     activeIds.has(b.rawproductid),

@@ -12,6 +12,9 @@
         <button class="recipe-all-btn" @click="openAllRecipes">
           <BookOpen :size="16" /> All Recipes
         </button>
+        <button class="add-btn" @click="openAddModal">
+          <Plus :size="16" /> Add Item
+        </button>
       </div>
     </header>
 
@@ -150,7 +153,7 @@
 
             <!-- Stock detail (only if recipe set) -->
             <div
-              v-if="item._recipeCount > 0 && item._stockDetail"
+              v-if="item._recipeCount > 0 && item._stockDetail && item._stockDetail.length > 0"
               class="stock-detail-row"
             >
               <span
@@ -192,6 +195,14 @@
             <span class="price">{{
               item.Price != null ? "₱" + item.Price.toFixed(2) : "—"
             }}</span>
+            <div class="card-actions">
+              <button class="icon-btn edit" @click="openEditModal(item)" title="Edit">
+                <Edit2 :size="14" />
+              </button>
+              <button class="icon-btn delete" @click="deleteItem(item.ProductId)" title="Archive">
+                <Trash2 :size="14" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -361,28 +372,26 @@
 
           <div class="ingredient-list">
             <div v-for="(ing, i) in recipeRows" :key="i" class="ingredient-row">
-            <!-- Raw material picker — grouped by category -->
-            <div class="field-item">
-              <div class="select-wrap full">
-                <select v-model="ing.rawproductid" @change="onRawProductChange(ing)">
-                  <option :value="null">Select raw material</option>
-                  <template v-for="cat in rawProductCategories" :key="cat">
-                    <optgroup :label="cat">
-                      <option
-                        v-for="rp in rawProductsByCategory[cat]"
-                        :key="rp.rawproductid"
-                        :value="rp.rawproductid"
-                      >
-                        {{ rp.name }} ({{ rp.unit }})
-                      </option>
-                    </optgroup>
-                  </template>
-                </select>
-                <ChevronDown :size="12" class="sel-icon" />
+              <div class="field-item">
+                <div class="select-wrap full">
+                  <select v-model="ing.rawproductid" @change="onRawProductChange(ing)">
+                    <option :value="null">Select raw material</option>
+                    <template v-for="cat in rawProductCategories" :key="cat">
+                      <optgroup :label="cat">
+                        <option
+                          v-for="rp in rawProductsByCategory[cat]"
+                          :key="rp.rawproductid"
+                          :value="rp.rawproductid"
+                        >
+                          {{ rp.name }} ({{ rp.unit }})
+                        </option>
+                      </optgroup>
+                    </template>
+                  </select>
+                  <ChevronDown :size="12" class="sel-icon" />
+                </div>
               </div>
-            </div>
 
-              <!-- Quantity -->
               <div class="field-item">
                 <input
                   v-model.number="ing.quantityneeded"
@@ -393,7 +402,6 @@
                 />
               </div>
 
-              <!-- Unit — auto-filled, but editable -->
               <div class="field-item unit-field">
                 <div class="select-wrap full">
                   <select v-model="ing.unit">
@@ -424,8 +432,6 @@
                   }}
                 </span>
               </div>
-
-              <!-- Stock available for this ingredient -->
 
               <button
                 class="remove-ing"
@@ -606,6 +612,9 @@ import {
 
 const route = useRoute();
 
+// ─── Branch ID (from localStorage) ────────────────────────────────────────────
+const branchId = ref(null);
+
 // ─── Cache ────────────────────────────────────────────────────────────────────
 const CACHE_KEY_MENU = "cache_menu_items";
 const CACHE_KEY_RAW = "cache_raw_products";
@@ -625,12 +634,16 @@ const saveCache = (key, data, ttl) =>
 const loadCache = (key) => {
   const raw = sessionStorage.getItem(key);
   if (!raw) return null;
-  const parsed = JSON.parse(raw);
-  if (Date.now() > parsed.expiresAt) {
-    sessionStorage.removeItem(key);
+  try {
+    const parsed = JSON.parse(raw);
+    if (Date.now() > parsed.expiresAt) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data;
+  } catch {
     return null;
   }
-  return parsed.data;
 };
 
 // ─── Size helpers ─────────────────────────────────────────────────────────────
@@ -649,6 +662,7 @@ const getSizeType = (cat) => {
     return "iced";
   return "none";
 };
+
 const getSizeLabels = (cat) => {
   const t = getSizeType(cat);
   if (t === "hot") return ["Small", "Regular"];
@@ -691,27 +705,10 @@ function formatConvertHint(qty, fromUnit, toUnit) {
   return `${+c.toFixed(2)} ${toUnit} in inventory`;
 }
 
-function formatIngStock(ing) {
-  if (!ing.rawproductid) return "—";
-  const invUnit = getInventoryUnit(ing.rawproductid);
-  const avail = stockMap.value[ing.rawproductid] ?? 0;
-  return formatQtyDisplay(avail, invUnit);
-}
-
-function getIngStockClass(ing) {
-  if (!ing.rawproductid || !ing.quantityneeded) return "neutral";
-  const invUnit = getInventoryUnit(ing.rawproductid);
-  const needed = normaliseNeeded(ing.quantityneeded, ing.unit, invUnit);
-  const avail = stockMap.value[ing.rawproductid] ?? 0;
-  if (avail <= 0) return "danger";
-  if (avail < needed) return "warn";
-  return "ok";
-}
-
 // ─── State ────────────────────────────────────────────────────────────────────
 const menuItems = ref([]);
 const rawProducts = ref([]);
-const stockMap = ref({}); // { rawproductid → net qty in inventory unit }
+const stockMap = ref({}); // { rawproductid → net qty in inventory unit for current branch }
 const allRecipes = ref([]); // full recipe list for stock checks
 const loading = ref(false);
 const searchQuery = ref("");
@@ -746,7 +743,7 @@ const expandedRecipe = ref(null);
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const categories = computed(() =>
   [...new Set(menuItems.value.map(i => i.Category).filter(Boolean))].sort()
-)
+);
 
 // ─── Grouped raw products for recipe dropdown ─────────────────────────────────
 const rawProductCategories = computed(() =>
@@ -755,20 +752,20 @@ const rawProductCategories = computed(() =>
       .filter(r => r.status !== 'Archived')
       .map(r => r.category || 'Other')
   )].sort()
-)
+);
 
 const rawProductsByCategory = computed(() => {
-  const map = {}
+  const map = {};
   rawProducts.value
     .filter(r => r.status !== 'Archived')
     .forEach(r => {
-      const cat = r.category || 'Other'
-      if (!map[cat]) map[cat] = []
-      map[cat].push(r)
-    })
-  Object.values(map).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name)))
-  return map
-})
+      const cat = r.category || 'Other';
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(r);
+    });
+  Object.values(map).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name)));
+  return map;
+});
 
 function getStockStatus(item) {
   if (item._recipeCount === 0) return "no_recipe";
@@ -780,7 +777,6 @@ function getStockStatus(item) {
     Object.fromEntries(rawProducts.value.map((r) => [r.rawproductid, r.unit])),
   );
   if (shortages.length === 0) return "available";
-  // Check if any ingredient is completely zero
   const hasZero = shortages.some((s) => s.available <= 0);
   return hasZero ? "oos" : "low";
 }
@@ -816,6 +812,7 @@ const allRecipeCategories = computed(() =>
     ...new Set(allRecipesSummary.value.map((r) => r.Category).filter(Boolean)),
   ].sort(),
 );
+
 const allRecipesByCategory = computed(() =>
   allRecipesSummary.value.reduce((acc, row) => {
     const cat = row.Category || "Uncategorized";
@@ -824,6 +821,7 @@ const allRecipesByCategory = computed(() =>
     return acc;
   }, {}),
 );
+
 const filteredRecipePanel = computed(() => {
   const catItems = allRecipesByCategory.value[activeRecipeCategory.value] ?? [];
   if (!recipeSearch.value) return catItems;
@@ -857,6 +855,28 @@ const recipeStockPreview = computed(() => {
   );
 });
 
+// ─── Fetch branch ID from localStorage ────────────────────────────────────────
+const fetchBranchId = async () => {
+  const branchSlug = localStorage.getItem("branch");
+  if (branchSlug && branchSlug !== "all") {
+    const { data } = await supabase
+      .from("branch")
+      .select("BranchId")
+      .ilike("BranchName", `%${branchSlug}%`)
+      .maybeSingle();
+    if (data) {
+      branchId.value = data.BranchId;
+    }
+  }
+  // If still null, try to get first branch
+  if (!branchId.value) {
+    const { data } = await supabase.from("branch").select("BranchId").limit(1);
+    if (data && data.length > 0) {
+      branchId.value = data[0].BranchId;
+    }
+  }
+};
+
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 const fetchRawProducts = async () => {
   const cached = loadCache(CACHE_KEY_RAW);
@@ -866,7 +886,7 @@ const fetchRawProducts = async () => {
   }
   const { data } = await supabase
     .from("rawproduct")
-    .select("rawproductid, name, unit, reorderlevel, status")
+    .select("rawproductid, name, unit, reorderlevel, status, category")
     .neq("status", "Archived")
     .order("name");
   if (data) {
@@ -883,16 +903,41 @@ const fetchStockMap = async (force = false) => {
       return;
     }
   }
-  const { data: txns } = await supabase
-    .from("rawproducttransaction")
-    .select("rawproductid, transactiontype, quantity")
-    .gt("quantity", 0);
-  if (!txns) return;
-  const m = {};
-  for (const t of txns) {
-    const d = t.transactiontype === "in" ? t.quantity : -t.quantity;
-    m[t.rawproductid] = (m[t.rawproductid] ?? 0) + d;
+  
+  // Only fetch stock for the current branch
+  if (!branchId.value) {
+    console.warn("No branch ID available for stock fetch");
+    return;
   }
+  
+  // Get IN transactions
+  const { data: inTxns } = await supabase
+    .from("rawproducttransaction")
+    .select("rawproductid, quantity")
+    .eq("branchid", branchId.value)
+    .eq("transactiontype", "in")
+    .gt("quantity", 0);
+  
+  // Get OUT transactions
+  const { data: outTxns } = await supabase
+    .from("rawproducttransaction")
+    .select("rawproductid, quantity")
+    .eq("branchid", branchId.value)
+    .eq("transactiontype", "out")
+    .gt("quantity", 0);
+  
+  const m = {};
+  
+  // Add IN transactions
+  for (const t of inTxns ?? []) {
+    m[t.rawproductid] = (m[t.rawproductid] ?? 0) + t.quantity;
+  }
+  
+  // Subtract OUT transactions
+  for (const t of outTxns ?? []) {
+    m[t.rawproductid] = (m[t.rawproductid] ?? 0) - t.quantity;
+  }
+  
   stockMap.value = m;
   saveCache(CACHE_KEY_STOCK, stockMap.value, CACHE_TTL_STOCK);
 };
@@ -922,7 +967,6 @@ const fetchAllRecipes = async (force = false) => {
 };
 
 const fetchMenuItems = async (force = false) => {
-  // Check cache BEFORE setting loading = true to avoid flash
   if (!force) {
     const cached = loadCache(CACHE_KEY_MENU);
     if (cached) {
@@ -958,10 +1002,11 @@ const fetchMenuItems = async (force = false) => {
   const invUnitMap = Object.fromEntries(
     rawProducts.value.map((r) => [r.rawproductid, r.unit]),
   );
+  
   menuItems.value = (products ?? []).map((p) => {
     const count = recipeCounts[p.ProductId] ?? 0;
     const stockDetail =
-      count > 0
+      count > 0 && branchId.value
         ? checkStockForProduct(
             p.ProductId,
             1,
@@ -978,7 +1023,6 @@ const fetchMenuItems = async (force = false) => {
 
 // ─── Recipe modal helpers ─────────────────────────────────────────────────────
 const onRawProductChange = (ing) => {
-  // Auto-fill unit from inventory
   if (ing.rawproductid) {
     ing.unit = suggestRecipeUnit(ing.rawproductid, rawProducts.value);
   }
@@ -1022,6 +1066,7 @@ const openEditModal = async (item) => {
     Category: item.Category ?? "",
     Price: item.Price,
     sizePrices: item.size_prices || {},
+    image_url: item.image_url || null,
   };
   showModal.value = true;
 };
@@ -1234,9 +1279,11 @@ const openAllRecipes = async () => {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
+  await fetchBranchId();
   await fetchRawProducts();
   await Promise.all([fetchStockMap(), fetchAllRecipes()]);
   await fetchMenuItems();
+  
   const editId = route.query.edit;
   if (editId) {
     const item = menuItems.value.find((p) => String(p.ProductId) === editId);
