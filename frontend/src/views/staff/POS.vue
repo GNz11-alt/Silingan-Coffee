@@ -875,7 +875,8 @@ const cashierName = computed(
   () => currentUser.value?.username ?? localStorage.getItem("username") ?? "Staff"
 );
 const branchAddress = computed(() => branchRecord.value?.Location ?? "");
-const currentDate = new Date().toLocaleDateString("en-PH", {
+const currentDate = new Date().toLocaleString("en-PH", {
+  timeZone: "Asia/Manila",
   weekday: "short", month: "short", day: "numeric", year: "numeric",
 });
 const menuCategories = computed(() =>
@@ -1130,10 +1131,11 @@ const fetchTransactions = async (force = false) => {
     }
   }
   
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+const today = new Date();
+const todayStr = today.toLocaleDateString("en-CA"); // gives YYYY-MM-DD in local time
+const tomorrow = new Date(today);
+tomorrow.setDate(tomorrow.getDate() + 1);
+const tomorrowStr = tomorrow.toLocaleDateString("en-CA");
   
   const { data } = await supabase
     .from("orders")
@@ -1144,9 +1146,9 @@ const fetchTransactions = async (force = false) => {
       discount ( discountid, discountname, discounttype, discountvalue ),
       orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
     `)
-    .gte("CreatedAt", today.toISOString())
-    .lt("CreatedAt", tomorrow.toISOString())
-    .order("CreatedAt", { ascending: false });
+  .gte("CreatedAt", todayStr)
+  .lt("CreatedAt", tomorrowStr)
+  .order("CreatedAt", { ascending: false });
     
   if (data) { 
     transactions.value = data;
@@ -1518,8 +1520,13 @@ const getCatIcon = (cat) => {
   if (c.includes("pastry") || c.includes("rice") || c.includes("pika")) return Cookie;
   return UtensilsCrossed;
 };
-const formatTime = (iso) =>
-  iso ? new Date(iso + "Z").toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" }) : "—";
+const formatTime = (iso) => {
+  if (!iso) return "—";
+  // The DB stores Manila time without timezone info.
+  // Force it to be interpreted as Asia/Manila.
+  const date = new Date(iso.includes("+") || iso.endsWith("Z") ? iso : iso + "+08:00");
+  return date.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
+};
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
