@@ -1182,8 +1182,10 @@ export default {
         this.branchResolved = true;
         return;
       }
+
+      // Try matching by BranchId (if stored as numeric ID)
       const parsed = parseInt(slug, 10);
-      if (!isNaN(parsed)) {
+      if (!isNaN(parsed) && String(parsed) === slug.trim()) {
         const { data } = await supabase
           .from("branch")
           .select("BranchId, BranchName")
@@ -1192,30 +1194,37 @@ export default {
         if (data) {
           this.managerBranchId = data.BranchId;
           this.managerBranchName = data.BranchName;
-        }
-      } else {
-        const { data } = await supabase
-          .from("branch")
-          .select("BranchId, BranchName")
-          .ilike("BranchName", `%${slug}%`)
-          .limit(1)
-          .maybeSingle();
-        if (data) {
-          this.managerBranchId = data.BranchId;
-          this.managerBranchName = data.BranchName;
-        } else {
-          const { data: locData } = await supabase
-            .from("branch")
-            .select("BranchId, BranchName")
-            .ilike("Location", `%${slug}%`)
-            .limit(1)
-            .maybeSingle();
-          if (locData) {
-            this.managerBranchId = locData.BranchId;
-            this.managerBranchName = locData.BranchName;
-          }
+          this.branchResolved = true;
+          return;
         }
       }
+
+      // Try exact match on BranchName or Location
+      const { data: exact } = await supabase
+        .from("branch")
+        .select("BranchId, BranchName")
+        .or(`BranchName.ilike.${slug},Location.ilike.${slug}`)
+        .maybeSingle();
+      if (exact) {
+        this.managerBranchId = exact.BranchId;
+        this.managerBranchName = exact.BranchName;
+        this.branchResolved = true;
+        return;
+      }
+
+      // Fallback: partial match (for substrings stored in users.branch)
+      const { data: fuzzy } = await supabase
+        .from("branch")
+        .select("BranchId, BranchName")
+        .or(`BranchName.ilike.%${slug}%,Location.ilike.%${slug}%`)
+        .order("BranchId")
+        .limit(1)
+        .maybeSingle();
+      if (fuzzy) {
+        this.managerBranchId = fuzzy.BranchId;
+        this.managerBranchName = fuzzy.BranchName;
+      }
+
       this.branchResolved = true;
     },
 

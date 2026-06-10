@@ -82,7 +82,7 @@
           :class="{ active: $route.path === '/staff/menu' }"
         >
           <component :is="Coffee" class="nav-icon" :size="20" />
-          <span v-show="!isSidebarCollapsed">Menu & Pricing</span>
+          <span v-show="!isSidebarCollapsed">Menu</span>
         </router-link>
 
         <router-link

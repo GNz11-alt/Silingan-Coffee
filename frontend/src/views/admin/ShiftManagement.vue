@@ -800,17 +800,24 @@
           @click.stop
         >
           <div class="modal-panel-header">
-            <h5 class="mb-0">Delete Schedule</h5>
+            <h5 class="mb-0">Archive Schedule</h5>
             <button class="btn-close-panel" @click="showDeleteConfirm = false">
               <i class="bi bi-x-lg"></i>
             </button>
           </div>
           <div class="modal-panel-body">
             <p>
-              Delete the schedule for
+              Archive the schedule for
               <strong>{{ deleteTarget?.employeeName }}</strong> on
-              <strong>{{ formatDate(deleteTarget?.shiftDate) }}</strong
-              >? This cannot be undone.
+              <strong>{{ formatDate(deleteTarget?.shiftDate) }}</strong>?
+            </p>
+            <p
+              v-if="deleteTarget && isPastDate(deleteTarget.shiftDate)"
+              class="text-warning"
+            >
+              <i class="bi bi-exclamation-triangle me-1"></i>
+              This schedule has already passed. Archiving will send it to
+              Backup & Restore.
             </p>
           </div>
           <div class="modal-panel-footer">
@@ -818,7 +825,7 @@
               Cancel
             </button>
             <button class="btn btn-danger-brand" @click="deleteSchedule">
-              Delete
+              Archive
             </button>
           </div>
         </div>
@@ -2263,6 +2270,14 @@ const saveSchedule = async (overrideConflict = false) => {
 const confirmConflictSave = () => {
   showConflictConfirm.value = false;
   saveSchedule(true);
+};
+
+const isPastDate = (dateStr) => {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d < today;
 };
 
 const confirmDelete = (sched) => {

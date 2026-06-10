@@ -214,6 +214,7 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "@/supabase.js";
+import { useUserBranch } from "@/composables/useUserBranch.js";
 import {
   DollarSign,
   ShoppingBag,
@@ -232,7 +233,11 @@ const name = raw.split(/[^a-zA-Z]/)[0];
 const username = ref(
   name.charAt(0).toUpperCase() + name.slice(1).toLowerCase(),
 );
-const userBranch = ref(localStorage.getItem("branch") || "");
+const { userBranchId, userBranchName, resolveBranch } = useUserBranch();
+const yesterdayRevenue = ref(0);
+const yesterdayOrders = ref(0);
+const recentOrders = ref([]);
+const branchLabel = ref("");
 const isLoading = ref(true);
 
 const totalRevenue = ref(0);
@@ -241,10 +246,6 @@ const lowStockCount = ref(0);
 const lowStockPercent = ref(0);
 const staffOnDuty = ref(0);
 const totalEmployees = ref(0);
-const yesterdayRevenue = ref(0);
-const yesterdayOrders = ref(0);
-const recentOrders = ref([]);
-const branchLabel = ref("");
 
 const formatCurrency = (value) =>
   "₱" +
@@ -261,17 +262,9 @@ const formatTime = (iso) =>
 const fetchDashboardData = async () => {
   isLoading.value = true;
 
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-
-  const { data: branchData } = await supabase
-    .from("branch")
-    .select("BranchId, BranchName")
-    .eq("Location", userBranch.value)
-    .maybeSingle();
-
-  const branchId = branchData?.BranchId;
-  branchLabel.value = branchData?.BranchName || userBranch.value;
+  await resolveBranch();
+  const branchId = userBranchId.value;
+  branchLabel.value = userBranchName.value || localStorage.getItem("branch") || "";
 
   if (branchId) {
     const { data: ordersData } = await supabase

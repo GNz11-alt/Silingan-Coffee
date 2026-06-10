@@ -730,24 +730,48 @@ export default {
   },
 
   methods: {
-    async resolveEmployeeId() {
-      const username = localStorage.getItem("username");
-      const branchShort = localStorage.getItem("branch");
-      if (!branchShort) return false;
+    async resolveBranchId() {
+      const slug = localStorage.getItem("branch");
+      if (!slug || slug === "all") return null;
 
-      try {
-        const { data: branchData } = await supabase
+      const parsed = parseInt(slug, 10);
+      if (!isNaN(parsed) && String(parsed) === slug.trim()) {
+        const { data } = await supabase
           .from("branch")
           .select("BranchId")
-          .eq("Location", branchShort)
-          .single();
+          .eq("BranchId", parsed)
+          .maybeSingle();
+        if (data) return data.BranchId;
+      }
 
-        if (!branchData) return false;
+      const { data: exact } = await supabase
+        .from("branch")
+        .select("BranchId")
+        .or(`BranchName.ilike.${slug},Location.ilike.${slug}`)
+        .maybeSingle();
+      if (exact) return exact.BranchId;
+
+      const { data: fuzzy } = await supabase
+        .from("branch")
+        .select("BranchId")
+        .or(`BranchName.ilike.%${slug}%,Location.ilike.%${slug}%`)
+        .order("BranchId")
+        .limit(1)
+        .maybeSingle();
+      return fuzzy?.BranchId ?? null;
+    },
+
+    async resolveEmployeeId() {
+      const username = localStorage.getItem("username");
+      const branchId = await this.resolveBranchId();
+      if (!branchId) return false;
+
+      try {
 
         const { data: employees } = await supabase
           .from("employee")
           .select("EmployeeId, FirstName, LastName, Email")
-          .eq("BranchAssigned", branchData.BranchId)
+          .eq("BranchAssigned", branchId)
           .eq("Status", "Active");
 
         if (!employees || employees.length === 0) return false;

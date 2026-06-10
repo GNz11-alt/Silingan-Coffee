@@ -12,9 +12,6 @@
         <button class="recipe-all-btn" @click="openAllRecipes">
           <BookOpen :size="16" /> All Recipes
         </button>
-        <button class="add-btn" @click="openAddModal">
-          <Plus :size="16" /> Add Menu Item
-        </button>
       </div>
     </header>
 
@@ -195,22 +192,6 @@
             <span class="price">{{
               item.Price != null ? "₱" + item.Price.toFixed(2) : "—"
             }}</span>
-            <div class="card-actions">
-              <button
-                class="icon-btn edit"
-                @click="openEditModal(item)"
-                title="Edit"
-              >
-                <Edit2 :size="15" />
-              </button>
-              <button
-                class="icon-btn delete"
-                @click="deleteItem(item.ProductId)"
-                title="Delete"
-              >
-                <Trash2 :size="15" />
-              </button>
-            </div>
           </div>
         </div>
       </div>

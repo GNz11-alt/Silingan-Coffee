@@ -334,6 +334,7 @@ import {
   UtensilsCrossed,
 } from "lucide-vue-next";
 import { supabase } from "@/supabase.js";
+import { useUserBranch } from "@/composables/useUserBranch.js";
 
 // ── Current user ───────────────────────────────────────────
 const currentUser = localStorage.getItem("username") || "Unknown";
@@ -482,16 +483,11 @@ const filteredItems = computed(() =>
 );
 
 // ── Resolve manager branch ─────────────────────────────────
+const { userBranchId, resolveBranch } = useUserBranch();
+
 const resolveManagerBranch = async () => {
-  const slug = localStorage.getItem("branch");
-  if (!slug || slug === "all") return;
-  const { data } = await supabase
-    .from("branch")
-    .select("BranchId")
-    .eq("Location", slug) // ← use Location not BranchName
-    .maybeSingle();
-  managerBranchId.value = data?.BranchId ?? null;
-  console.log("managerBranchId resolved:", managerBranchId.value);
+  await resolveBranch();
+  managerBranchId.value = userBranchId.value;
 };
 
 // ── Fetch ──────────────────────────────────────────────────

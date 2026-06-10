@@ -705,6 +705,7 @@ import {
   MinusCircle, ClipboardList, Printer, Lock, Pencil,
 } from "lucide-vue-next";
 import { supabase } from "@/supabase.js";
+import { useUserBranch } from "@/composables/useUserBranch.js";
 
 import BatchRestockModal from "@/components/BatchRestockModal.vue";
 import StockReduceModal  from "@/components/StockReduceModal.vue";
@@ -765,6 +766,8 @@ const itemBatches = ref([]);
 
 const toast = ref({ show: false, message: "", type: "success" });
 
+const { userBranchId, userBranchName, resolveBranch } = useUserBranch();
+
 // ── BRANCH: always resolved from localStorage, never user-selectable ─────────
 const selectedBranchName = computed(
   () => branches.value.find((b) => b.BranchId === selectedBranchId.value)?.BranchName ?? "Your Branch"
@@ -774,25 +777,8 @@ const fetchBranches = async () => {
   const { data } = await supabase.from("branch").select("BranchId, BranchName").order("BranchName");
   if (data) branches.value = data;
 
-  // Resolve the user's assigned branch from localStorage
-  const slug = localStorage.getItem("branch");
-  if (slug && slug !== "all") {
-    const match = (data ?? []).find((b) =>
-      b.BranchName?.toLowerCase().includes(slug.toLowerCase())
-    );
-    if (match) {
-      selectedBranchId.value = match.BranchId;
-    } else {
-      // Fallback: try exact BranchId stored
-      const idMatch = (data ?? []).find((b) => String(b.BranchId) === slug);
-      if (idMatch) selectedBranchId.value = idMatch.BranchId;
-    }
-  }
-
-  // Safety: if still null (misconfigured), default to first branch
-  if (!selectedBranchId.value && data?.length) {
-    selectedBranchId.value = data[0].BranchId;
-  }
+  await resolveBranch();
+  selectedBranchId.value = userBranchId.value;
 };
 
 // ── MODAL HANDLERS ───────────────────────────────────────────────────────────

@@ -263,9 +263,7 @@ const handleKeydown = (e) => {
 onMounted(async () => {
   await resolveBranch();
   selectedBranchId.value = userBranchId.value;
-  if (selectedBranchId.value) {
-    search.setScopes({ branches: [selectedBranchId.value] });
-  }
+  // No automatic branch filter — show everything on open
 });
 </script>
 
