@@ -980,12 +980,26 @@ const decreaseQty = (i) => { if (cart.value[i].qty > 1) cart.value[i].qty--; els
 const removeFromCart = (i) => cart.value.splice(i, 1);
 
 // ─── Transaction number ───────────────────────────────────────────────────────
-const generateTransactionNumber = () => {
+const generateTransactionNumber = async () => {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
-  const seq = String(transactions.value.length + 1).padStart(4, "0");
+  
+  // Get the count of today's transactions for this specific branch
+  const todayStr = now.toLocaleDateString("en-CA");
+  let query = supabase
+    .from("orders")
+    .select("OrderId", { count: "exact", head: true })
+    .gte("CreatedAt", todayStr)
+    .lt("CreatedAt", new Date(now.setDate(now.getDate() + 1)).toLocaleDateString("en-CA"));
+  
+  if (branchId.value) {
+    query = query.eq("BranchId", branchId.value);
+  }
+  
+  const { count } = await query;
+  const seq = String((count || 0) + 1).padStart(4, "0");
   return `SI-${y}${m}${d}-${seq}`;
 };
 
@@ -1020,6 +1034,18 @@ const fetchCurrentUser = async () => {
     const { data: emp } = await supabase.from("employee").select("EmployeeId, FirstName, LastName").or(`FirstName.ilike.%${username}%,LastName.ilike.%${username}%`).maybeSingle();
     if (emp) employeeRecord.value = emp;
   }
+  // At the end of fetchCurrentUser, add:
+if (!branchId.value && currentUser.value?.branch) {
+  // Try to get branch from user's branch field
+  const { data: branchData } = await supabase
+    .from("branch")
+    .select("BranchId")
+    .eq("BranchName", currentUser.value.branch)
+    .maybeSingle();
+  if (branchData) {
+    branchId.value = branchData.BranchId;
+  }
+}
 };
 
 const fetchMenu = async (force = false) => {
@@ -1131,24 +1157,32 @@ const fetchTransactions = async (force = false) => {
     }
   }
   
-const today = new Date();
-const todayStr = today.toLocaleDateString("en-CA"); // gives YYYY-MM-DD in local time
-const tomorrow = new Date(today);
-tomorrow.setDate(tomorrow.getDate() + 1);
-const tomorrowStr = tomorrow.toLocaleDateString("en-CA");
+  const today = new Date();
+  const todayStr = today.toLocaleDateString("en-CA"); // gives YYYY-MM-DD in local time
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toLocaleDateString("en-CA");
   
-  const { data } = await supabase
+  // Build the query
+  let query = supabase
     .from("orders")
     .select(`
       OrderId, TotalAmount, DiscountId, DiscountedAmount, FinalAmount,
       cashpaid, changegiven, PaymentMethod, Status, CreatedAt,
-      transaction_number, cancel_reason, discount_id_number, order_type,
+      transaction_number, cancel_reason, discount_id_number, order_type, BranchId,
       discount ( discountid, discountname, discounttype, discountvalue ),
       orderitem ( OrderItemId, Quantity, UnitPrice, Subtotal, ProductId, product ( ProductId, ProductName ) )
     `)
-  .gte("CreatedAt", todayStr)
-  .lt("CreatedAt", tomorrowStr)
-  .order("CreatedAt", { ascending: false });
+    .gte("CreatedAt", todayStr)
+    .lt("CreatedAt", tomorrowStr)
+    .order("CreatedAt", { ascending: false });
+  
+  // Filter by branch if we have a branch ID
+  if (branchId.value) {
+    query = query.eq("BranchId", branchId.value);
+  }
+  
+  const { data } = await query;
     
   if (data) { 
     transactions.value = data;
