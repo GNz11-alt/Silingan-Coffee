@@ -888,6 +888,7 @@
               <div class="col-12 employee-search-wrap">
                 <label class="form-label-sm">Staff</label>
                 <input
+                  ref="employeeSearchRef"
                   v-model="employeeSearchQuery"
                   type="text"
                   class="form-control fc-brand"
@@ -913,14 +914,11 @@
                   v-if="employeeDropdownOpen && !employeesLoading"
                   class="employee-dropdown"
                 >
-                  <div v-if="!form.branchId" class="employee-dropdown-empty">
-                    Select a branch first
-                  </div>
                   <div
-                    v-else-if="!filteredEmployeeList.length"
+                    v-if="!filteredEmployeeList.length"
                     class="employee-dropdown-empty"
                   >
-                    No staff found for this branch
+                    No staff found
                   </div>
                   <div
                     v-for="(e, i) in filteredEmployeeList"
@@ -942,7 +940,11 @@
               </div>
               <div class="col-12">
                 <label class="form-label-sm">Role</label>
-                <select v-model="form.role" class="form-select fc-brand">
+                <div v-if="form.employeeId && !showRoleOverride" class="d-flex align-items-center gap-2">
+                  <span class="badge" style="background:#31201d;font-size:0.85rem;padding:6px 14px">{{ form.role || '—' }}</span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="showRoleOverride = true">Change</button>
+                </div>
+                <select v-show="!form.employeeId || showRoleOverride" v-model="form.role" class="form-select fc-brand" :disabled="!form.employeeId">
                   <option value="" disabled>Select role</option>
                   <option v-for="r in roles" :key="r" :value="r">
                     {{ r }}
@@ -958,6 +960,8 @@
                   v-model="form.shiftDate"
                   type="date"
                   class="form-control fc-brand"
+                  :disabled="!form.employeeId"
+                  :min="todayStr"
                 />
                 <div v-if="errors.shiftDate" class="text-danger small mt-1">
                   {{ errors.shiftDate }}
@@ -969,6 +973,7 @@
                   v-model="form.startTime"
                   type="time"
                   class="form-control fc-brand"
+                  :disabled="!form.employeeId"
                 />
                 <div v-if="errors.startTime" class="text-danger small mt-1">
                   {{ errors.startTime }}
@@ -980,6 +985,7 @@
                   v-model="form.endTime"
                   type="time"
                   class="form-control fc-brand"
+                  :disabled="!form.employeeId"
                 />
                 <div v-if="errors.endTime" class="text-danger small mt-1">
                   {{ errors.endTime }}
@@ -1018,7 +1024,6 @@
       <div v-if="showConflictConfirm" class="modal-overlay">
         <div
           style="position: absolute; inset: 0; z-index: 0"
-          @click="showConflictConfirm = false"
         ></div>
         <div
           class="modal-panel modal-panel--sm"
@@ -1064,7 +1069,6 @@
       <div v-if="showDeleteConfirm" class="modal-overlay">
         <div
           style="position: absolute; inset: 0; z-index: 0"
-          @click="showDeleteConfirm = false"
         ></div>
         <div
           class="modal-panel modal-panel--sm"
@@ -1643,9 +1647,11 @@ onMounted(() => {
   };
   window.addEventListener("resize", onResize);
   resizeCleanup = () => window.removeEventListener("resize", onResize);
+  document.addEventListener("click", onDocumentClick);
 });
 onUnmounted(() => {
   resizeCleanup?.();
+  document.removeEventListener("click", onDocumentClick);
 });
 const overflowThreshold = computed(() =>
   windowWidth.value < 600 ? 2 : SHIFT_OVERFLOW,
@@ -2060,13 +2066,17 @@ const form = ref(emptyForm());
 const employeeSearchQuery = ref("");
 const employeeDropdownOpen = ref(false);
 const employeeHighlightIndex = ref(0);
+const employeeSearchRef = ref(null);
+const showRoleOverride = ref(false);
+
+const todayStr = computed(() => toLocalDateKey(new Date()));
 
 const filteredEmployeeList = computed(() => {
-  if (!form.value.branchId) return [];
-  const branchId = String(form.value.branchId);
-  let list = employeeList.value.filter(
-    (e) => String(e.branchAssigned) === branchId,
-  );
+  let list = employeeList.value;
+  if (form.value.branchId) {
+    const branchId = String(form.value.branchId);
+    list = list.filter((e) => String(e.branchAssigned) === branchId);
+  }
   if (employeeSearchQuery.value) {
     const q = employeeSearchQuery.value.toLowerCase();
     list = list.filter((e) => e.name.toLowerCase().includes(q));
@@ -2580,7 +2590,6 @@ const fetchEmployees = async () => {
   const { data, error } = await supabase
     .from("employee")
     .select("EmployeeId, FirstName, LastName, BranchAssigned, Position, Status")
-    .eq("Status", "Active")
     .order("FirstName");
   if (error) {
     console.error("[Schedule] fetchEmployees failed:", error);
@@ -2731,7 +2740,8 @@ const onEmployeeSelected = () => {
   const emp = employeeList.value.find((e) => e.id === form.value.employeeId);
   if (!emp) return;
   if (emp.branchAssigned) form.value.branchId = emp.branchAssigned;
-  if (emp.position && !form.value.role) form.value.role = emp.position;
+  form.value.role = emp.position || "";
+  showRoleOverride.value = false;
 };
 
 const onBranchChanged = () => {
@@ -2746,7 +2756,22 @@ const selectEmployee = (emp) => {
   form.value.employeeId = emp.id;
   employeeSearchQuery.value = emp.name;
   employeeDropdownOpen.value = false;
-  if (emp.position && !form.value.role) form.value.role = emp.position;
+  onEmployeeSelected();
+};
+
+const onDocumentClick = (e) => {
+  if (
+    employeeDropdownOpen.value &&
+    employeeSearchRef.value &&
+    !employeeSearchRef.value.contains(e.target)
+  ) {
+    employeeDropdownOpen.value = false;
+    if (form.value.employeeId) {
+      employeeSearchQuery.value =
+        employeeList.value.find((emp) => emp.id === form.value.employeeId)
+          ?.name || "";
+    }
+  }
 };
 
 const selectEmployeeByHighlight = () => {
