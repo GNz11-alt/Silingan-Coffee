@@ -107,34 +107,6 @@
 
       <div class="stat-card">
         <div class="stat-icon">
-          <component :is="AlertCircle" :size="28" stroke-width="1.5" />
-        </div>
-        <div class="stat-info">
-          <h3>Low Stock Items</h3>
-          <p class="stat-value">{{ isLoading ? "..." : lowStockCount }}</p>
-          <span
-            :class="[
-              'stat-trend',
-              lowStockPercent >= 20
-                ? 'danger'
-                : lowStockPercent > 0
-                  ? 'warning'
-                  : 'positive',
-            ]"
-          >
-            {{
-              lowStockPercent >= 20
-                ? "critical — needs attention"
-                : lowStockPercent > 0
-                  ? "needs restocking"
-                  : "all items stocked"
-            }}
-          </span>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-icon">
           <component :is="TrendingUp" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">

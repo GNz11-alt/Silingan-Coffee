@@ -33,17 +33,7 @@
             >{{ filteredTransactions.length }} orders shown</span
           >
         </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">
-          <component :is="ShoppingBag" :size="28" stroke-width="1.5" />
-        </div>
-        <div class="stat-info">
-          <h3>Total Orders</h3>
-          <p class="stat-value">{{ allTransactions.length }}</p>
-          <span class="stat-trend positive">all time</span>
-        </div>
-      </div>
+      </div
       <div class="stat-card">
         <div class="stat-icon">
           <component :is="TrendingUp" :size="28" stroke-width="1.5" />
