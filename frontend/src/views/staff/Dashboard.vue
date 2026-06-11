@@ -158,17 +158,33 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 2,
   });
 
-const formatTime = (iso) =>
-  iso
-    ? new Date(iso + "Z").toLocaleTimeString("en-PH", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
+// Interpret DB timestamps as Manila time (no trailing Z — they are local, not UTC)
+const formatTime = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(
+    iso.includes("+") || iso.endsWith("Z") ? iso : iso + "+08:00",
+  );
+  return d.toLocaleTimeString("en-PH", {
+    timeZone: "Asia/Manila",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 const fetchDashboardData = async () => {
   isLoading.value = true;
-  const today = new Date().toISOString().split("T")[0];
+
+  // Use Manila local date, not UTC — avoids wrong-day queries before 8 AM
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Manila",
+  }); // "YYYY-MM-DD"
+  const tomorrow = (() => {
+    const d = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }),
+    );
+    d.setDate(d.getDate() + 1);
+    return d.toLocaleDateString("en-CA");
+  })();
 
   await resolveBranch();
   const branchId = userBranchId.value;
@@ -176,12 +192,13 @@ const fetchDashboardData = async () => {
     userBranchName.value || localStorage.getItem("branch") || "";
 
   if (branchId) {
+    // Fetch completed orders for today using the same date range logic as POS.vue
     const { data: ordersData } = await supabase
       .from("orders")
       .select("OrderId, FinalAmount, CreatedAt")
       .eq("BranchId", branchId)
-      .gte("CreatedAt", `${today}T00:00:00`)
-      .lte("CreatedAt", `${today}T23:59:59`)
+      .gte("CreatedAt", today)
+      .lt("CreatedAt", tomorrow)
       .eq("Status", "completed");
 
     if (ordersData) {
@@ -201,14 +218,15 @@ const fetchDashboardData = async () => {
       (item) => item.Quantity <= item.LowStockThreshold && item.Quantity > 0,
     ).length;
 
+    // Recent orders: same date range, completed only, latest 5
     const { data: recentData } = await supabase
       .from("orders")
       .select(
         "OrderId, FinalAmount, CreatedAt, orderitem(Quantity, ProductId, product(ProductName))",
       )
       .eq("BranchId", branchId)
-      .gte("CreatedAt", `${today}T00:00:00`)
-      .lte("CreatedAt", `${today}T23:59:59`)
+      .gte("CreatedAt", today)
+      .lt("CreatedAt", tomorrow)
       .eq("Status", "completed")
       .order("CreatedAt", { ascending: false })
       .limit(5);

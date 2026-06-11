@@ -109,7 +109,7 @@ function buildDocument(payload) {
     content.push({
       table: {
         headerRows: 1,
-        widths: [20, '*', 58, 45, 58, 58, 38, 48, '*'],
+        widths: [20, '*', 45, 35, 45, 45, 30, 40, 80],
         body: tableBody,
       },
       layout: 'lightHorizontalLines',
@@ -122,9 +122,48 @@ function buildDocument(payload) {
     margin: [0, 14, 0, 0],
   })
 
+  content.push({
+    columns: [
+      {
+        width: '*',
+        stack: [
+          { text: '_________________________', alignment: 'center', margin: [0, 0, 0, 2], fontSize: 8 },
+          { text: 'Prepared by', alignment: 'center', fontSize: 7.5, color: '#666' },
+        ],
+        margin: [0, 0, 6, 0],
+      },
+      {
+        width: '*',
+        stack: [
+          { text: '_________________________', alignment: 'center', margin: [0, 0, 0, 2], fontSize: 8 },
+          { text: 'Approved by (Manager)', alignment: 'center', fontSize: 7.5, color: '#666' },
+        ],
+        margin: [6, 0, 6, 0],
+      },
+      {
+        width: '*',
+        stack: [
+          { text: '_________________________', alignment: 'center', margin: [0, 0, 0, 2], fontSize: 8 },
+          { text: 'Received by', alignment: 'center', fontSize: 7.5, color: '#666' },
+        ],
+        margin: [6, 0, 6, 0],
+      },
+      {
+        width: '*',
+        stack: [
+          { text: '_________________________', alignment: 'center', margin: [0, 0, 0, 2], fontSize: 8 },
+          { text: 'Date Received', alignment: 'center', fontSize: 7.5, color: '#666' },
+        ],
+        margin: [6, 0, 0, 0],
+      },
+    ],
+    margin: [0, 20, 0, 0],
+    columnGap: 0,
+  })
+
   return {
     pageSize: 'A4',
-    pageMargins: [24, 24, 24, 24],
+    pageMargins: [40, 40, 40, 40],
     content,
     styles: {
       title: { fontSize: 16, bold: true, margin: [0, 0, 0, 10] },

@@ -257,11 +257,12 @@
                       tr.PaymentMethod ?? "—"
                     }}</span>
                   </td>
-                  <td>
-                    <span :class="['status-badge', tr.Status]">{{
-                      tr.Status
-                    }}</span>
-                  </td>
+                    <td>
+                      <span :class="['status-badge', tr.Status]">{{ tr.Status }}</span>
+                      <div v-if="tr.Status === 'cancelled' && tr.cancel_reason" class="inline-cancel-reason">
+                        "{{ tr.cancel_reason }}"
+                      </div>
+                    </td>
                   <td>
                     <ChevronDown
                       :size="16"
@@ -322,10 +323,7 @@
                               >
                             </div>
                             <div class="s-row total">
-                              <span>Total</span
-                              ><span
-                                >₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}</span
-                              >
+                              <span>Total</span><span>₱{{ (tr.FinalAmount ?? 0).toFixed(2) }}</span>
                             </div>
                             <div class="s-row" v-if="tr.cashpaid">
                               <span>Cash Paid</span
@@ -337,6 +335,10 @@
                                 >₱{{ (tr.changegiven ?? 0).toFixed(2) }}</span
                               >
                             </div>
+                            <div v-if="tr.Status === 'cancelled' && tr.cancel_reason" class="cancel-reason-panel">
+                                <span class="cancel-reason-label">Cancellation Reason</span>
+                                <span class="cancel-reason-text">{{ tr.cancel_reason }}</span>
+                              </div>
                           </div>
                         </div>
                       </div>
@@ -610,6 +612,7 @@ const fetchAllOrders = async () => {
       changegiven,
       PaymentMethod,
       Status,
+      cancel_reason, 
       CreatedAt,
       discount ( discountid, discountname, discounttype, discountvalue ),
       orderitem (
@@ -1151,6 +1154,40 @@ onMounted(async () => {
 .status-badge.cancelled {
   color: #dc2626;
 }
+
+.inline-cancel-reason {
+  font-size: 11px;
+  color: #dc2626;
+  font-style: italic;
+  margin-top: 3px;
+  max-width: 160px;
+  line-height: 1.4;
+}
+
+.cancel-reason-panel {
+  margin-top: 12px;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cancel-reason-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #dc2626;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cancel-reason-text {
+  font-size: 13px;
+  color: #991b1b;
+  font-style: italic;
+  line-height: 1.4;
+}
+
 .expand-icon {
   color: #ccc;
   transition: transform 0.2s;

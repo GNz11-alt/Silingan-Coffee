@@ -24,7 +24,7 @@
               <div class="prf-doc-logo"></div>
               <div>
                 <h1 class="prf-doc-title">Purchase Reorder Order</h1>
-                <p class="prf-doc-meta">{{ branchName }} &nbsp;·&nbsp; Generated {{ today }}</p>
+                <p class="prf-doc-meta">{{ branchName }}<span class="print-only"> &nbsp;·&nbsp; Generated {{ today }}</span></p>
               </div>
             </div>
             <div class="prf-doc-right">
@@ -220,25 +220,6 @@
         </div>
         <!-- end printable -->
 
-      </div>
-    </div>
-    <!-- ── NO-DATE CONFIRMATION ────────────────────────── -->
-    <div v-if="showDateConfirm" class="prf-overlay" @click.self="showDateConfirm = false">
-      <div class="prf-modal prf-modal--sm">
-        <div class="prf-screen-header">
-          <h2>No date selected</h2>
-        </div>
-        <div class="prf-confirm-body">
-          <p>You haven't set a <strong>Date needed</strong>. Generate the reorder form without a date?</p>
-          <label class="prf-checkbox-label">
-            <input type="checkbox" v-model="dontShowAgain" />
-            Don't show this again this session
-          </label>
-        </div>
-        <div class="prf-modal-actions">
-          <button class="prf-btn-outline" @click="showDateConfirm = false">Cancel</button>
-          <button class="prf-btn-print" @click="confirmNoDate">Generate anyway</button>
-        </div>
       </div>
     </div>
   </Teleport>
@@ -663,6 +644,12 @@ const confirmNoDate = () => {
 .prf-td-input {
   min-width: 100px;
 }
+.prf-table td:last-child.prf-td-input {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .prf-qty-input {
   width: 80px;
   padding: 5px 8px;
@@ -683,6 +670,7 @@ const confirmNoDate = () => {
   box-sizing: border-box;
 }
 
+.print-only,
 .prf-print-line {
   display: none;
 }
@@ -716,6 +704,7 @@ const confirmNoDate = () => {
   gap: 24px;
   margin-top: 40px;
   margin-bottom: 24px;
+  page-break-inside: avoid;
 }
 .prf-sig-block {
   display: flex;
@@ -771,6 +760,13 @@ const confirmNoDate = () => {
   }
   .prf-table tr {
     page-break-inside: avoid;
+  }
+  .prf-table td:last-child.prf-td-input {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    word-break: break-word;
   }
   body * {
     visibility: hidden;

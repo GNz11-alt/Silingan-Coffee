@@ -226,22 +226,35 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 2,
   });
 
-const formatTime = (iso) =>
-  iso
-    ? new Date(iso + "Z").toLocaleTimeString("en-PH", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
+// Interpret DB timestamps as Manila time (not UTC)
+const formatTime = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(
+    iso.includes("+") || iso.endsWith("Z") ? iso : iso + "+08:00",
+  );
+  return d.toLocaleTimeString("en-PH", {
+    timeZone: "Asia/Manila",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 const fetchDashboardData = async () => {
   isLoading.value = true;
 
-  const todayDate = new Date();
-  const today = todayDate.toISOString().split("T")[0];
-  const yesterdayDate = new Date(todayDate);
+  // Use Manila local date to avoid wrong-day queries before 8 AM
+  const manilaNow = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" }),
+  );
+  const today = manilaNow.toLocaleDateString("en-CA"); // YYYY-MM-DD
+
+  const tomorrowDate = new Date(manilaNow);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = tomorrowDate.toLocaleDateString("en-CA");
+
+  const yesterdayDate = new Date(manilaNow);
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterday = yesterdayDate.toISOString().split("T")[0];
+  const yesterday = yesterdayDate.toLocaleDateString("en-CA");
 
   await resolveBranch();
   const branchId = userBranchId.value;
@@ -249,12 +262,13 @@ const fetchDashboardData = async () => {
     userBranchName.value || localStorage.getItem("branch") || "";
 
   if (branchId) {
+    // Today's completed orders — same date range logic as POS.vue
     const { data: ordersData } = await supabase
       .from("orders")
       .select("OrderId, FinalAmount, CreatedAt")
       .eq("BranchId", branchId)
-      .gte("CreatedAt", `${today}T00:00:00`)
-      .lte("CreatedAt", `${today}T23:59:59`)
+      .gte("CreatedAt", today)
+      .lt("CreatedAt", tomorrow)
       .eq("Status", "completed");
 
     if (ordersData) {
@@ -265,12 +279,13 @@ const fetchDashboardData = async () => {
       );
     }
 
+    // Yesterday's completed orders for comparison
     const { data: yesterdayData } = await supabase
       .from("orders")
       .select("FinalAmount")
       .eq("BranchId", branchId)
-      .gte("CreatedAt", `${yesterday}T00:00:00`)
-      .lte("CreatedAt", `${yesterday}T23:59:59`)
+      .gte("CreatedAt", yesterday)
+      .lt("CreatedAt", today)
       .eq("Status", "completed");
 
     yesterdayRevenue.value = (yesterdayData ?? []).reduce(
@@ -279,6 +294,7 @@ const fetchDashboardData = async () => {
     );
     yesterdayOrders.value = yesterdayData?.length ?? 0;
 
+    // Inventory / low stock
     const { data: inventoryData } = await supabase
       .from("inventory")
       .select("Quantity, LowStockThreshold")
@@ -291,6 +307,7 @@ const fetchDashboardData = async () => {
     lowStockPercent.value =
       totalItems > 0 ? (lowStockCount.value / totalItems) * 100 : 0;
 
+    // Total employees in branch
     const { count: empCount } = await supabase
       .from("employee")
       .select("*", { count: "exact", head: true })
@@ -299,6 +316,7 @@ const fetchDashboardData = async () => {
 
     totalEmployees.value = empCount || 0;
 
+    // Staff on duty today
     const { count: dutyCount } = await supabase
       .from("schedule")
       .select("*", { count: "exact", head: true })
@@ -307,12 +325,13 @@ const fetchDashboardData = async () => {
 
     staffOnDuty.value = dutyCount || 0;
 
+    // Recent orders (latest 5, completed, today)
     const { data: recentData } = await supabase
       .from("orders")
       .select("OrderId, FinalAmount, BranchId, CreatedAt, branch(BranchName)")
       .eq("BranchId", branchId)
-      .gte("CreatedAt", `${today}T00:00:00`)
-      .lte("CreatedAt", `${today}T23:59:59`)
+      .gte("CreatedAt", today)
+      .lt("CreatedAt", tomorrow)
       .eq("Status", "completed")
       .order("CreatedAt", { ascending: false })
       .limit(5);

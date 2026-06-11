@@ -836,7 +836,11 @@
               </div>
               <div class="col-12">
                 <label class="form-label-sm">Role</label>
-                <select v-model="form.role" class="form-select fc-brand">
+                <div v-if="form.employeeId && !showRoleOverride" class="d-flex align-items-center gap-2">
+                  <span class="badge" style="background:#31201d;font-size:0.85rem;padding:6px 14px">{{ form.role || '—' }}</span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="showRoleOverride = true">Change</button>
+                </div>
+                <select v-show="!form.employeeId || showRoleOverride" v-model="form.role" class="form-select fc-brand" :disabled="!form.employeeId">
                   <option value="" disabled>Select role</option>
                   <option v-for="r in roles" :key="r" :value="r">
                     {{ r }}
@@ -852,6 +856,8 @@
                   v-model="form.shiftDate"
                   type="date"
                   class="form-control fc-brand"
+                  :disabled="!form.employeeId"
+                  :min="todayStr"
                 />
                 <div v-if="errors.shiftDate" class="text-danger small mt-1">
                   {{ errors.shiftDate }}
@@ -863,6 +869,7 @@
                   v-model="form.startTime"
                   type="time"
                   class="form-control fc-brand"
+                  :disabled="!form.employeeId"
                 />
                 <div v-if="errors.startTime" class="text-danger small mt-1">
                   {{ errors.startTime }}
@@ -874,6 +881,7 @@
                   v-model="form.endTime"
                   type="time"
                   class="form-control fc-brand"
+                  :disabled="!form.employeeId"
                 />
                 <div v-if="errors.endTime" class="text-danger small mt-1">
                   {{ errors.endTime }}
@@ -912,7 +920,6 @@
       <div v-if="showConflictConfirm" class="modal-overlay">
         <div
           style="position: absolute; inset: 0; z-index: 0"
-          @click="showConflictConfirm = false"
         ></div>
         <div
           class="modal-panel modal-panel--sm"
@@ -958,7 +965,6 @@
       <div v-if="showDeleteConfirm" class="modal-overlay">
         <div
           style="position: absolute; inset: 0; z-index: 0"
-          @click="showDeleteConfirm = false"
         ></div>
         <div
           class="modal-panel modal-panel--sm"
@@ -1520,9 +1526,11 @@ onMounted(() => {
   };
   window.addEventListener("resize", onResize);
   resizeCleanup = () => window.removeEventListener("resize", onResize);
+  document.addEventListener("click", onDocumentClick);
 });
 onUnmounted(() => {
   resizeCleanup?.();
+  document.removeEventListener("click", onDocumentClick);
 });
 const overflowThreshold = computed(() =>
   windowWidth.value < 600 ? 2 : SHIFT_OVERFLOW,
@@ -1882,6 +1890,9 @@ const staffSearchText = ref("");
 const staffDropdownOpen = ref(false);
 const staffHighlightIndex = ref(-1);
 const staffSearchInputRef = ref(null);
+const showRoleOverride = ref(false);
+
+const todayStr = computed(() => toLocalDateKey(new Date()));
 
 const pendingCount = computed(
   () => availability.value.filter((a) => a.status === "Pending").length,
@@ -2238,7 +2249,6 @@ const fetchEmployees = async () => {
     .from("employee")
     .select("EmployeeId, FirstName, LastName, BranchAssigned, Position, Status")
     .eq("BranchAssigned", managerBranchId.value)
-    .eq("Status", "Active")
     .order("FirstName");
   if (error) {
     console.error("[Schedule] fetchEmployees failed:", error);
@@ -2598,7 +2608,8 @@ const onEmployeeSelected = () => {
   const emp = employeeList.value.find((e) => e.id === form.value.employeeId);
   if (!emp) return;
   form.value.branchId = emp.branchAssigned || managerBranchId.value;
-  if (emp.position && !form.value.role) form.value.role = emp.position;
+  form.value.role = emp.position || "";
+  showRoleOverride.value = false;
 };
 
 const filteredEmployeeList = computed(() => {
@@ -2619,6 +2630,19 @@ const selectStaff = (emp) => {
   staffDropdownOpen.value = false;
   staffHighlightIndex.value = -1;
   onEmployeeSelected();
+};
+
+const onDocumentClick = (e) => {
+  if (
+    staffDropdownOpen.value &&
+    staffSearchInputRef.value &&
+    !staffSearchInputRef.value.contains(e.target)
+  ) {
+    staffDropdownOpen.value = false;
+    if (form.value.employeeId) {
+      staffSearchText.value = selectedEmployeeName.value;
+    }
+  }
 };
 
 const onStaffSearchFocus = () => {
