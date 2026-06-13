@@ -1,7 +1,16 @@
 <template>
   <div class="dashboard-content">
     <div class="welcome-header">
-      <h1>Dashboard</h1>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <h1>Dashboard</h1>
+        <button
+          class="toggle-amounts-btn"
+          @click="showAmounts = !showAmounts"
+          :title="showAmounts ? 'Hide amounts' : 'Show amounts'"
+        >
+          <component :is="showAmounts ? Eye : EyeOff" :size="18" />
+        </button>
+      </div>
       <p class="welcome-message">
         Welcome back, <strong>{{ username }}!</strong>
       </p>
@@ -11,12 +20,18 @@
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">
-          <component :is="DollarSign" :size="28" stroke-width="1.5" />
+          <component :is="PesoSign" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">
           <h3>Branch Revenue</h3>
           <p class="stat-value">
-            {{ isLoading ? "..." : formatCurrency(totalRevenue) }}
+            {{
+              isLoading
+                ? "..."
+                : showAmounts
+                  ? formatCurrency(totalRevenue)
+                  : "••••••"
+            }}
           </p>
           <span
             :class="[
@@ -183,14 +198,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, h } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "@/supabase.js";
 import { useUserBranch } from "@/composables/useUserBranch.js";
 import {
-  DollarSign,
+  Eye,
+  EyeOff,
   ShoppingBag,
-  AlertCircle,
   Users,
   TrendingUp,
   Package,
@@ -212,6 +227,8 @@ const recentOrders = ref([]);
 const branchLabel = ref("");
 const isLoading = ref(true);
 
+const showAmounts = ref(true);
+
 const totalRevenue = ref(0);
 const totalOrders = ref(0);
 const lowStockCount = ref(0);
@@ -220,11 +237,41 @@ const staffOnDuty = ref(0);
 const totalEmployees = ref(0);
 
 const formatCurrency = (value) =>
-  "₱" +
   Number(value || 0).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+const PesoSign = {
+  render() {
+    return h(
+      "svg",
+      {
+        xmlns: "http://www.w3.org/2000/svg",
+        width: "28",
+        height: "28",
+        viewBox: "0 0 24 24",
+        fill: "currentColor",
+        stroke: "none",
+      },
+      [
+        h(
+          "text",
+          {
+            x: "50%",
+            y: "50%",
+            "dominant-baseline": "central",
+            "text-anchor": "middle",
+            "font-size": "18",
+            "font-weight": "600",
+            "font-family": "Arial, sans-serif",
+          },
+          "₱",
+        ),
+      ],
+    );
+  },
+};
 
 // Interpret DB timestamps as Manila time (not UTC)
 const formatTime = (iso) => {
@@ -471,6 +518,20 @@ onMounted(() => {
   gap: 24px;
 }
 
+.toggle-amounts-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.toggle-amounts-btn:hover {
+  color: #8b4513;
+}
+
 .recent-orders,
 .quick-actions {
   background: #ffffff;
@@ -584,38 +645,87 @@ onMounted(() => {
 }
 
 @media (min-width: 769px) {
-  .stats-grid { grid-template-columns: repeat(3, 1fr); }
-  .branch-grid { grid-template-columns: repeat(3, 1fr); }
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .branch-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (min-width: 1024px) {
-  .stats-grid { grid-template-columns: repeat(5, 1fr); }
-  .branch-grid { grid-template-columns: repeat(5, 1fr); }
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .branch-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
-  .dashboard-content { padding: 14px; overflow-x: hidden; }
+  .dashboard-content {
+    padding: 14px;
+    overflow-x: hidden;
+  }
 
   /* Stats and branch — always 2 col */
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .stat-card { padding: 12px; gap: 8px; min-width: 0; }
-  .stat-info { min-width: 0; }
-  .stat-info h3 { font-size: 11px; }
-  .stat-value { font-size: 18px; }
-  .stat-trend { font-size: 10px; }
-  .stat-icon svg { width: 20px; height: 20px; }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .stat-card {
+    padding: 12px;
+    gap: 8px;
+    min-width: 0;
+  }
+  .stat-info {
+    min-width: 0;
+  }
+  .stat-info h3 {
+    font-size: 11px;
+  }
+  .stat-value {
+    font-size: 18px;
+  }
+  .stat-trend {
+    font-size: 10px;
+  }
+  .stat-icon svg {
+    width: 20px;
+    height: 20px;
+  }
 
-  .branch-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .branch-card { padding: 14px; }
-  .branch-info h4 { font-size: 13px; }
-  .branch-revenue { font-size: 15px; }
+  .branch-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .branch-card {
+    padding: 14px;
+  }
+  .branch-info h4 {
+    font-size: 13px;
+  }
+  .branch-revenue {
+    font-size: 15px;
+  }
 
   /* Bottom section stacks */
-  .bottom-section { grid-template-columns: 1fr; gap: 16px; }
-  .recent-orders, .quick-actions { padding: 16px; }
+  .bottom-section {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .recent-orders,
+  .quick-actions {
+    padding: 16px;
+  }
 
   /* Orders list tighter */
-  .order-info { gap: 8px; flex-wrap: wrap; }
-  .order-time { min-width: unset; }
+  .order-info {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .order-time {
+    min-width: unset;
+  }
 }
 </style>

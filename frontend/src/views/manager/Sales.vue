@@ -33,7 +33,7 @@
             >{{ filteredTransactions.length }} orders shown</span
           >
         </div>
-      </div
+      </div>
       <div class="stat-card">
         <div class="stat-icon">
           <component :is="TrendingUp" :size="28" stroke-width="1.5" />

@@ -1,7 +1,16 @@
 <template>
   <div class="dashboard-content">
     <div class="welcome-header">
-      <h1>Dashboard</h1>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <h1>Dashboard</h1>
+        <button
+          class="toggle-amounts-btn"
+          @click="showAmounts = !showAmounts"
+          :title="showAmounts ? 'Hide amounts' : 'Show amounts'"
+        >
+          <component :is="showAmounts ? Eye : EyeOff" :size="18" />
+        </button>
+      </div>
       <p class="welcome-message">
         Welcome back, <strong>{{ username }}!</strong>
       </p>
@@ -11,12 +20,18 @@
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">
-          <component :is="DollarSign" :size="28" stroke-width="1.5" />
+          <component :is="PesoSign" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">
           <h3>Branch Revenue</h3>
           <p class="stat-value">
-            {{ isLoading ? "..." : formatCurrency(totalRevenue) }}
+            {{
+              isLoading
+                ? "..."
+                : showAmounts
+                  ? formatCurrency(totalRevenue)
+                  : "••••••"
+            }}
           </p>
           <span class="stat-trend positive">Today</span>
         </div>
@@ -122,12 +137,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, h } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "@/supabase.js";
 import { useUserBranch } from "@/composables/useUserBranch.js";
 import {
-  DollarSign,
+  Eye,
+  EyeOff,
   ShoppingBag,
   AlertCircle,
   ShoppingCart,
@@ -151,12 +167,44 @@ const shiftsToday = ref(0);
 const recentOrders = ref([]);
 const branchLabel = ref("");
 
+const showAmounts = ref(true);
+
 const formatCurrency = (value) =>
-  "₱" +
   Number(value || 0).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+const PesoSign = {
+  render() {
+    return h(
+      "svg",
+      {
+        xmlns: "http://www.w3.org/2000/svg",
+        width: "28",
+        height: "28",
+        viewBox: "0 0 24 24",
+        fill: "currentColor",
+        stroke: "none",
+      },
+      [
+        h(
+          "text",
+          {
+            x: "50%",
+            y: "50%",
+            "dominant-baseline": "central",
+            "text-anchor": "middle",
+            "font-size": "18",
+            "font-weight": "600",
+            "font-family": "Arial, sans-serif",
+          },
+          "₱",
+        ),
+      ],
+    );
+  },
+};
 
 // Interpret DB timestamps as Manila time (no trailing Z — they are local, not UTC)
 const formatTime = (iso) => {
@@ -360,6 +408,20 @@ onMounted(() => {
 }
 .stat-trend.danger {
   color: #dc2626;
+}
+
+.toggle-amounts-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.toggle-amounts-btn:hover {
+  color: #8b4513;
 }
 
 .bottom-section {

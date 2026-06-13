@@ -1,7 +1,16 @@
 <template>
   <div class="dashboard-content">
     <div class="welcome-header">
-      <h1>Dashboard</h1>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <h1>Dashboard</h1>
+        <button
+          class="toggle-amounts-btn"
+          @click="showAmounts = !showAmounts"
+          :title="showAmounts ? 'Hide amounts' : 'Show amounts'"
+        >
+          <component :is="showAmounts ? Eye : EyeOff" :size="18" />
+        </button>
+      </div>
       <p class="welcome-message">
         Welcome back, <strong>{{ username }}!</strong>
       </p>
@@ -10,12 +19,18 @@
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">
-          <component :is="DollarSign" :size="28" stroke-width="1.5" />
+          <component :is="PesoSign" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">
           <h3>Network Revenue</h3>
           <p class="stat-value">
-            {{ isLoading ? "..." : formatCurrency(totalRevenue) }}
+            {{
+              isLoading
+                ? "..."
+                : showAmounts
+                  ? formatCurrency(totalRevenue)
+                  : "••••••"
+            }}
           </p>
           <span
             :class="[
@@ -146,7 +161,12 @@
         >
           <div class="branch-info">
             <h4>{{ branch.name }}</h4>
-            <p class="branch-revenue">{{ formatCurrency(branch.revenue) }}</p>
+            <div class="stat-value-row">
+              <span class="branch-currency">₱</span>
+              <span class="branch-revenue">
+                {{ showAmounts ? formatCurrency(branch.revenue) : "••••••" }}
+              </span>
+            </div>
             <span :class="['branch-trend', branch.status]">{{
               branch.statusText
             }}</span>
@@ -204,14 +224,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, h } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "@/supabase.js";
 import {
-  DollarSign,
+  Eye,
+  EyeOff,
   ShoppingBag,
   Building,
-  AlertCircle,
   TrendingUp,
   Plus,
   Package,
@@ -239,15 +259,15 @@ const lowStockPercent = ref(0);
 // Data
 const branchPerformance = ref([]);
 const recentOrders = ref([]);
+const showAmounts = ref(true);
 
 const formatCurrency = (value) => {
-  return (
-    "₱" +
-    Number(value || 0).toLocaleString("en-PH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  );
+  const num = Number(value || 0);
+  if (num === 0) return "0.00";
+  return num.toLocaleString("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
 
 const formatTime = (iso) =>
@@ -257,6 +277,37 @@ const formatTime = (iso) =>
         minute: "2-digit",
       })
     : "—";
+
+const PesoSign = {
+  render() {
+    return h(
+      "svg",
+      {
+        xmlns: "http://www.w3.org/2000/svg",
+        width: "28",
+        height: "28",
+        viewBox: "0 0 24 24",
+        fill: "currentColor",
+        stroke: "none",
+      },
+      [
+        h(
+          "text",
+          {
+            x: "50%",
+            y: "50%",
+            "dominant-baseline": "central",
+            "text-anchor": "middle",
+            "font-size": "18",
+            "font-weight": "600",
+            "font-family": "Arial, sans-serif",
+          },
+          "₱",
+        ),
+      ],
+    );
+  },
+};
 
 const fetchDashboardData = async () => {
   isLoading.value = true;
@@ -440,6 +491,11 @@ const fetchDashboardData = async () => {
 
 const quickActions = [
   {
+    icon: PesoSign,
+    text: "Process Sale",
+    onClick: () => router.push("/admin/sales"),
+  },
+  {
     icon: Plus,
     text: "Add New Product",
     onClick: () => router.push("/admin/inventory"),
@@ -448,11 +504,6 @@ const quickActions = [
     icon: Package,
     text: "View Inventory",
     onClick: () => router.push("/admin/inventory"),
-  },
-  {
-    icon: DollarSign,
-    text: "Process Sale",
-    onClick: () => router.push("/admin/sales"),
   },
   {
     icon: RefreshCw,
@@ -528,11 +579,20 @@ onMounted(() => {
   font-weight: 500;
 }
 
+.stat-value-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
 .stat-value {
   font-size: 24px;
   font-weight: 600;
   color: #212529;
-  margin-bottom: 4px;
+  margin-bottom: 0; /* remove any bottom margin */
+  line-height: 1;
 }
 
 .stat-trend {
@@ -548,7 +608,11 @@ onMounted(() => {
 .stat-trend.positive {
   color: #28a745;
 }
-
+.branch-currency {
+  font-size: 18px;
+  font-weight: 600;
+  color: #8b4513;
+}
 .empty-state {
   text-align: center;
   padding: 28px 0;
@@ -739,6 +803,21 @@ onMounted(() => {
 .action-item:hover {
   background: #fff4e6;
   border-color: #8b4513;
+  color: #8b4513;
+}
+
+.toggle-amounts-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.toggle-amounts-btn:hover {
   color: #8b4513;
 }
 
