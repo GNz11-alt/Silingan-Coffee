@@ -411,10 +411,9 @@
               <div class="crd-label">Cash Received</div>
                 <input
                   class="crd-amount"
-                  type="number"
+                  type="text"
                   inputmode="decimal"
-                  min="0"
-                  :value="cashReceived"
+                  :value="cashReceived || ''"
                   @input="onManualCashInput"
                   @keydown.enter.prevent="$event.target.blur()"
                   placeholder="0.00"
@@ -851,7 +850,28 @@ const cashReceived = computed(() =>
 );
 
 const onManualCashInput = (e) => {
-  const val = parseFloat(e.target.value);
+  // Strip anything that isn't a digit or decimal point
+  let raw = e.target.value.replace(/[^\d.]/g, "");
+
+  // Only allow one decimal point
+  const parts = raw.split(".");
+  if (parts.length > 2) raw = parts[0] + "." + parts.slice(1).join("");
+
+  // Cap integer part to 7 digits (max ₱9,999,999)
+  if (parts[0].length > 7) {
+    parts[0] = parts[0].slice(0, 7);
+    raw = parts.length > 1 ? parts[0] + "." + parts[1] : parts[0];
+  }
+
+  // Cap decimal part to 2 digits
+  if (parts.length > 1 && parts[1].length > 2) {
+    raw = parts[0] + "." + parts[1].slice(0, 2);
+  }
+
+  // Write cleaned value back to input
+  e.target.value = raw;
+
+  const val = parseFloat(raw);
   manualOverride.value = isNaN(val) ? 0 : val;
 };
 
