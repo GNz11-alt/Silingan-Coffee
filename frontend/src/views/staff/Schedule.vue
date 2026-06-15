@@ -48,7 +48,7 @@
             <form class="availability-form" @submit.prevent>
               <div class="form-group">
                 <label>Date</label>
-                <input type="date" v-model="availForm.Date" :min="todayISO" />
+                <input type="date" v-model="availForm.Date" :min="todayISO" :max="maxDate" />
               </div>
               <div class="form-row">
                 <div class="form-group">
@@ -322,7 +322,12 @@
                     v-for="shift in day.shifts"
                     :key="shift.id"
                     class="shift-badge"
-                    style="background: #5d4037"
+                    :style="{
+                      background: '#5d4037',
+                      borderLeft:
+                        '3px solid ' +
+                        (shift.branchId ? branchColor(shift.branchId) : '#5d4037'),
+                    }"
                     @click.stop="selectedShift = shift"
                     title="View shift details"
                   >
@@ -372,7 +377,13 @@
                   {{ formatShiftDate(shift.WorkDate) }}
                 </div>
                 <div class="sched-list-meta">
-                  {{ shift.TimeIn }} – {{ shift.TimeOut }} • {{ shift.Branch }}
+                  {{ shift.TimeIn }} – {{ shift.TimeOut }} •
+                  <span
+                    v-if="shift.BranchId"
+                    class="branch-dot"
+                    :style="{ background: branchColor(shift.BranchId) }"
+                  ></span>
+                  {{ shift.Branch }}
                 </div>
               </div>
               <span class="shift-status-badge" :class="shiftStatusClass(shift.Status)">{{ shift.Status }}</span>
@@ -585,6 +596,11 @@ export default {
     todayISO() {
       return new Date().toISOString().slice(0, 10);
     },
+    maxDate() {
+      const d = new Date();
+      d.setDate(d.getDate() + 60);
+      return d.toISOString().slice(0, 10);
+    },
 
     todayLabel() {
       return new Date().toLocaleDateString("en-PH", {
@@ -649,6 +665,7 @@ export default {
             shiftDate: s.WorkDate,
             role: s.Position,
             branch: s.Branch,
+            branchId: s.BranchId,
             status: s.Status,
           };
         });
@@ -792,7 +809,25 @@ export default {
     ]);
   },
 
+  async activated() {
+    // Re-fetch schedule data when navigating back to this tab (KeepAlive)
+    if (this.employeeId) {
+      await this.loadSchedule();
+    }
+  },
+
   methods: {
+    branchColor(branchId) {
+      const colors = [
+        "#7B2D2D",
+        "#0D6E6E",
+        "#6B3FA0",
+        "#B8860B",
+        "#1E6B4F",
+        "#A0522D",
+      ];
+      return colors[branchId % colors.length];
+    },
     async resolveBranchId() {
       const slug = localStorage.getItem("branch");
       if (!slug || slug === "all") return null;
@@ -885,11 +920,6 @@ export default {
 
     async loadSchedule() {
       if (!this.employeeId) return;
-      const cached = loadCache(CACHE_KEY_SCHEDULE);
-      if (cached) {
-        this.mySchedules = cached;
-        return;
-      }
       this.loadingSchedule = true;
       try {
         const { data, error } = await supabase
@@ -908,10 +938,10 @@ export default {
           TimeIn: s.StartTime ? s.StartTime.slice(0, 5) : "",
           TimeOut: s.EndTime ? s.EndTime.slice(0, 5) : "",
           Branch: s.branch?.BranchName || "",
+          BranchId: s.BranchId,
           Position: s.Role || "",
           Status: s.Status || "Scheduled",
         }));
-        saveCache(CACHE_KEY_SCHEDULE, this.mySchedules);
       } catch (err) {
         console.error("loadSchedule:", err);
         this.showToast("Failed to load schedule.", "error");
@@ -995,6 +1025,36 @@ export default {
       if (!this.availForm.TimeIn || !this.availForm.TimeOut) {
         this.showToast("Please set time in and time out.", "error");
         return;
+      }
+      if (this.availForm.TimeOut <= this.availForm.TimeIn) {
+        this.showToast("Time out must be after time in.", "error");
+        return;
+      }
+      const branchId = this.currentEmployee?.BranchAssigned;
+      if (branchId) {
+        const dayOfWeek = new Date(this.availForm.Date + "T12:00:00").getDay();
+        const { data: hours } = await supabase
+          .from("branch_operating_hours")
+          .select("opentime, closetime, isopen")
+          .eq("branchid", branchId)
+          .eq("dayofweek", dayOfWeek)
+          .maybeSingle();
+        if (hours) {
+          if (!hours.isopen) {
+            this.showToast("Branch is closed on this day.", "error");
+            return;
+          }
+          const open = hours.opentime?.slice(0, 5);
+          const close = hours.closetime?.slice(0, 5);
+          if (open && this.availForm.TimeIn < open) {
+            this.showToast(`Time in must be at or after opening (${open}).`, "error");
+            return;
+          }
+          if (close && this.availForm.TimeOut > close) {
+            this.showToast(`Time out must be at or before closing (${close}).`, "error");
+            return;
+          }
+        }
       }
       this.savingAvail = true;
       try {
@@ -1977,7 +2037,16 @@ export default {
     margin-bottom: 0.3rem;
   }
 
-  .shift-badge {
+.branch-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+.shift-badge {
     padding: 0.3rem 0.4rem;
     font-size: 0.65rem;
   }

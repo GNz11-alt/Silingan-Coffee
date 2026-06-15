@@ -6,13 +6,21 @@
         <h4 class="page-title mb-1">Shift Management</h4>
         <p class="page-sub mb-0">Manage staff, availability, and schedules</p>
       </div>
-      <button
-        class="btn btn-primary-brand"
-        @click="openCreateModal"
-        :disabled="employeesLoading"
-      >
-        <i class="bi bi-plus-lg me-1"></i> Create Schedule
-      </button>
+      <div class="d-flex gap-2">
+        <button
+          class="btn btn-outline-brand"
+          @click="openOperatingHours"
+        >
+          <i class="bi bi-clock me-1"></i> Hours
+        </button>
+        <button
+          class="btn btn-primary-brand"
+          @click="openCreateModal"
+          :disabled="employeesLoading"
+        >
+          <i class="bi bi-plus-lg me-1"></i> Create Schedule
+        </button>
+      </div>
     </div>
 
     <div v-if="isLoading" class="text-center py-5">
@@ -108,7 +116,11 @@
                     {{ emp.firstName }} {{ emp.lastName }}
                   </div>
                   <div class="emp-row-pos">
-                    {{ emp.position }} � {{ emp.branchName }}
+                    <span
+                      class="branch-dot"
+                      :style="{ background: branchColor(emp.branchAssigned || emp.id) }"
+                    ></span>
+                    {{ emp.position }} · {{ emp.branchName }}
                   </div>
                 </div>
                 <span
@@ -163,7 +175,14 @@
                         {{ formatDate(avail.availableDate) }} &nbsp;<i
                           class="bi bi-clock"
                         ></i>
-                        {{ avail.startTime }}�{{ avail.endTime }}
+                        {{ avail.startTime }}–{{ avail.endTime }}
+                        <span v-if="avail.branchId" class="ms-1">
+                          <span
+                            class="branch-dot"
+                            :style="{ background: branchColor(avail.branchId) }"
+                          ></span>
+                          {{ branchName(avail.branchId) }}
+                        </span>
                       </div>
                       <div v-if="avail.notes" class="avail-notes">
                         {{ avail.notes }}
@@ -230,7 +249,14 @@
                       {{ formatDate(avail.availableDate) }} &nbsp;<i
                         class="bi bi-clock"
                       ></i>
-                      {{ avail.startTime }}�{{ avail.endTime }}
+                      {{ avail.startTime }}–{{ avail.endTime }}
+                      <span v-if="avail.branchId" class="ms-1">
+                        <span
+                          class="branch-dot"
+                          :style="{ background: branchColor(avail.branchId) }"
+                        ></span>
+                        {{ branchName(avail.branchId) }}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -274,8 +300,12 @@
                       <span class="avail-role">{{ inq.role }}</span>
                     </div>
                     <div class="avail-meta">
-                      <strong>{{ inq.requestType }}</strong> �
+                      <strong>{{ inq.requestType }}</strong> ·
                       {{ formatDate(inq.requestDate) }}
+                      <span v-if="inq.branchId" class="ms-1">
+                        <span class="branch-dot" :style="{ background: branchColor(inq.branchId) }"></span>
+                        {{ branchName(inq.branchId) }}
+                      </span>
                     </div>
                     <div class="avail-notes">{{ inq.reason }}</div>
                     <div
@@ -348,6 +378,10 @@
                     <div class="avail-meta">
                       <i class="bi bi-clock"></i> Requested
                       {{ formatDate(req.requestedAt) }}
+                      <span v-if="req.branchId" class="ms-1">
+                        <span class="branch-dot" :style="{ background: branchColor(req.branchId) }"></span>
+                        {{ branchName(req.branchId) }}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -497,7 +531,11 @@
                     }}
                   </div>
                   <div class="sched-list-meta">
-                    {{ sched.role }} � {{ branchName(sched.branchId) }}
+                    <span
+                      class="branch-dot"
+                      :style="{ background: branchColor(sched.branchId) }"
+                    ></span>
+                    {{ sched.role }} · {{ branchName(sched.branchId) }}
                   </div>
                 </div>
                 <div class="d-flex flex-column align-items-end gap-1">
@@ -546,34 +584,6 @@
             </button>
             <!-- View toggle -->
             <div class="ms-auto d-flex gap-1">
-              <button
-                class="btn btn-sm"
-                :class="
-                  schedViewMode === 'calendar'
-                    ? 'btn-primary-brand'
-                    : 'btn-ghost'
-                "
-                @click="
-                  schedViewMode = 'calendar';
-                  switchTab('schedule');
-                "
-              >
-                <i class="bi bi-calendar3"></i> Schedules
-              </button>
-              <button
-                class="btn btn-sm"
-                :class="
-                  schedViewMode === 'timeline'
-                    ? 'btn-primary-brand'
-                    : 'btn-ghost'
-                "
-                @click="
-                  schedViewMode = 'timeline';
-                  switchTab('schedule');
-                "
-              >
-                <i class="bi bi-clock-history"></i> Timeline
-              </button>
             </div>
           </div>
 
@@ -597,7 +607,7 @@
                   'is-today': day.isToday,
                   'is-other-month': day.isOtherMonth,
                 }"
-                @click="openCreateModal(day.dateStr)"
+                @click="openDayDetail(day)"
               >
                 <div class="day-number">
                   {{ day.dayOfMonth }}
@@ -608,7 +618,10 @@
                     v-for="shift in day.shifts.slice(0, overflowThreshold)"
                     :key="shift.id"
                     class="shift-badge"
-                    :style="{ background: avatarColor(shift.employeeId) }"
+                    :style="{
+                      background: avatarColor(shift.employeeId),
+                      borderLeft: '3px solid ' + branchColor(shift.branchId),
+                    }"
                     @click.stop="showShiftDetail = shift"
                     :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
                   >
@@ -621,7 +634,7 @@
                     @click.stop="openDayDetail(day)"
                   >
                     <span class="overflow-pill-label"
-                      >+{{ day.shifts.length - overflowThreshold }} more</span
+                      >View all {{ day.shifts.length }} shifts</span
                     >
                     <span class="overflow-pill-avatars">
                       <span
@@ -642,117 +655,7 @@
               </div>
             </div>
           </div>
-
-          <!-- Timeline -->
-          <div v-if="schedViewMode === 'timeline'" class="timeline-container">
-            <div class="timeline-nav mb-2">
-              <button
-                class="btn btn-ghost btn-sm"
-                @click="timelineDateOffset -= 1"
-              >
-                <i class="bi bi-chevron-left"></i>
-              </button>
-              <span class="timeline-date-label">{{ timelineDateLabel }}</span>
-              <button
-                class="btn btn-ghost btn-sm"
-                @click="timelineDateOffset = 0"
-              >
-                Today
-              </button>
-              <button
-                class="btn btn-ghost btn-sm"
-                @click="timelineDateOffset += 1"
-              >
-                <i class="bi bi-chevron-right"></i>
-              </button>
-            </div>
-            <div class="timeline-scroll">
-              <div class="timeline-grid">
-                <div class="timeline-col timeline-time-col">
-                  <div class="timeline-corner"></div>
-                  <div
-                    v-for="h in timelineHours"
-                    :key="h"
-                    class="timeline-hour-label"
-                  >
-                    {{ String(h).padStart(2, "0") }}:00
-                  </div>
-                </div>
-                <div
-                  v-for="branch in timelineBranches"
-                  :key="branch.branchId"
-                  class="timeline-col timeline-branch-col"
-                >
-                  <div
-                    class="timeline-branch-header"
-                    :style="{ borderLeftColor: branch.color }"
-                  >
-                    <span
-                      class="timeline-branch-dot"
-                      :style="{ background: branch.color }"
-                    ></span>
-                    {{ branch.branchName }}
-                  </div>
-                  <div class="timeline-branch-body">
-                    <div
-                      v-for="shift in branch.shifts"
-                      :key="shift.id"
-                      class="timeline-shift"
-                      :style="{
-                        top: timeToPosition(shift.startTime) + 'px',
-                        height:
-                          timeToHeight(shift.startTime, shift.endTime) + 'px',
-                        background: avatarColor(shift.employeeId),
-                      }"
-                      @click.stop="showShiftDetail = shift"
-                      :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
-                    >
-                      <div
-                        v-if="
-                          timeToHeight(shift.startTime, shift.endTime) >= 28
-                        "
-                        class="timeline-shift-name"
-                      >
-                        {{ shift.employeeName }}
-                      </div>
-                      <div
-                        v-if="
-                          timeToHeight(shift.startTime, shift.endTime) >= 28
-                        "
-                        class="timeline-shift-time"
-                      >
-                        {{ shift.startTime }}–{{ shift.endTime }}
-                      </div>
-                    </div>
-                    <div
-                      v-if="isTimelineToday"
-                      class="timeline-now-line"
-                      :style="{ top: currentTimeTop + 'px' }"
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Legend -->
-          <div v-if="schedEmployees.length" class="employee-legend mt-2">
-            <span class="legend-label">Staff:</span>
-            <span
-              v-for="emp in schedEmployees"
-              :key="emp.id"
-              class="legend-item"
-              :title="emp.name"
-            >
-              <span
-                class="legend-swatch"
-                :style="{ background: avatarColor(emp.id) }"
-              ></span>
-              {{ emp.name }}
-            </span>
-          </div>
         </div>
-        <!-- end right-panel -->
       </div>
       <!-- end split-layout -->
     </template>
@@ -787,6 +690,14 @@
             </button>
           </div>
           <div class="modal-panel-body">
+            <div
+              v-if="isPastEdit"
+              class="alert alert-warning py-2 px-3 mb-3"
+              style="font-size: 0.85rem"
+            >
+              <i class="bi bi-clock-history me-1"></i>
+              This shift is in the past. Only the status can be changed.
+            </div>
             <div class="row g-3">
               <div class="col-12">
                 <label class="form-label-sm">Staff</label>
@@ -799,7 +710,7 @@
                     :placeholder="
                       employeesLoading ? 'Loading staff…' : 'Search staff...'
                     "
-                    :disabled="employeesLoading"
+                    :disabled="employeesLoading || isPastEdit"
                     @focus="onStaffSearchFocus"
                     @blur="onStaffSearchBlur"
                     @input="onStaffSearchInput"
@@ -833,14 +744,21 @@
                 <div v-if="errors.employeeId" class="text-danger small mt-1">
                   {{ errors.employeeId }}
                 </div>
+                <div
+                  v-if="employeeConflictMsg && !errors.employeeId"
+                  class="text-warning small mt-1 d-flex align-items-center gap-1"
+                >
+                  <i class="bi bi-exclamation-triangle"></i>
+                  {{ employeeConflictMsg }}
+                </div>
               </div>
               <div class="col-12">
                 <label class="form-label-sm">Role</label>
                 <div v-if="form.employeeId && !showRoleOverride" class="d-flex align-items-center gap-2">
                   <span class="badge" style="background:#31201d;font-size:0.85rem;padding:6px 14px">{{ form.role || '—' }}</span>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" @click="showRoleOverride = true">Change</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" :disabled="isPastEdit" @click="showRoleOverride = true">Change</button>
                 </div>
-                <select v-show="!form.employeeId || showRoleOverride" v-model="form.role" class="form-select fc-brand" :disabled="!form.employeeId">
+                <select v-show="!form.employeeId || showRoleOverride" v-model="form.role" class="form-select fc-brand" :disabled="!form.employeeId || isPastEdit">
                   <option value="" disabled>Select role</option>
                   <option v-for="r in roles" :key="r" :value="r">
                     {{ r }}
@@ -852,15 +770,32 @@
               </div>
               <div class="col-12">
                 <label class="form-label-sm">Shift Date</label>
-                <input
-                  v-model="form.shiftDate"
-                  type="date"
-                  class="form-control fc-brand"
-                  :disabled="!form.employeeId"
-                  :min="todayStr"
-                />
+                  <input
+                    v-model="form.shiftDate"
+                    type="date"
+                    class="form-control fc-brand"
+                    :disabled="!form.employeeId || isPastEdit"
+                    :min="todayStr"
+                    :max="maxDateStr"
+                  />
                 <div v-if="errors.shiftDate" class="text-danger small mt-1">
                   {{ errors.shiftDate }}
+                </div>
+              </div>
+              <div v-if="formQuickPeriods.length" class="col-12 mb-2">
+                <label class="form-label-sm">Quick Select</label>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button
+                    v-for="p in formQuickPeriods"
+                    :key="p.id ?? p.periodname"
+                    type="button"
+                    class="btn btn-sm"
+                    :class="form.startTime === (p.starttime?.slice(0,5) || '') && form.endTime === (p.endtime?.slice(0,5) || '') ? 'btn-brand' : 'btn-outline-brand'"
+                    :disabled="isPastEdit"
+                    @click="selectPeriod(p)"
+                  >
+                    {{ p.periodname }}
+                  </button>
                 </div>
               </div>
               <div class="col-6">
@@ -869,8 +804,16 @@
                   v-model="form.startTime"
                   type="time"
                   class="form-control fc-brand"
-                  :disabled="!form.employeeId"
+                  :disabled="!form.employeeId || isPastEdit"
+                  :min="formOperatingHours?.openTime"
+                  :max="formOperatingHours?.closeTime"
                 />
+                <div v-if="formOperatingHours && !formOperatingHours.isOpen" class="text-warning small mt-1">
+                  Branch is closed on this day
+                </div>
+                <div v-else-if="formOperatingHours" class="text-muted small mt-1">
+                  Hours: {{ formOperatingHours.openTime }}–{{ formOperatingHours.closeTime }}
+                </div>
                 <div v-if="errors.startTime" class="text-danger small mt-1">
                   {{ errors.startTime }}
                 </div>
@@ -881,7 +824,9 @@
                   v-model="form.endTime"
                   type="time"
                   class="form-control fc-brand"
-                  :disabled="!form.employeeId"
+                  :disabled="!form.employeeId || isPastEdit"
+                  :min="form.startTime || formOperatingHours?.openTime"
+                  :max="formOperatingHours?.closeTime"
                 />
                 <div v-if="errors.endTime" class="text-danger small mt-1">
                   {{ errors.endTime }}
@@ -954,6 +899,54 @@
             </button>
             <button class="btn btn-danger-brand" @click="confirmConflictSave">
               Save Anyway
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ROLE CAPACITY REACHED -->
+    <Teleport to="body">
+      <div v-if="showRoleCapModal" class="modal-overlay">
+        <div
+          style="position: absolute; inset: 0; z-index: 0"
+        ></div>
+        <div
+          class="modal-panel modal-panel--sm"
+          style="position: relative; z-index: 1"
+          @click.stop
+        >
+          <div class="modal-panel-header">
+            <h5 class="mb-0">Role Capacity Reached</h5>
+            <button
+              class="btn-close-panel"
+              @click="showRoleCapModal = false"
+            >
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="modal-panel-body">
+            <p v-if="roleCapInfo">
+              The role <strong>{{ roleCapInfo.role }}</strong> already has
+              <strong>{{ roleCapInfo.count }}</strong> staff scheduled for this
+              time slot (max {{ roleCapInfo.cap }} per role).
+            </p>
+            <p v-if="roleCapInfo?.staff?.length" class="mb-2">
+              <strong>Scheduled staff:</strong>
+            </p>
+            <ul v-if="roleCapInfo?.staff?.length" class="role-cap-staff-list">
+              <li v-for="(s, i) in roleCapInfo.staff" :key="i">
+                {{ s.name }} — {{ s.startTime }}–{{ s.endTime }}
+              </li>
+            </ul>
+            <p class="mb-0">Please choose a different shift or role.</p>
+          </div>
+          <div class="modal-panel-footer">
+            <button class="btn btn-ghost" @click="showRoleCapModal = false">
+              Cancel
+            </button>
+            <button class="btn btn-primary-brand" @click="changeShift">
+              Change Shift
             </button>
           </div>
         </div>
@@ -1059,9 +1052,15 @@
                 </div>
                 <div class="shift-detail-row">
                   <span class="label">Branch:</span
-                  ><span class="value">{{
-                    branchName(showShiftDetail.branchId)
-                  }}</span>
+                  ><span class="value">
+                    <span
+                      class="branch-dot"
+                      :style="{
+                        background: branchColor(showShiftDetail.branchId),
+                      }"
+                    ></span>
+                    {{ branchName(showShiftDetail.branchId) }}</span
+                  >
                 </div>
                 <div class="shift-detail-row">
                   <span class="label">Status:</span
@@ -1102,7 +1101,11 @@
               }}</span>
             </div>
             <div class="day-detail-header-actions">
+              <span v-if="isPastDate(showDayDetail.dateStr)" class="badge-status badge-inactive" style="font-size:0.75rem;padding:0.3rem 0.7rem;">
+                <i class="bi bi-lock-fill me-1"></i> Past — View only
+              </span>
               <button
+                v-else
                 class="btn btn-sm btn-primary-brand"
                 @click="
                   openCreateModal(showDayDetail.dateStr);
@@ -1118,129 +1121,100 @@
           </div>
           <div class="modal-panel-body modal-panel-body--day-detail">
             <template v-if="showDayDetail.shifts.length">
-              <div class="day-detail-timeline-wrap">
-                <div class="day-detail-timeline-grid">
-                  <div class="dtd-time-col">
-                    <div
-                      v-for="h in dayDetailHours"
-                      :key="h"
-                      class="dtd-hour-label"
-                    >
-                      {{ String(h).padStart(2, "0") }}:00
-                    </div>
-                  </div>
-                  <div
-                    v-for="group in dayDetailGroups"
-                    :key="group.branchId"
-                    class="dtd-branch-col"
-                  >
-                    <div
-                      class="dtd-branch-header"
-                      :style="{ borderLeftColor: group.color }"
-                    >
-                      <span
-                        class="dtd-branch-dot"
-                        :style="{ background: group.color }"
-                      ></span>
-                      {{ group.branchName }}
-                      <span class="dtd-branch-count">{{
-                        group.shifts.length
-                      }}</span>
-                    </div>
-                    <div
-                      class="dtd-branch-body"
-                      :style="{ height: dayDetailTimelineHeight + 'px' }"
-                    >
-                      <div
-                        v-for="shift in group.shifts"
-                        :key="shift.id"
-                        class="dtd-shift"
-                        :style="{
-                          top: timeToPosition(shift.startTime) + 'px',
-                          height:
-                            timeToHeight(shift.startTime, shift.endTime) + 'px',
-                          background: avatarColor(shift.employeeId),
-                        }"
-                        @click.stop="
-                          showShiftDetail = shift;
-                          closeDayDetail();
-                        "
-                        :title="`${shift.employeeName} — ${shift.startTime}-${shift.endTime}`"
+              <div class="dtd-period-tab-bar mb-3">
+                <button
+                  v-for="pt in dayDetailPeriodTabs"
+                  :key="pt.key"
+                  class="dtd-period-tab"
+                  :class="{ active: activeDayDetailPeriod === pt.key }"
+                  @click="activeDayDetailPeriod = pt.key"
+                >
+            {{ pt.label }}
+                  <span class="dtd-tab-count">{{ pt.count }}</span>
+                </button>
+              </div>
+              <div class="dtd-grid-scroll">
+                <table class="dtd-grid">
+                  <thead>
+                    <tr>
+                      <th class="dtd-th-role">Role</th>
+                      <th
+                        v-for="b in dayDetailBranches"
+                        :key="b.id"
+                        class="dtd-th-branch"
+                        :style="{ borderTopColor: b.color }"
                       >
-                        <div
-                          class="dtd-shift-pattern"
-                          :style="{
-                            backgroundImage: patternSVG(
-                              ACCENT_VARIANTS[empVariantIndex(shift.employeeId)]
-                                .pattern,
-                            ),
-                          }"
-                        ></div>
-                        <div
-                          class="dtd-shift-stripe"
-                          :style="{
-                            background:
-                              ACCENT_VARIANTS[empVariantIndex(shift.employeeId)]
-                                .accent,
-                          }"
-                        ></div>
-                        <div class="dtd-shift-content">
-                          <div class="dtd-shift-name">
-                            {{ shift.employeeName }}
-                          </div>
-                          <div
-                            v-if="
-                              timeToHeight(shift.startTime, shift.endTime) >= 48
-                            "
-                            class="dtd-shift-time"
-                          >
-                            {{ shift.startTime }}–{{ shift.endTime }}
-                          </div>
-                          <div
-                            v-if="
-                              timeToHeight(shift.startTime, shift.endTime) >= 72
-                            "
-                            class="dtd-shift-role-pill"
-                            :style="{
-                              background:
-                                ROLE_PILL_COLORS[shift.role] ||
-                                'rgba(255,255,255,0.5)',
-                            }"
-                          >
-                            {{ shift.role }}
-                          </div>
+                        <span class="branch-dot" :style="{ background: b.color }"></span>
+                        {{ b.name }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in dayDetailGridForPeriod" :key="row.role">
+                      <td class="dtd-td-role">{{ row.role }}</td>
+                      <td
+                        v-for="b in dayDetailBranches"
+                        :key="b.id"
+                        class="dtd-td-cell"
+                      >
+                        <div v-if="getCellCap(row.role)" class="dtd-cap-badge" :class="{ 'cap-full': (row.cells[b.id]?.length || 0) >= getCellCap(row.role) }">
+                          <span>{{ row.cells[b.id]?.length || 0 }}/{{ getCellCap(row.role) }}</span>
+                          <span v-if="(row.cells[b.id]?.length || 0) >= getCellCap(row.role)" class="cap-full-label">Full</span>
                         </div>
-                        <div class="dtd-shift-actions">
-                          <button
-                            @click.stop="
-                              openEditModal(shift);
-                              closeDayDetail();
-                            "
-                            title="Edit"
+                        <template v-if="row.cells[b.id]?.length">
+                          <div
+                            v-for="shift in row.cells[b.id]"
+                            :key="shift.id"
+                            class="dtd-cell-card"
+                            @click.stop="showShiftDetail = shift; closeDayDetail()"
                           >
-                            <i class="bi bi-pencil"></i>
-                          </button>
-                          <button
-                            @click.stop="
-                              confirmDelete(shift);
-                              closeDayDetail();
-                            "
-                            title="Archive"
+                            <div class="dtd-cell-name">{{ shift.employeeName }}</div>
+                            <div class="dtd-cell-time">{{ shift.startTime }}&#8211;{{ shift.endTime }}</div>
+                            <div v-if="!isPastDate(showDayDetail.dateStr)" class="dtd-cell-actions">
+                              <button @click.stop="openEditModal(shift); closeDayDetail()">
+                                <i class="bi bi-pencil"></i>
+                              </button>
+                              <button @click.stop="confirmDelete(shift); closeDayDetail()">
+                                <i class="bi bi-trash3"></i>
+                              </button>
+                              <button
+                                v-if="!getCellCap(row.role) || (row.cells[b.id]?.length || 0) < getCellCap(row.role)"
+                                class="dtd-cell-add-btn"
+                                title="Add shift"
+                                @click.stop="openCreateFromGrid(b.id, row.role)"
+                              >
+                                <i class="bi bi-plus-lg"></i>
+                              </button>
+                            </div>
+                          </div>
+                        </template>
+                        <span
+                          v-else-if="!isPastDate(showDayDetail.dateStr)"
+                        >
+                          <span
+                            v-if="!getCellCap(row.role) || (row.cells[b.id]?.length || 0) < getCellCap(row.role)"
+                            class="dtd-cell-empty"
+                            title="Add shift"
+                            @click.stop="openCreateFromGrid(b.id, row.role)"
                           >
-                            <i class="bi bi-trash3"></i>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                            <span class="dtd-cell-empty-icon">+</span>
+                          </span>
+                          <span v-else class="dtd-cell-full-label">Full</span>
+                        </span>
+                        <span v-else class="dtd-cell-empty-past">&mdash;</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </template>
             <template v-else>
               <div class="day-detail-empty">
                 <i class="bi bi-calendar2-x"></i>
-                <p>No shifts scheduled for this day.</p>
+                <p v-if="isPastDate(showDayDetail.dateStr)">No shifts were scheduled for this day.</p>
+                <p v-else>No shifts scheduled for this day.</p>
                 <button
+                  v-if="!isPastDate(showDayDetail.dateStr)"
                   class="btn btn-primary-brand btn-sm"
                   @click="
                     openCreateModal(showDayDetail.dateStr);
@@ -1251,6 +1225,116 @@
                 </button>
               </div>
             </template>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- OPERATING HOURS / PERIODS MODAL -->
+    <Teleport to="body">
+      <div v-if="showOperatingHoursModal" class="modal-overlay">
+        <div style="position: absolute; inset: 0; z-index: 0" @click="closeOperatingHours"></div>
+        <div class="modal-panel" style="max-width: 620px; position: relative; z-index: 1" @click.stop>
+          <div class="modal-panel-header">
+            <div>
+              <h5 class="mb-0">Operating Hours &amp; Periods</h5>
+              <p class="text-muted small mb-0 mt-1">Set hours and shift periods for your branch</p>
+            </div>
+            <button class="btn-close-panel" @click="closeOperatingHours">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="oh-tab-bar">
+            <button class="oh-tab-btn" :class="{ active: showOhTab === 'hours' }" @click="showOhTab = 'hours'">
+              <i class="bi bi-clock me-1"></i> Hours
+            </button>
+            <button class="oh-tab-btn" :class="{ active: showOhTab === 'periods' }" @click="openPeriodsTab">
+              <i class="bi bi-layers me-1"></i> Periods
+            </button>
+          </div>
+          <div class="modal-panel-body" style="max-height: 70vh; overflow-y: auto">
+            <!-- Hours tab -->
+            <template v-if="showOhTab === 'hours'">
+              <table class="oh-table" v-if="ohDays.length">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Open</th>
+                    <th>Close</th>
+                    <th class="text-center">Open?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="day in ohDays" :key="day.dayOfWeek">
+                    <td class="oh-day-label">{{ dayLabels[day.dayOfWeek] }}</td>
+                    <td>
+                      <input v-model="day.openTime" type="time" class="form-control fc-brand" :disabled="!day.isOpen" />
+                    </td>
+                    <td>
+                      <input v-model="day.closeTime" type="time" class="form-control fc-brand" :disabled="!day.isOpen" />
+                    </td>
+                    <td class="text-center">
+                      <input type="checkbox" v-model="day.isOpen" class="form-check-input" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </template>
+            <!-- Periods tab -->
+            <template v-if="showOhTab === 'periods'">
+              <div class="mb-2 d-flex justify-content-between align-items-center">
+                <small class="text-muted">Define shift periods for your branch</small>
+                <button class="btn btn-sm btn-outline-brand" @click="autoSuggestPeriods">
+                  <i class="bi bi-magic me-1"></i> Suggest
+                </button>
+              </div>
+              <table class="oh-table">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th style="width:60px">Max/Role</th>
+                    <th style="width:40px"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(p, i) in branchPeriods" :key="i">
+                    <td>
+                      <input v-model="p.periodName" class="form-control fc-brand" placeholder="e.g. Morning" />
+                    </td>
+                    <td>
+                      <input v-model="p.startTime" type="time" class="form-control fc-brand" />
+                    </td>
+                    <td>
+                      <input v-model="p.endTime" type="time" class="form-control fc-brand" />
+                    </td>
+                    <td>
+                      <input v-model.number="p.maxPerRole" type="number" min="1" max="10" class="form-control fc-brand" style="width:60px" />
+                    </td>
+                    <td class="text-center">
+                      <button class="btn btn-sm btn-ghost text-danger p-0" @click="removePeriod(i)" title="Remove">
+                        <i class="bi bi-x-lg"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <button class="btn btn-sm btn-ghost mt-2" @click="addPeriod">
+                <i class="bi bi-plus-lg me-1"></i> Add Period
+              </button>
+            </template>
+          </div>
+          <div class="modal-panel-footer d-flex justify-content-end gap-2">
+            <button class="btn btn-ghost" @click="closeOperatingHours">Cancel</button>
+            <button
+              class="btn btn-primary-brand"
+              @click="showOhTab === 'hours' ? saveOperatingHoursAction() : savePeriods(managerBranchId)"
+              :disabled="ohSaving || periodsSaving"
+            >
+              <span v-if="ohSaving || periodsSaving" class="spinner-border spinner-border-sm me-1"></span>
+              {{ showOhTab === 'hours' ? 'Save Hours' : 'Save Periods' }}
+            </button>
           </div>
         </div>
       </div>
@@ -1507,6 +1591,7 @@ defineOptions({ name: "ManagerSchedule" });
 import { ref, computed, onMounted, watch, onUnmounted, nextTick } from "vue";
 import { supabase } from "@/supabase.js";
 import { useUserBranch } from "@/composables/useUserBranch.js";
+import { useOperatingHours } from "@/composables/useOperatingHours.js";
 import {
   getMonthStart,
   toLocalDateKey,
@@ -1565,16 +1650,14 @@ const schedRangeStart = ref("");
 const schedRangeEnd = ref("");
 const schedDateFilter = ref("");
 const schedStatusFilter = ref("");
-const schedViewMode = ref("table"); // "table", "calendar", or "timeline"
-const timelineDateOffset = ref(0);
-const TLINE_ROW_HEIGHT = 48;
-const TLINE_AXIS_START = 6;
-const TLINE_AXIS_END = 22;
+const schedViewMode = ref("table");
 const monthOffset = ref(0); // 0 = current month, -1 = last month, +1 = next month
 const showModal = ref(false);
 const showShiftDetail = ref(null);
 const showConflictConfirm = ref(false);
 const showDayDetail = ref(null);
+const dayDetailBackup = ref(null);
+const activeDayDetailPeriod = ref('all');
 const conflictInfo = ref(null);
 const employeesLoading = ref(true);
 const showDeleteConfirm = ref(false);
@@ -1584,7 +1667,211 @@ const deleteTarget = ref(null);
 const toast = ref({ show: false, message: "", type: "success" });
 const errors = ref({});
 
-// ── Staff ─────────────────────────────────────────────────
+// ── Operating Hours ─────────────────────────────────────────
+const showOperatingHoursModal = ref(false);
+const ohDays = ref([]);
+const ohSaving = ref(false);
+const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const {
+  hoursByBranch,
+  fetchOperatingHours,
+  saveOperatingHours,
+  getHoursForDay,
+} = useOperatingHours();
+
+const openOperatingHours = async () => {
+  showOperatingHoursModal.value = true;
+  await nextTick();
+  const days = await fetchOperatingHours(managerBranchId.value);
+  ohDays.value = days || [];
+};
+
+const saveOperatingHoursAction = async () => {
+  ohSaving.value = true;
+  try {
+    const success = await saveOperatingHours(managerBranchId.value, ohDays.value);
+    if (success) showToast("Operating hours saved.", "success");
+    closeOperatingHours();
+  } catch (e) {
+    showToast("Failed to save operating hours.", "error");
+  } finally {
+    ohSaving.value = false;
+  }
+};
+
+const closeOperatingHours = () => {
+  showOperatingHoursModal.value = false;
+};
+
+// ── Shift Periods ─────────────────────────────────────────
+const showOhTab = ref("hours");
+const allPeriods = ref([]);
+const branchPeriods = ref([]);
+const periodsSaving = ref(false);
+
+async function fetchPeriods(branchId) {
+  try {
+    const { data, error } = await supabase
+      .from("branch_shift_periods")
+      .select("*")
+      .eq("branchid", branchId)
+      .order("starttime");
+    if (error) throw error;
+    const list = data || [];
+    allPeriods.value = allPeriods.value.filter((p) => p.branchid !== branchId).concat(list);
+    return list;
+  } catch (e) {
+    console.warn("fetchPeriods error:", e);
+    return [];
+  }
+}
+
+async function savePeriods(branchId) {
+  if (!hoursByBranch.value[branchId]) {
+    await fetchOperatingHours(branchId);
+  }
+  const days = hoursByBranch.value[branchId];
+  let effectiveOpen = "00:00";
+  let effectiveClose = "23:59";
+  if (days?.length) {
+    const openDays = days.filter((d) => d.isOpen);
+    if (openDays.length) {
+      effectiveOpen = openDays[0].openTime;
+      effectiveClose = openDays[0].closeTime;
+      for (const d of openDays) {
+        if (d.openTime < effectiveOpen) effectiveOpen = d.openTime;
+        if (d.closeTime > effectiveClose) effectiveClose = d.closeTime;
+      }
+    }
+  }
+  for (const p of branchPeriods.value) {
+    if (!p.periodName?.trim()) {
+      showToast("Each period must have a name.", "error");
+      return;
+    }
+    if (!p.startTime || !p.endTime) {
+      showToast(`Period "${p.periodName}" is missing start or end time.`, "error");
+      return;
+    }
+    if (p.startTime >= p.endTime) {
+      showToast(`Period "${p.periodName}" start time must be before end time.`, "error");
+      return;
+    }
+    if (p.startTime < effectiveOpen) {
+      showToast(`Period "${p.periodName}" start time (${p.startTime}) is before branch opening time (${effectiveOpen}).`, "error");
+      return;
+    }
+    if (p.endTime > effectiveClose) {
+      showToast(`Period "${p.periodName}" end time (${p.endTime}) is after branch closing time (${effectiveClose}).`, "error");
+      return;
+    }
+  }
+  periodsSaving.value = true;
+  try {
+    const { data: existing } = await supabase
+      .from("branch_shift_periods")
+      .select("id")
+      .eq("branchid", branchId);
+    const existingIds = new Set((existing || []).map((r) => r.id));
+    const keepIds = new Set();
+    for (const p of branchPeriods.value) {
+      if (p.id) {
+        keepIds.add(p.id);
+        const { error } = await supabase
+          .from("branch_shift_periods")
+          .update({ periodname: p.periodName, starttime: p.startTime, endtime: p.endTime, maxperrole: p.maxPerRole })
+          .eq("id", p.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("branch_shift_periods")
+          .insert({ branchid: branchId, periodname: p.periodName, starttime: p.startTime, endtime: p.endTime, maxperrole: p.maxPerRole })
+          .select();
+        if (error) throw error;
+        if (data) keepIds.add(data[0].id);
+      }
+    }
+    for (const id of existingIds) {
+      if (!keepIds.has(id)) {
+        await supabase.from("branch_shift_periods").delete().eq("id", id);
+      }
+    }
+    await fetchPeriods(branchId);
+    showToast("Shift periods saved.", "success");
+  } catch (e) {
+    showToast("Failed to save periods.", "error");
+  } finally {
+    periodsSaving.value = false;
+  }
+}
+
+async function openPeriodsTab() {
+  showOhTab.value = "periods";
+  const bid = managerBranchId.value;
+  if (!bid) return;
+  const list = await fetchPeriods(bid);
+  branchPeriods.value = list.map((p) => ({
+    id: p.id,
+    periodName: p.periodname,
+    startTime: p.starttime.slice(0, 5),
+    endTime: p.endtime.slice(0, 5),
+    maxPerRole: p.maxperrole,
+  }));
+  if (!branchPeriods.value.length) autoSuggestPeriods();
+}
+
+function autoSuggestPeriods() {
+  branchPeriods.value = [
+    { id: null, periodName: "Morning", startTime: "06:00", endTime: "12:00", maxPerRole: 2 },
+    { id: null, periodName: "Afternoon", startTime: "12:00", endTime: "18:00", maxPerRole: 2 },
+    { id: null, periodName: "Evening", startTime: "18:00", endTime: "22:00", maxPerRole: 2 },
+  ];
+}
+
+function addPeriod() {
+  branchPeriods.value.push({ id: null, periodName: "", startTime: "08:00", endTime: "17:00", maxPerRole: 2 });
+}
+
+function removePeriod(index) {
+  branchPeriods.value.splice(index, 1);
+}
+
+const periodsByBranch = computed(() => {
+  const groups = {};
+  for (const p of allPeriods.value) {
+    if (!groups[p.branchid]) groups[p.branchid] = [];
+    groups[p.branchid].push(p);
+  }
+  return groups;
+});
+
+const dayDetailColumnGroups = computed(() => {
+  return dayDetailBranches.value.map((b) => {
+    const periods = periodsByBranch.value[b.id] || [];
+    return {
+      branchId: b.id,
+      name: b.name,
+      color: b.color,
+      periods: periods.length ? periods : [{ id: null, periodname: "All Day", starttime: null, endtime: null }],
+      colspan: Math.max(periods.length, 1),
+    };
+  });
+});
+
+function getShiftsForPeriod(shifts, period) {
+  if (!shifts?.length) return [];
+  if (!period?.starttime) return shifts;
+  return shifts.filter((s) => timesOverlap(s.startTime, s.endTime, period.starttime.slice(0, 5), period.endtime.slice(0, 5)));
+}
+
+function getCellCap(role) {
+  const tabs = dayDetailPeriodTabs.value;
+  const activeKey = activeDayDetailPeriod.value;
+  const activePt = tabs.find(t => t.key === activeKey);
+  if (!activePt || activeKey === 'all' || !activePt.periodObj?.maxperrole) return null;
+  return role === 'Manager' ? 1 : activePt.periodObj.maxperrole;
+}
+
 const staffLoading = ref(false);
 const staffSearch = ref("");
 const staffFilterDept = ref("");
@@ -1868,6 +2155,7 @@ window.addEventListener("beforeunload", () => {
 const roles = [
   "Barista",
   "Cashier",
+  "Delivery Staff",
   "Kitchen Staff",
   "Cleaning Staff",
   "Server",
@@ -1879,6 +2167,7 @@ const emptyForm = () => ({
   employeeId: "",
   role: "",
   shiftDate: "",
+  branchLocked: false,
   startTime: "",
   endTime: "",
   branchId: "",
@@ -1886,13 +2175,53 @@ const emptyForm = () => ({
 });
 const form = ref(emptyForm());
 
+const formOperatingHours = computed(() => {
+  if (!form.value.branchId || !form.value.shiftDate) return null;
+  const d = new Date(form.value.shiftDate + "T12:00:00");
+  const dayOfWeek = d.getDay();
+  return getHoursForDay(form.value.branchId, dayOfWeek);
+});
+
+const formQuickPeriods = computed(() => {
+  const bid = form.value.branchId;
+  if (!bid) return [];
+  const defined = periodsByBranch.value[bid];
+  if (defined?.length) return defined;
+  const days = hoursByBranch.value[bid];
+  if (!days?.length) return [];
+  // Use the first open day's hours to generate fallback periods
+  const firstOpen = days.find(d => d.isOpen);
+  if (!firstOpen) return [];
+  const o = firstOpen.openTime;
+  const c = firstOpen.closeTime;
+  const morningEnd = "12:00" > c ? c : "12:00";
+  const afternoonStart = "12:00" < o ? o : "12:00";
+  const afternoonEnd = "18:00" > c ? c : "18:00";
+  const eveningStart = "18:00" < o ? o : "18:00";
+  return [
+    { id: null, periodname: "Morning", starttime: o, endtime: morningEnd },
+    { id: null, periodname: "Afternoon", starttime: afternoonStart, endtime: afternoonEnd },
+    { id: null, periodname: "Evening", starttime: eveningStart, endtime: c },
+  ].filter((p) => p.starttime < p.endtime);
+});
+
 const staffSearchText = ref("");
 const staffDropdownOpen = ref(false);
 const staffHighlightIndex = ref(-1);
 const staffSearchInputRef = ref(null);
 const showRoleOverride = ref(false);
+const employeeConflictMsg = ref("");
 
 const todayStr = computed(() => toLocalDateKey(new Date()));
+const maxDateStr = computed(() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 60);
+  return toLocalDateKey(d);
+});
+const isPastEdit = computed(() => {
+  if (!isEditing.value || !form.value.shiftDate) return false;
+  return form.value.shiftDate < todayStr.value;
+});
 
 const pendingCount = computed(
   () => availability.value.filter((a) => a.status === "Pending").length,
@@ -1958,27 +2287,103 @@ const filteredSchedules = computed(() => {
   });
 });
 
-const dayDetailGroups = computed(() => {
+const dayDetailBranches = computed(() => {
   if (!showDayDetail.value) return [];
-  const groups = {};
+  const seen = new Set();
+  const list = [];
   for (const s of showDayDetail.value.shifts) {
-    const branchId = s.branchId;
-    if (!groups[branchId]) {
-      groups[branchId] = {
-        branchId,
-        branchName: branchName(branchId),
-        color: avatarColor(branchId),
-        shifts: [],
-      };
+    if (!seen.has(s.branchId)) {
+      seen.add(s.branchId);
+      list.push({ id: s.branchId, name: branchName(s.branchId), color: branchColor(s.branchId) });
     }
-    groups[branchId].shifts.push(s);
   }
-  for (const g of Object.values(groups)) {
-    g.shifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
+  return list.sort((a, b) => a.name.localeCompare(b.name));
+});
+
+const dayDetailGrid = computed(() => {
+  if (!showDayDetail.value) return [];
+  const gridMap = {};
+  for (const role of roles) {
+    gridMap[role] = {};
   }
-  return Object.values(groups).sort((a, b) =>
-    a.branchName.localeCompare(b.branchName),
-  );
+  for (const s of showDayDetail.value.shifts) {
+    const role = s.role || "Unassigned";
+    if (!gridMap[role]) gridMap[role] = {};
+    if (!gridMap[role][s.branchId]) gridMap[role][s.branchId] = [];
+    gridMap[role][s.branchId].push(s);
+  }
+  const orderedRoles = roles.includes("Unassigned")
+    ? roles
+    : [...roles, "Unassigned"];
+  for (const role of Object.keys(gridMap)) {
+    for (const bid of Object.keys(gridMap[role])) {
+      if (gridMap[role][bid]?.length) {
+        gridMap[role][bid].sort((a, b) => a.startTime.localeCompare(b.startTime));
+      }
+    }
+  }
+  return orderedRoles
+    .filter((r) => r in gridMap)
+    .map((role) => ({ role, cells: gridMap[role] }));
+});
+
+const dayDetailPeriodTabs = computed(() => {
+  if (!showDayDetail.value) return [];
+  const shifts = showDayDetail.value.shifts;
+  const seenPeriods = new Map();
+  for (const bid of dayDetailBranches.value.map(b => b.id)) {
+    const periods = periodsByBranch.value[bid] || [];
+    if (!periods.length) {
+      if (!seenPeriods.has('all')) seenPeriods.set('all', { key: 'all', label: 'All Day', startTime: null, endTime: null });
+    } else {
+      for (const p of periods) {
+        const key = p.periodname?.toLowerCase().replace(/\s+/g, '_') || 'all';
+        if (!seenPeriods.has(key)) {
+          seenPeriods.set(key, {
+            key,
+            label: p.periodname,
+            startTime: p.starttime?.slice(0, 5) || null,
+            endTime: p.endtime?.slice(0, 5) || null,
+            periodObj: p,
+          });
+        }
+      }
+    }
+  }
+  const tabs = [{ key: 'all', label: 'All', startTime: null, endTime: null, count: shifts.length }];
+  for (const [, pt] of seenPeriods) {
+    if (pt.key === 'all') continue;
+    const count = pt.startTime
+      ? shifts.filter(s => timesOverlap(s.startTime, s.endTime, pt.startTime, pt.endTime)).length
+      : shifts.length;
+    tabs.push({ ...pt, count });
+  }
+  return tabs;
+});
+
+const dayDetailGridForPeriod = computed(() => {
+  if (!showDayDetail.value) return [];
+  const activePt = dayDetailPeriodTabs.value.find(t => t.key === activeDayDetailPeriod.value);
+  const filteredShifts = !activePt || activePt.key === 'all' || !activePt.startTime
+    ? showDayDetail.value.shifts
+    : showDayDetail.value.shifts.filter(s =>
+        timesOverlap(s.startTime, s.endTime, activePt.startTime, activePt.endTime)
+      );
+  const orderedRoles = [...roles, 'Unassigned'];
+  const gridMap = {};
+  for (const role of orderedRoles) gridMap[role] = {};
+  for (const s of filteredShifts) {
+    const role = s.role || 'Unassigned';
+    if (!gridMap[role]) gridMap[role] = {};
+    if (!gridMap[role][s.branchId]) gridMap[role][s.branchId] = [];
+    gridMap[role][s.branchId].push(s);
+  }
+  for (const role of Object.keys(gridMap)) {
+    for (const bid of Object.keys(gridMap[role])) {
+      gridMap[role][bid]?.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    }
+  }
+  return orderedRoles.map(role => ({ role, cells: gridMap[role] }));
 });
 
 const dayDetailDateLabel = computed(() => {
@@ -1992,154 +2397,9 @@ const dayDetailDateLabel = computed(() => {
   });
 });
 
-const dayDetailHours = computed(() => {
-  if (!showDayDetail.value) return [];
-  let min = TLINE_AXIS_START;
-  let max = TLINE_AXIS_END;
-  for (const s of showDayDetail.value.shifts) {
-    const sh = parseInt(s.startTime.split(":")[0], 10);
-    const eh = parseInt(s.endTime.split(":")[0], 10);
-    if (sh < min) min = sh;
-    if (eh > max) max = eh;
-  }
-  const hours = [];
-  for (let h = min; h <= max; h++) hours.push(h);
-  return hours;
-});
-
-const dayDetailTimelineHeight = computed(
-  () => dayDetailHours.value.length * TLINE_ROW_HEIGHT,
-);
-
 const schedulesByDate = computed(() =>
   buildSchedulesByDate(filteredSchedules.value),
 );
-
-const schedEmployees = computed(() => {
-  const seen = new Set();
-  return schedules.value
-    .filter((s) => {
-      if (seen.has(s.employeeId)) return false;
-      seen.add(s.employeeId);
-      return true;
-    })
-    .map((s) => ({
-      id: s.employeeId,
-      name: s.employeeName,
-      initials: s.initials,
-    }));
-});
-
-// ── Timeline helpers ────────────────────────────────────
-const timelineDate = computed(() => {
-  const d = new Date();
-  d.setDate(d.getDate() + timelineDateOffset.value);
-  return toLocalDateKey(d);
-});
-
-const timelineDateLabel = computed(() => {
-  const d = new Date();
-  d.setDate(d.getDate() + timelineDateOffset.value);
-  return d.toLocaleDateString("en-PH", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-});
-
-const isTimelineToday = computed(() => timelineDateOffset.value === 0);
-
-const timelineShifts = computed(() =>
-  schedules.value.filter((s) => s.shiftDate === timelineDate.value),
-);
-
-const timelineHours = computed(() => {
-  let min = TLINE_AXIS_START;
-  let max = TLINE_AXIS_END;
-  for (const s of timelineShifts.value) {
-    const sh = parseInt(s.startTime.split(":")[0], 10);
-    const eh = parseInt(s.endTime.split(":")[0], 10);
-    if (sh < min) min = sh;
-    if (eh > max) max = eh;
-  }
-  const hours = [];
-  for (let h = min; h <= max; h++) hours.push(h);
-  return hours;
-});
-
-const timelineBranches = computed(() => {
-  const groups = {};
-  for (const s of timelineShifts.value) {
-    const bid = s.branchId;
-    if (!groups[bid]) {
-      groups[bid] = {
-        branchId: bid,
-        branchName: branchName(bid),
-        color: avatarColor(bid),
-        shifts: [],
-      };
-    }
-    groups[bid].shifts.push(s);
-  }
-  for (const g of Object.values(groups)) {
-    g.shifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
-  }
-  return Object.values(groups).sort((a, b) =>
-    a.branchName.localeCompare(b.branchName),
-  );
-});
-
-const ACCENT_VARIANTS = [
-  { accent: "rgba(255,255,255,0.55)", pattern: "none" },
-  { accent: "rgba(255,220,100,0.85)", pattern: "stripes" },
-  { accent: "rgba(120,220,180,0.85)", pattern: "dots" },
-  { accent: "rgba(200,160,255,0.85)", pattern: "crosshatch" },
-];
-
-const empVariantIndex = (employeeId) => employeeId % ACCENT_VARIANTS.length;
-
-function patternSVG(type) {
-  const c = encodeURIComponent("rgba(255,255,255,0.9)");
-  if (type === "stripes")
-    return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2' stroke='${c}' stroke-width='1.5'/%3E%3C/svg%3E")`;
-  if (type === "dots")
-    return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Ccircle cx='2' cy='2' r='1.2' fill='${c}'/%3E%3C/svg%3E")`;
-  if (type === "crosshatch")
-    return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Cpath d='M0,0 l8,8 M8,0 l-8,8' stroke='${c}' stroke-width='1'/%3E%3C/svg%3E")`;
-  return "none";
-}
-
-const ROLE_PILL_COLORS = {
-  Barista: "rgba(255,255,255,0.9)",
-  Cashier: "rgba(255,193,7,0.85)",
-  "Kitchen Staff": "rgba(255,152,0,0.85)",
-  "Cleaning Staff": "rgba(0,188,212,0.85)",
-  Server: "rgba(233,30,99,0.85)",
-  Supervisor: "rgba(76,175,80,0.85)",
-};
-
-const timeToPosition = (time) => {
-  const [h, m] = time.split(":").map(Number);
-  return (h + m / 60 - TLINE_AXIS_START) * TLINE_ROW_HEIGHT;
-};
-
-const timeToHeight = (start, end) => {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  let dur = eh + em / 60 - (sh + sm / 60);
-  if (dur <= 0)
-    dur = TLINE_AXIS_END - TLINE_AXIS_START - (sh + sm / 60 - TLINE_AXIS_START);
-  return Math.max(dur * TLINE_ROW_HEIGHT, 20);
-};
-
-const currentTimeTop = computed(() => {
-  const now = new Date();
-  return (
-    (now.getHours() + now.getMinutes() / 60 - TLINE_AXIS_START) *
-    TLINE_ROW_HEIGHT
-  );
-});
 
 const monthStart = computed(() => getMonthStart(monthOffset.value));
 
@@ -2238,12 +2498,6 @@ const updateInquiryStatus = async (inq, status) => {
 };
 
 const fetchEmployees = async () => {
-  const cached = loadCache(CACHE_KEY_EMPLOYEES);
-  if (cached) {
-    employeeList.value = cached;
-    employeesLoading.value = false;
-    return;
-  }
   employeesLoading.value = true;
   const { data, error } = await supabase
     .from("employee")
@@ -2259,8 +2513,8 @@ const fetchEmployees = async () => {
       name: `${e.FirstName} ${e.LastName}`,
       branchAssigned: e.BranchAssigned,
       position: e.Position,
+      status: e.Status,
     }));
-    saveCache(CACHE_KEY_EMPLOYEES, employeeList.value);
   }
   employeesLoading.value = false;
 };
@@ -2353,6 +2607,7 @@ const fetchChangeInquiries = async (force = false) => {
           `${e.FirstName?.[0] || ""}${e.LastName?.[0] || ""}`.toUpperCase() ||
           "?",
         role: e.Position || "—",
+        branchId: managerBranchId.value,
       };
     });
   }
@@ -2384,6 +2639,7 @@ const fetchChangeInquiries = async (force = false) => {
         employeeName: emp?.name || "Unknown",
         initials: emp?.initials || "?",
         role: emp?.role || "—",
+        branchId: emp?.branchId || null,
         requestDate: c.requestdate,
         requestType: c.requesttype || "Shift Change",
         preferredDate: c.preferreddate,
@@ -2435,6 +2691,7 @@ const fetchResetRequests = async (force = false) => {
     employeeId: r.employee_id,
     username: r.username,
     role: r.role,
+    branchId: managerBranchId.value,
     status: r.status,
     requestedAt: r.requested_at,
     resolvedAt: r.resolved_at,
@@ -2613,9 +2870,10 @@ const onEmployeeSelected = () => {
 };
 
 const filteredEmployeeList = computed(() => {
+  const list = employeeList.value.filter((e) => e.status === "Active");
   const q = staffSearchText.value.toLowerCase().trim();
-  if (!q) return employeeList.value;
-  return employeeList.value.filter((e) => e.name.toLowerCase().includes(q));
+  if (!q) return list;
+  return list.filter((e) => e.name.toLowerCase().includes(q));
 });
 
 const selectedEmployeeName = computed(() => {
@@ -2706,25 +2964,66 @@ const switchTab = (key) => {
 };
 
 const openDayDetail = (day) => {
+  activeDayDetailPeriod.value = 'all';
   showDayDetail.value = day;
+  nextTick(async () => {
+    const bids = new Set((day.shifts || []).map((s) => s.branchId));
+    for (const bid of bids) {
+      if (!(bid in periodsByBranch.value) || !periodsByBranch.value[bid].length) {
+        await fetchPeriods(bid);
+      }
+    }
+  });
+};
+
+const selectPeriod = (p) => {
+  form.value.startTime = p.starttime?.slice(0, 5) || "";
+  form.value.endTime = p.endtime?.slice(0, 5) || "";
 };
 
 const closeDayDetail = () => {
   showDayDetail.value = null;
 };
 
-const openCreateModal = (dateStr) => {
+const openCreateFromGrid = async (branchId, role) => {
+  if (isPastDate(showDayDetail.value?.dateStr)) return;
+  const dateStr = showDayDetail.value?.dateStr;
+  const dayOfWeek = new Date(dateStr + "T12:00:00").getDay();
+  if (!hoursByBranch.value[branchId]) {
+    await fetchOperatingHours(branchId);
+  }
+  const oh = getHoursForDay(branchId, dayOfWeek);
+  if (oh && !oh.isOpen) {
+    showToast("Branch is closed on this day.", "error");
+    return;
+  }
+  dayDetailBackup.value = showDayDetail.value;
+  closeDayDetail();
+  openCreateModal(dateStr, branchId, role, true);
+};
+
+const openCreateModal = async (dateStr, branchId, role, locked) => {
   if (employeesLoading.value) {
     showToast("Staff list is still loading. Please wait.", "error");
     return;
   }
+  form.value = emptyForm();
+  form.value.branchId = branchId || managerBranchId.value;
+  if (locked) form.value.branchLocked = true;
+  if (dateStr) form.value.shiftDate = dateStr;
+  if (role) form.value.role = role;
   if (!employeeList.value.length) {
-    showToast("No active staff available to schedule.", "error");
+    showToast("No staff found in the system.", "error");
     return;
   }
-  form.value = emptyForm();
-  form.value.branchId = managerBranchId.value;
-  if (dateStr) form.value.shiftDate = dateStr;
+  if (form.value.branchId) {
+    if (!hoursByBranch.value[form.value.branchId]) {
+      await fetchOperatingHours(form.value.branchId);
+    }
+    if (!periodsByBranch.value[form.value.branchId]?.length) {
+      await fetchPeriods(form.value.branchId);
+    }
+  }
   errors.value = {};
   isEditing.value = false;
   showModal.value = true;
@@ -2735,10 +3034,17 @@ const openEditModal = (sched) => {
   errors.value = {};
   isEditing.value = true;
   showModal.value = true;
+  if (form.value.branchId && !periodsByBranch.value[form.value.branchId]?.length) {
+    fetchPeriods(form.value.branchId);
+  }
 };
 
 const closeModal = () => {
   showModal.value = false;
+  if (dayDetailBackup.value) {
+    showDayDetail.value = dayDetailBackup.value;
+    dayDetailBackup.value = null;
+  }
 };
 
 const validate = () => {
@@ -2756,11 +3062,49 @@ const validate = () => {
   )
     e.endTime = "End time must be after start time.";
   const today = toLocalDateKey(new Date());
-  if (form.value.shiftDate && form.value.shiftDate < today)
+  if (form.value.shiftDate && form.value.shiftDate < today && !isPastEdit.value)
     e.shiftDate = "Shift date cannot be in the past.";
+  if (!isPastEdit.value) {
+    if (form.value.shiftDate && form.value.shiftDate > maxDateStr.value)
+      e.shiftDate = "Shift date cannot be more than 60 days from today.";
+    if (form.value.shiftDate === today && form.value.startTime) {
+      const now = new Date();
+      const currentH = String(now.getHours()).padStart(2, '0');
+      const currentM = String(now.getMinutes()).padStart(2, '0');
+      if (form.value.startTime <= `${currentH}:${currentM}`)
+        e.startTime = "Start time must be after the current time for today's shifts.";
+    }
+    const oh = formOperatingHours.value;
+    if (oh) {
+      if (!oh.isOpen) {
+        e.shiftDate = "Branch is closed on this day.";
+      } else {
+        if (form.value.startTime && form.value.startTime < oh.openTime)
+          e.startTime = `Start time must be at or after opening (${oh.openTime}).`;
+        if (form.value.endTime && form.value.endTime > oh.closeTime)
+          e.endTime = `End time must be at or before closing (${oh.closeTime}).`;
+      }
+    }
+    if ((form.value.startTime || form.value.endTime) && form.value.branchId) {
+      const periods = periodsByBranch.value[form.value.branchId];
+      if (periods?.length && form.value.startTime) {
+        const match = periods.find(p =>
+          p.starttime && form.value.startTime >= p.starttime.slice(0, 5) && form.value.startTime < p.endtime.slice(0, 5)
+        );
+        if (!match && !e.startTime) {
+          e.startTime = "Shift does not fall within any defined shift period.";
+        } else if (match && form.value.endTime && form.value.endTime > match.endtime.slice(0, 5) && !e.endTime) {
+          e.endTime = `End time must not exceed period end (${match.endtime.slice(0, 5)}).`;
+        }
+      }
+    }
+  }
   errors.value = e;
   return Object.keys(e).length === 0;
 };
+
+const showRoleCapModal = ref(false);
+const roleCapInfo = ref(null);
 
 const checkRoleCap = async (
   date,
@@ -2771,23 +3115,72 @@ const checkRoleCap = async (
 ) => {
   const { data } = await supabase
     .from("schedule")
-    .select("ScheduleId, StartTime, EndTime")
+    .select("ScheduleId, StartTime, EndTime, EmployeeId, employee(FirstName, LastName)")
     .eq("ShiftDate", date)
     .eq("Role", role)
     .eq("BranchId", managerBranchId.value)
     .neq("Status", "Cancelled")
     .neq("Status", "Archived");
 
-  if (!data) return 0;
+  if (!data) return { count: 0, staff: [] };
   let count = 0;
+  const staff = [];
   for (const s of data) {
     if (excludeId && s.ScheduleId === excludeId) continue;
     if (timesOverlap(startTime, endTime, s.StartTime, s.EndTime)) {
       count++;
+      const empName = s.employee
+        ? `${s.employee.FirstName || ""} ${s.employee.LastName || ""}`.trim()
+        : `Employee #${s.EmployeeId}`;
+      staff.push({
+        name: empName,
+        startTime: normalizeTime(s.StartTime),
+        endTime: normalizeTime(s.EndTime),
+      });
     }
   }
-  return count;
+  return { count, staff };
 };
+
+const checkEmployeeConflict = async () => {
+  const eid = form.value.employeeId;
+  const date = form.value.shiftDate;
+  if (!eid || !date) {
+    employeeConflictMsg.value = "";
+    return;
+  }
+  const { data } = await supabase
+    .from("schedule")
+    .select("ScheduleId, StartTime, EndTime, Role")
+    .eq("EmployeeId", eid)
+    .eq("ShiftDate", date)
+    .neq("Status", "Cancelled")
+    .neq("Status", "Archived");
+  if (!data || data.length === 0) {
+    employeeConflictMsg.value = "";
+    return;
+  }
+  const newStart = form.value.startTime;
+  const newEnd = form.value.endTime;
+  if (newStart && newEnd) {
+    for (const existing of data) {
+      if (isEditing.value && existing.ScheduleId === form.value.id) continue;
+      if (timesOverlap(newStart, newEnd, normalizeTime(existing.StartTime), normalizeTime(existing.EndTime))) {
+        employeeConflictMsg.value = `⚠ This staff already has a shift on this date from ${normalizeTime(existing.StartTime)}–${normalizeTime(existing.EndTime)} (${existing.Role}).`;
+        return;
+      }
+    }
+    employeeConflictMsg.value = "";
+  } else {
+    const names = data.map(s => `${normalizeTime(s.StartTime)}–${normalizeTime(s.EndTime)} (${s.Role})`).join(", ");
+    employeeConflictMsg.value = `⚠ Already has ${data.length} shift(s) on this date: ${names}.`;
+  }
+};
+
+watch([() => form.value.employeeId, () => form.value.shiftDate, () => form.value.startTime, () => form.value.endTime], () => {
+  if (form.value.employeeId && form.value.shiftDate) checkEmployeeConflict();
+  else employeeConflictMsg.value = "";
+}, { immediate: false });
 
 const checkScheduleConflict = async () => {
   const { data } = await supabase
@@ -2827,6 +3220,27 @@ const saveSchedule = async (overrideConflict = false) => {
 
   saving.value = true;
   try {
+    // Duplicate guard — exact same shift already exists
+    if (form.value.employeeId && form.value.shiftDate && form.value.startTime && form.value.endTime && form.value.role) {
+      let dupQuery = supabase
+        .from("schedule")
+        .select("ScheduleId")
+        .eq("EmployeeId", form.value.employeeId)
+        .eq("ShiftDate", form.value.shiftDate)
+        .eq("StartTime", form.value.startTime)
+        .eq("EndTime", form.value.endTime)
+        .eq("Role", form.value.role)
+        .eq("BranchId", managerBranchId.value)
+        .neq("Status", "Cancelled")
+        .neq("Status", "Archived");
+      if (isEditing.value) dupQuery = dupQuery.neq("ScheduleId", form.value.id);
+      const { data: dupData } = await dupQuery.maybeSingle();
+      if (dupData) {
+        showToast("This shift is a duplicate of an existing schedule.", "error");
+        return;
+      }
+    }
+
     const conflict = await checkScheduleConflict();
     if (conflict && !overrideConflict) {
       conflictInfo.value = conflict;
@@ -2834,18 +3248,36 @@ const saveSchedule = async (overrideConflict = false) => {
       return;
     }
 
-    const roleCount = await checkRoleCap(
+    const { count: roleCount, staff: roleStaff } = await checkRoleCap(
       form.value.shiftDate,
       form.value.role,
       form.value.startTime,
       form.value.endTime,
       isEditing.value ? form.value.id : null,
     );
-    if (roleCount >= 2) {
-      throw new Error(
-        `Role "${form.value.role}" already has ${roleCount} staff scheduled for this shift (max 2 per role).`,
-      );
+    let cap = form.value.role === 'Manager' ? 1 : 2;
+    if (form.value.startTime) {
+      const periods = periodsByBranch.value[form.value.branchId];
+      if (periods?.length) {
+        const match = periods.find(p =>
+          p.starttime && form.value.startTime >= p.starttime.slice(0, 5) && form.value.startTime < p.endtime.slice(0, 5)
+        );
+        if (match?.maxperrole) cap = form.value.role === 'Manager' ? 1 : match.maxperrole;
+      }
     }
+    if (roleCount >= cap) {
+      roleCapInfo.value = {
+        role: form.value.role,
+        count: roleCount,
+        cap,
+        staff: roleStaff,
+      };
+      showRoleCapModal.value = true;
+      return;
+    }
+
+    // Snapshot old values before updating (for notification)
+    const oldValues = isEditing.value ? { ...form.value } : null;
 
     const payload = {
       EmployeeId: form.value.employeeId,
@@ -2865,17 +3297,62 @@ const saveSchedule = async (overrideConflict = false) => {
         .eq("ScheduleId", form.value.id);
 
       if (error) throw error;
-      showToast("Schedule updated.", "success");
-      await fetchSchedules();
+
+      // Insert shift change notification for the affected employee
+      if (oldValues) {
+        const emp = employeeList.value.find(e => e.id === oldValues.employeeId);
+        const empName = emp ? emp.name : `Employee #${oldValues.employeeId}`;
+        const oldStart = oldValues.startTime;
+        const oldEnd = oldValues.endTime;
+        const oldDate = oldValues.shiftDate;
+        const oldRole = oldValues.role;
+        const newStart = form.value.startTime;
+        const newEnd = form.value.endTime;
+        const newDate = form.value.shiftDate;
+        const newRole = form.value.role;
+        const message = `Your shift changed from ${oldDate} ${oldStart}–${oldEnd} (${oldRole}) to ${newDate} ${newStart}–${newEnd} (${newRole}).`;
+        await supabase.from("notifications").insert({
+          role: 'staff',
+          branch_id: managerBranchId.value,
+          employee_id: form.value.employeeId,
+          category: 'schedule_change',
+          title: 'Schedule Updated',
+          message,
+          severity: 'medium',
+          is_read: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      // Cancellation notification
+      if (oldValues && oldValues.status !== 'Cancelled' && form.value.status === 'Cancelled') {
+        const empName2 = employeeList.value.find(e => e.id === form.value.employeeId)?.name || `Employee #${form.value.employeeId}`;
+        const cancelMsg = `Your shift on ${form.value.shiftDate} (${form.value.startTime}–${form.value.endTime}, ${form.value.role}) has been cancelled.`;
+        await supabase.from("notifications").insert({
+          role: 'staff',
+          branch_id: managerBranchId.value,
+          employee_id: form.value.employeeId,
+          category: 'schedule_change',
+          title: 'Schedule Cancelled',
+          message: cancelMsg,
+          severity: 'high',
+          is_read: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      showToast("Schedule updated and staff notified.", "success");
     } else {
       const { error } = await supabase.from("schedule").insert([payload]);
       if (error) throw error;
       showToast("Schedule created.", "success");
-      await fetchSchedules();
     }
+
     sessionStorage.removeItem(CACHE_KEY_SCHEDULES);
+    await fetchSchedules(true);
     showConflictConfirm.value = false;
     conflictInfo.value = null;
+    dayDetailBackup.value = null;
     closeModal();
     activeTab.value = "schedule";
   } catch (error) {
@@ -2889,6 +3366,14 @@ const saveSchedule = async (overrideConflict = false) => {
 const confirmConflictSave = () => {
   showConflictConfirm.value = false;
   saveSchedule(true);
+};
+
+const changeShift = () => {
+  showRoleCapModal.value = false;
+  nextTick(() => {
+    const dateInput = document.querySelector('.modal-panel input[type="date"]');
+    if (dateInput) dateInput.focus();
+  });
 };
 
 const isPastDate = (dateStr) => {
@@ -2941,6 +3426,23 @@ const updateAvailStatus = async (avail, status) => {
         throw new Error("Cannot approve: end time must be after start time.");
       }
 
+      const dayOfWeek = new Date(avail.availableDate + "T12:00:00").getDay();
+      if (!hoursByBranch.value[managerBranchId.value]) {
+        await fetchOperatingHours(managerBranchId.value);
+      }
+      const availOh = getHoursForDay(managerBranchId.value, dayOfWeek);
+      if (availOh) {
+        if (!availOh.isOpen) {
+          throw new Error("Cannot approve: branch is closed on this date.");
+        }
+        if (avail.startTime < availOh.openTime) {
+          throw new Error(`Cannot approve: start time (${avail.startTime}) is before opening (${availOh.openTime}).`);
+        }
+        if (avail.endTime > availOh.closeTime) {
+          throw new Error(`Cannot approve: end time (${avail.endTime}) is after closing (${availOh.closeTime}).`);
+        }
+      }
+
       const { data: conflicts } = await supabase
         .from("schedule")
         .select("StartTime, EndTime, Role")
@@ -2975,15 +3477,25 @@ const updateAvailStatus = async (avail, status) => {
 
       const roleToUse =
         avail.role !== "—" ? avail.role : emp?.Position || "Staff";
-      const roleCount = await checkRoleCap(
+      const { count: roleCount } = await checkRoleCap(
         avail.availableDate,
         roleToUse,
         avail.startTime,
         avail.endTime,
       );
-      if (roleCount >= 2) {
+      let availCap = roleToUse === 'Manager' ? 1 : 2;
+      if (avail.startTime) {
+        const periods = periodsByBranch.value[managerBranchId.value];
+        if (periods?.length) {
+          const match = periods.find(p =>
+            p.starttime && avail.startTime >= p.starttime.slice(0, 5) && avail.startTime < p.endtime.slice(0, 5)
+          );
+          if (match?.maxperrole) availCap = roleToUse === 'Manager' ? 1 : match.maxperrole;
+        }
+      }
+      if (roleCount >= availCap) {
         throw new Error(
-          `Role "${roleToUse}" already has ${roleCount} staff scheduled for this shift (max 2 per role).`,
+          `Role "${roleToUse}" already has ${roleCount} staff scheduled for this shift (max ${availCap} per role).`,
         );
       }
 
@@ -3043,6 +3555,18 @@ const branchName = (id) => {
   if (id == null || id === "") return "—";
   const match = branches.value.find((b) => String(b.id) === String(id));
   return match?.name || `Branch #${id}`;
+};
+
+const branchColor = (branchId) => {
+  const colors = [
+    "#7B2D2D",
+    "#0D6E6E",
+    "#6B3FA0",
+    "#B8860B",
+    "#1E6B4F",
+    "#A0522D",
+  ];
+  return colors[branchId % colors.length];
 };
 
 const avatarColor = (id) => {
@@ -3539,176 +4063,148 @@ onMounted(async () => {
 
 /* Day detail modal */
 .modal-panel--day-detail {
-  max-width: 760px;
-  width: 90vw;
+  max-width: 900px;
+  width: 92vw;
 }
 .modal-panel-body--day-detail {
   overflow: hidden;
 }
-.day-detail-timeline-wrap {
-  overflow: auto;
-  max-height: 480px;
+.dtd-grid-scroll {
+  overflow-x: auto;
+  max-height: 520px;
+  overflow-y: auto;
 }
-.day-detail-header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+.dtd-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
 }
-.day-detail-count-badge {
-  background: #f3f4f6;
-  color: #6b7280;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
+.dtd-grid th,
+.dtd-grid td {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #f0ebe8;
+  text-align: left;
+  vertical-align: top;
 }
-.day-detail-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.day-detail-timeline-grid {
-  display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
-  min-width: 100%;
-}
-.dtd-time-col {
-  width: 44px;
-  min-width: 44px;
-  flex-shrink: 0;
-  border-right: 1px solid #e5e7eb;
-}
-.dtd-hour-label {
-  height: 48px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 2px;
-  font-size: 0.6rem;
-  color: #9ca3af;
-  font-weight: 600;
-  border-bottom: 1px solid #f3f4f6;
-}
-.dtd-branch-col {
-  border-right: 1px solid #e5e7eb;
-}
-.dtd-branch-col:last-child {
-  border-right: none;
-}
-.dtd-branch-header {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.4rem;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #4b5563;
-  background: #f9fafb;
-  border-left: 3px solid #7b2d2d;
-  border-bottom: 1px solid #e5e7eb;
-}
-.dtd-branch-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dtd-branch-count {
-  margin-left: auto;
-  font-weight: 600;
-  font-size: 0.6rem;
-  color: #9ca3af;
-}
-.dtd-branch-body {
-  position: relative;
-}
-.dtd-shift {
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  border-radius: 4px;
-  color: #fff;
-  cursor: pointer;
-  z-index: 10;
-  transition: opacity 0.15s;
-}
-.dtd-shift:hover {
-  opacity: 0.9;
-}
-.dtd-shift-pattern {
-  position: absolute;
-  inset: 0;
-  opacity: 0.12;
-  pointer-events: none;
-  border-radius: 4px;
-}
-.dtd-shift-stripe {
-  position: absolute;
+.dtd-th-role {
+  position: sticky;
   left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 4px 0 0 4px;
-}
-.dtd-shift-content {
-  padding: 0.2rem 0.3rem;
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-}
-.dtd-shift-name {
-  font-size: 0.65rem;
+  z-index: 2;
+  background: #f9fafb;
   font-weight: 700;
-  line-height: 1.2;
+  color: #6b7280;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  min-width: 90px;
+}
+.dtd-th-branch {
+  min-width: 150px;
+  font-weight: 600;
+  color: #4a4a4a;
+  background: #f9fafb;
+  border-top: 3px solid transparent;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.dtd-shift-time {
-  font-size: 0.55rem;
-  opacity: 0.9;
-  line-height: 1.2;
+.dtd-td-role {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  font-weight: 600;
+  color: #5d4037;
+  font-size: 0.78rem;
 }
-.dtd-shift-role-pill {
-  display: inline-block;
-  font-size: 0.5rem;
-  line-height: 1;
-  padding: 1px 5px;
-  border-radius: 8px;
-  color: rgba(0, 0, 0, 0.75);
+.dtd-td-cell {
+  min-width: 150px;
+}
+.dtd-cell-card {
+  padding: 0.3rem 0;
+  cursor: pointer;
+  position: relative;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+.dtd-cell-card:hover {
+  background: #f5f0ed;
+}
+.dtd-cell-card + .dtd-cell-card {
+  border-top: 1px solid #f0ebe8;
+}
+.dtd-cell-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+.dtd-cell-time {
+  font-size: 0.72rem;
+  color: #5d4037;
+  font-weight: 600;
+}
+.dtd-cell-actions {
+  display: none;
+  gap: 3px;
   margin-top: 2px;
 }
-.dtd-shift-actions {
-  display: none;
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  gap: 2px;
-  z-index: 20;
-}
-.dtd-shift:hover .dtd-shift-actions {
+.dtd-cell-card:hover .dtd-cell-actions {
   display: flex;
 }
-.dtd-shift-actions button {
-  background: rgba(0, 0, 0, 0.25);
+.dtd-cell-actions button {
+  background: #f5f0ed;
   border: none;
-  color: #fff;
+  color: #5d4037;
   width: 20px;
   height: 20px;
-  border-radius: 3px;
+  border-radius: 4px;
   font-size: 0.6rem;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  padding: 0;
-  transition: background 0.15s;
 }
-.dtd-shift-actions button:hover {
-  background: rgba(0, 0, 0, 0.4);
+.dtd-cell-actions button:hover {
+  background: #5d4037;
+  color: #fff;
+}
+.dtd-cell-add-btn {
+  background: #e8f5e9 !important;
+  color: #2e7d32 !important;
+}
+.dtd-cell-add-btn:hover {
+  background: #2e7d32 !important;
+  color: #fff !important;
+}
+.dtd-cell-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.15s;
+  color: #bbb;
+  font-size: 0.85rem;
+}
+.dtd-cell-empty:hover {
+  background: #f5f5f5;
+  color: #5d4037;
+}
+.dtd-cell-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px dashed #ccc;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.dtd-cell-empty:hover .dtd-cell-empty-icon {
+  border-color: #5d4037;
+  color: #5d4037;
 }
 .day-detail-empty {
   text-align: center;
@@ -3725,38 +4221,96 @@ onMounted(async () => {
   margin-bottom: 1rem;
 }
 
-@media (max-width: 600px) {
-  .day-detail-timeline-grid {
-    display: block;
-    min-width: 0;
-  }
-  .dtd-time-col {
-    display: flex !important;
-    width: 100%;
-    min-width: 100%;
-    overflow-x: auto;
-    border-right: none;
-    border-bottom: 1px solid #e5e7eb;
-    flex-shrink: 0;
-  }
-  .dtd-time-col .dtd-hour-label {
-    flex-shrink: 0;
-    width: 48px;
-    min-width: 48px;
-    height: auto;
-    padding: 0.35rem 0;
-    border-bottom: none;
-    justify-content: center;
-    font-size: 0.65rem;
-  }
-  .dtd-branch-col {
-    width: 100%;
-    border-right: none;
-    margin-bottom: 0.5rem;
-  }
-  .dtd-branch-col:last-child {
-    margin-bottom: 0;
-  }
+.dtd-period-tab-bar {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f0ebe8;
+}
+.dtd-period-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #e0dbd8;
+  background: #fafafa;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dtd-period-tab:hover {
+  border-color: #5d4037;
+  color: #5d4037;
+}
+.dtd-period-tab.active {
+  background: #5d4037;
+  border-color: #5d4037;
+  color: #fff;
+}
+.dtd-tab-time {
+  font-weight: 400;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+.dtd-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.12);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.dtd-period-tab.active .dtd-tab-count {
+  background: rgba(255,255,255,0.25);
+}
+.dtd-cell-empty-past {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  color: #d1d5db;
+  font-size: 1rem;
+}
+.dtd-cap-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 4px;
+  padding: 1px 6px;
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+.dtd-cap-badge.cap-full {
+  color: #b45309;
+  background: #fffbeb;
+}
+.dtd-cap-badge .cap-full-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.6rem;
+  letter-spacing: 0.03em;
+  color: #b45309;
+}
+.dtd-cell-full-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  color: #d1d5db;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .is-fading {
@@ -3784,39 +4338,17 @@ onMounted(async () => {
   transition: transform 0.4s ease;
 }
 
-.employee-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: #f9f6f4;
-  border-radius: 8px;
-  font-size: 0.85rem;
-}
-.employee-legend .legend-label {
-  font-weight: 600;
-  color: #5d4037;
-  margin-right: 4px;
-}
-.employee-legend .legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px 2px 4px;
-  border-radius: 4px;
-  background: #fff;
-  border: 1px solid #e8ddd8;
-}
-.employee-legend .legend-swatch {
+/* (legend CSS removed) */
+
+.branch-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 4px;
   flex-shrink: 0;
 }
-
 /* ── Staff tab ──────────────────────────────────────────── */
 .section-title {
   font-size: 1rem;
@@ -4274,135 +4806,70 @@ onMounted(async () => {
   }
 }
 
-/* ── Timeline ────────────────────────────────────────── */
-.timeline-container {
-  margin-top: 0.5rem;
-}
-.timeline-nav {
+/* (timeline & matrix CSS removed) */
+
+/* ── OH TAB BAR ─────────────────────────────────────────── */
+.oh-tab-bar {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  gap: 0;
+  border-bottom: 1px solid #f0ebe8;
+  padding: 0 1rem;
+  background: #fafafa;
 }
-.timeline-date-label {
-  font-size: 0.85rem;
+.oh-tab-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #1a1a1a;
-  min-width: 180px;
-  text-align: center;
-}
-.timeline-scroll {
-  overflow-x: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
-}
-.timeline-grid {
-  display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
-  min-width: 100%;
-}
-.timeline-col {
-  min-width: 0;
-}
-.timeline-time-col {
-  width: 52px;
-  min-width: 52px;
-  flex-shrink: 0;
-  border-right: 1px solid #e5e7eb;
-}
-.timeline-corner {
-  height: 36px;
-  border-bottom: 1px solid #e5e7eb;
-}
-.timeline-hour-label {
-  height: 48px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 2px;
-  font-size: 0.65rem;
-  color: #9ca3af;
-  font-weight: 600;
-  border-bottom: 1px solid #f3f4f6;
-}
-.timeline-branch-col {
-  border-right: 1px solid #e5e7eb;
-}
-.timeline-branch-col:last-child {
-  border-right: none;
-}
-.timeline-branch-header {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #4b5563;
-  background: #f9fafb;
-  border-left: 3px solid #7b2d2d;
-  border-bottom: 1px solid #e5e7eb;
-  height: 36px;
-}
-.timeline-branch-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.timeline-branch-body {
-  position: relative;
-  min-height: 768px;
-}
-.timeline-shift {
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  border-radius: 4px;
-  padding: 0.25rem 0.35rem;
-  color: #fff;
+  color: #888;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
-  overflow: hidden;
-  z-index: 2;
-  transition: opacity 0.15s;
+  transition: all 0.15s;
 }
-.timeline-shift:hover {
-  opacity: 0.85;
+.oh-tab-btn:hover {
+  color: #5d4037;
 }
-.timeline-shift-name {
-  font-size: 0.7rem;
-  font-weight: 700;
-  line-height: 1.2;
+.oh-tab-btn.active {
+  color: #5d4037;
+  border-bottom-color: #5d4037;
+}
+
+/* ── PERIOD COLUMNS ──────────────────────────────────────── */
+.dtd-th-period {
+  min-width: 120px;
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: #6b7280;
+  background: #fdfdfd;
+  text-align: center;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 0.35rem 0.4rem !important;
 }
-.timeline-shift-time {
-  font-size: 0.6rem;
-  opacity: 0.9;
-  line-height: 1.2;
+.dtd-th-period .period-icon {
+  font-size: 0.85rem;
+  margin-right: 2px;
 }
-.timeline-now-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #dc2626;
-  z-index: 3;
-  pointer-events: none;
+.dtd-period-time {
+  font-weight: 400;
+  color: #9ca3af;
+  font-size: 0.65rem;
+  display: block;
+  margin-top: 1px;
 }
-.timeline-now-line::before {
-  content: "";
-  position: absolute;
-  left: -4px;
-  top: -3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #dc2626;
+
+.btn-outline-brand {
+  background: #fff;
+  border: 1px solid var(--brand-primary, #5d4037);
+  color: var(--brand-primary, #5d4037);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.85rem;
+  transition: all 0.15s;
+}
+.btn-outline-brand:hover {
+  background: var(--brand-primary, #5d4037);
+  color: #fff;
 }
 </style>
 
@@ -4766,5 +5233,19 @@ onMounted(async () => {
 .reset-card {
   border-left: 3px solid #7b4f3a;
   background: #fdf8f6;
+}
+.role-cap-staff-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+}
+.role-cap-staff-list li {
+  font-size: 0.84rem;
+  padding: 0.25rem 0;
+  color: var(--text-main);
+  border-bottom: 1px solid #f0ebe8;
+}
+.role-cap-staff-list li:last-child {
+  border-bottom: none;
 }
 </style>
