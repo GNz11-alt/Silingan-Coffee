@@ -1778,17 +1778,24 @@ import {
 const SHIFT_OVERFLOW = 3;
 const windowWidth = ref(window.innerWidth);
 let resizeCleanup = null;
+let resizeDebounce = null;
 onMounted(() => {
   const onResize = () => {
-    windowWidth.value = window.innerWidth;
+    clearTimeout(resizeDebounce);
+    resizeDebounce = setTimeout(() => {
+      windowWidth.value = window.innerWidth;
+    }, 100);
   };
   window.addEventListener("resize", onResize);
-  resizeCleanup = () => window.removeEventListener("resize", onResize);
+  resizeCleanup = () => {
+    window.removeEventListener("resize", onResize);
+  };
   document.addEventListener("click", onDocumentClick);
 });
 onUnmounted(() => {
   resizeCleanup?.();
   document.removeEventListener("click", onDocumentClick);
+  clearTimeout(schedSearchDebounce);
 });
 const overflowThreshold = computed(() =>
   windowWidth.value < 600 ? 2 : SHIFT_OVERFLOW,
@@ -1810,10 +1817,6 @@ const leftTabs = [
   { key: "schedule", label: "Schedules" },
   { key: "change", label: "Inquiries" },
 ];
-
-window.addEventListener("beforeunload", () => {
-  sessionStorage.setItem("page_refreshed", "1");
-});
 
 const schedSearchInput = ref("");
 const schedSearch = ref("");
@@ -2031,19 +2034,6 @@ const periodsByBranch = computed(() => {
   return groups;
 });
 
-const dayDetailColumnGroups = computed(() => {
-  return dayDetailBranches.value.map((b) => {
-    const periods = periodsByBranch.value[b.id] || [];
-    return {
-      branchId: b.id,
-      name: b.name,
-      color: b.color,
-      periods: periods.length ? periods : [{ id: null, periodname: "All Day", starttime: null, endtime: null }],
-      colspan: Math.max(periods.length, 1),
-    };
-  });
-});
-
 function getShiftsForPeriod(shifts, period) {
   if (!shifts?.length) return [];
   if (!period?.starttime) return shifts;
@@ -2118,66 +2108,8 @@ const filteredStaff = computed(() => {
 });
 
 const fetchStaff = async (force = false) => {
-  if (!force) {
-    const cached = loadCache(CACHE_KEY_STAFF);
-    if (cached) {
-      staffMembers.value = cached;
-      staffLoading.value = false;
-      return;
-    }
-  }
   staffLoading.value = true;
-  try {
-    const { data, error } = await supabase
-      .from("employee")
-      .select(
-        "EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status",
-      )
-      .order("EmployeeId", { ascending: false });
-    if (error) throw error;
-    const branchIds = [
-      ...new Set(
-        (data || [])
-          .filter((e) => e.BranchAssigned)
-          .map((e) => e.BranchAssigned),
-      ),
-    ];
-    let branchMap = {};
-    if (branchIds.length) {
-      const { data: bData } = await supabase
-        .from("branch")
-        .select("BranchId, BranchName")
-        .in("BranchId", branchIds);
-      if (bData)
-        bData.forEach((b) => {
-          branchMap[b.BranchId] = b.BranchName;
-        });
-    }
-    staffMembers.value = (data || []).map((e) => ({
-      id: e.EmployeeId,
-      firstName: e.FirstName || "",
-      lastName: e.LastName || "",
-      email: e.Email || "",
-      phone: e.Phone || e.ContactInfo || "",
-      position: e.Position || "",
-      department: e.Department || "",
-      hourlyRate: e.HourlyRate || 0,
-      address: e.Address || "",
-      dateHired: e.DateHired || "",
-      branchId: e.BranchAssigned || null,
-      branchName: branchMap[e.BranchAssigned] || "—",
-      status: e.Status || "Active",
-    }));
-    const depts = [
-      ...new Set(staffMembers.value.map((e) => e.department).filter(Boolean)),
-    ];
-    saveCache(CACHE_KEY_STAFF, staffMembers.value);
-    staffDepartments.value = depts.sort();
-  } catch (err) {
-    console.error("[ShiftManagement] fetchStaff failed:", err);
-  } finally {
-    staffLoading.value = false;
-  }
+  await fetchEmployees(force);
 };
 
 const staffAvatarColor = (emp) => {
@@ -2400,6 +2332,7 @@ const dismissResetRequest = async (req) => {
 const roles = [
   "Barista",
   "Cashier",
+  "Delivery Staff",
   "Kitchen Staff",
   "Cleaning Staff",
   "Server",
@@ -2721,33 +2654,6 @@ const emptyDayBranches = computed(() => {
   })).sort((a, b) => a.name.localeCompare(b.name));
 });
 
-const dayDetailGrid = computed(() => {
-  if (!showDayDetail.value) return [];
-  const gridMap = {};
-  for (const role of roles) {
-    gridMap[role] = {};
-  }
-  for (const s of showDayDetail.value.shifts) {
-    const role = s.role || "Unassigned";
-    if (!gridMap[role]) gridMap[role] = {};
-    if (!gridMap[role][s.branchId]) gridMap[role][s.branchId] = [];
-    gridMap[role][s.branchId].push(s);
-  }
-  const orderedRoles = roles.includes("Unassigned")
-    ? roles
-    : [...roles, "Unassigned"];
-  for (const role of Object.keys(gridMap)) {
-    for (const bid of Object.keys(gridMap[role])) {
-      if (gridMap[role][bid]?.length) {
-        gridMap[role][bid].sort((a, b) => a.startTime.localeCompare(b.startTime));
-      }
-    }
-  }
-  return orderedRoles
-    .filter((r) => r in gridMap)
-    .map((role) => ({ role, cells: gridMap[role] }));
-});
-
 const dayDetailPeriodTabs = computed(() => {
   if (!showDayDetail.value) return [];
   const shifts = showDayDetail.value.shifts;
@@ -2804,7 +2710,9 @@ const dayDetailGridForPeriod = computed(() => {
       gridMap[role][bid]?.sort((a, b) => a.startTime.localeCompare(b.startTime));
     }
   }
-  return orderedRoles.map(role => ({ role, cells: gridMap[role] }));
+  return orderedRoles
+    .map(role => ({ role, cells: gridMap[role] }))
+    .filter(row => row.role !== 'Unassigned' || Object.keys(row.cells).some(bid => row.cells[bid]?.length));
 });
 
 const dayDetailDateLabel = computed(() => {
@@ -2919,22 +2827,41 @@ const updateInquiryStatus = async (inq, status) => {
   await fetchChangeInquiries();
 };
 
-const fetchEmployees = async () => {
-  const cached = loadCache(CACHE_KEY_EMPLOYEES_SCHED);
-  if (cached) {
-    employeeList.value = cached;
-    employeesLoading.value = false;
-    return;
+const fetchEmployees = async (force = false) => {
+  if (!force) {
+    const cached = loadCache(CACHE_KEY_EMPLOYEES_SCHED);
+    if (cached) {
+      employeeList.value = cached;
+      const staffCached = loadCache(CACHE_KEY_STAFF);
+      if (staffCached) {
+        staffMembers.value = staffCached;
+        employeesLoading.value = false;
+        staffLoading.value = false;
+        return;
+      }
+    }
   }
   employeesLoading.value = true;
+  staffLoading.value = true;
   const { data, error } = await supabase
     .from("employee")
-    .select("EmployeeId, FirstName, LastName, BranchAssigned, Position, Status")
+    .select("EmployeeId, FirstName, LastName, Email, Phone, Position, Department, HourlyRate, Address, ContactInfo, DateHired, BranchAssigned, Status")
     .order("FirstName");
   if (error) {
     console.error("[Schedule] fetchEmployees failed:", error);
     employeeList.value = [];
-  } else if (data) {
+    staffMembers.value = [];
+    employeesLoading.value = false;
+    staffLoading.value = false;
+    return;
+  }
+  if (data) {
+    const branchIds = [...new Set(data.filter(e => e.BranchAssigned).map(e => e.BranchAssigned))];
+    let branchMap = {};
+    if (branchIds.length) {
+      const { data: bData } = await supabase.from("branch").select("BranchId, BranchName").in("BranchId", branchIds);
+      if (bData) bData.forEach(b => { branchMap[b.BranchId] = b.BranchName; });
+    }
     employeeList.value = data.map((e) => ({
       id: e.EmployeeId,
       name: `${e.FirstName} ${e.LastName}`,
@@ -2942,9 +2869,28 @@ const fetchEmployees = async () => {
       position: e.Position,
       status: e.Status,
     }));
+    staffMembers.value = data.map((e) => ({
+      id: e.EmployeeId,
+      firstName: e.FirstName || "",
+      lastName: e.LastName || "",
+      email: e.Email || "",
+      phone: e.Phone || e.ContactInfo || "",
+      position: e.Position || "",
+      department: e.Department || "",
+      hourlyRate: e.HourlyRate || 0,
+      address: e.Address || "",
+      dateHired: e.DateHired || "",
+      branchId: e.BranchAssigned || null,
+      branchName: branchMap[e.BranchAssigned] || "—",
+      status: e.Status || "Active",
+    }));
+    const depts = [...new Set(staffMembers.value.map(e => e.department).filter(Boolean))];
+    staffDepartments.value = depts.sort();
     saveCache(CACHE_KEY_EMPLOYEES_SCHED, employeeList.value);
+    saveCache(CACHE_KEY_STAFF, staffMembers.value);
   }
   employeesLoading.value = false;
+  staffLoading.value = false;
 };
 
 const fetchAvailability = async (force = false) => {
@@ -2995,14 +2941,21 @@ const fetchSchedules = async (force = false) => {
       return;
     }
   }
-  const { data } = await supabase
+  const rangeStart = new Date();
+  rangeStart.setMonth(rangeStart.getMonth() - 1);
+  const rangeEnd = new Date();
+  rangeEnd.setMonth(rangeEnd.getMonth() + 2);
+  let query = supabase
     .from("schedule")
     .select(
       "ScheduleId, EmployeeId, Role, ShiftDate, StartTime, EndTime, Status, BranchId, employee(FirstName, LastName)",
     )
     .neq("Status", "Cancelled")
     .neq("Status", "Archived")
+    .gte("ShiftDate", rangeStart.toISOString().split("T")[0])
+    .lte("ShiftDate", rangeEnd.toISOString().split("T")[0])
     .order("ScheduleId", { ascending: false });
+  const { data } = await query;
   if (data) {
     schedules.value = data.map((s) => ({
       id: s.ScheduleId,
@@ -3033,24 +2986,9 @@ const fetchChangeInquiries = async (force = false) => {
       return;
     }
   }
-  const { data: empData } = await supabase
-    .from("employee")
-    .select("EmployeeId, FirstName, LastName, Position, BranchAssigned");
-  const empMap = {};
-  if (empData)
-    empData.forEach((e) => {
-      empMap[e.EmployeeId] = {
-        name: `${e.FirstName || ""} ${e.LastName || ""}`.trim() || "Unknown",
-        initials:
-          `${e.FirstName?.[0] || ""}${e.LastName?.[0] || ""}`.toUpperCase() ||
-          "?",
-        role: e.Position || "—",
-        branchId: e.BranchAssigned,
-      };
-    });
   const { data, error } = await supabase
     .from("changeinquiry")
-    .select("*")
+    .select("*, employee(EmployeeId, FirstName, LastName, Position, BranchAssigned)")
     .order("inquiryid", { ascending: false });
   if (error) {
     console.error("[Schedule] fetchChangeInquiries failed:", error);
@@ -3059,14 +2997,18 @@ const fetchChangeInquiries = async (force = false) => {
   }
   if (data) {
     changeInquiries.value = data.map((c) => {
-      const emp = empMap[c.employeeid];
+      const emp = c.employee;
       return {
         id: c.inquiryid,
         employeeId: c.employeeid,
-        employeeName: emp?.name || "Unknown",
-        initials: emp?.initials || "?",
-        role: emp?.role || "—",
-        branchId: emp?.branchId || null,
+        employeeName: emp
+          ? `${emp.FirstName || ""} ${emp.LastName || ""}`.trim() || "Unknown"
+          : "Unknown",
+        initials: emp
+          ? `${(emp.FirstName || "")[0] || ""}${(emp.LastName || "")[0] || ""}`.toUpperCase() || "?"
+          : "?",
+        role: emp?.Position || "—",
+        branchId: emp?.BranchAssigned || null,
         requestDate: c.requestdate,
         requestType: c.requesttype || "Shift Change",
         preferredDate: c.preferreddate,
@@ -3451,7 +3393,7 @@ const saveSchedule = async (overrideConflict = false) => {
       form.value.endTime,
       isEditing.value ? form.value.id : null,
     );
-    let cap = form.value.role === 'Manager' ? 1 : 2;
+    let cap = 2;
     if (form.value.startTime) {
       const periods = periodsByBranch.value[form.value.branchId];
       if (periods?.length) {
@@ -3461,6 +3403,7 @@ const saveSchedule = async (overrideConflict = false) => {
         if (match?.maxperrole) cap = form.value.role === 'Manager' ? 1 : match.maxperrole;
       }
     }
+    if (form.value.role === 'Manager') cap = 1;
     if (roleCount >= cap) {
       roleCapInfo.value = {
         role: form.value.role,
@@ -3819,13 +3762,9 @@ watch(schedSearchInput, (value) => {
   }, 200);
 });
 
-onUnmounted(() => {
-  clearTimeout(schedSearchDebounce);
-});
-
 onMounted(async () => {
-  if (sessionStorage.getItem("page_refreshed")) {
-    sessionStorage.removeItem("page_refreshed");
+  const navEntries = performance.getEntriesByType("navigation");
+  if (navEntries.length && navEntries[0].type === "reload") {
     [
       CACHE_KEY_SCHEDULES,
       CACHE_KEY_AVAILABILITY,
@@ -3840,7 +3779,6 @@ onMounted(async () => {
   await Promise.all([
     fetchBranches(),
     fetchEmployees(),
-    fetchStaff(),
     fetchAvailability(),
     fetchSchedules(),
     fetchChangeInquiries(),

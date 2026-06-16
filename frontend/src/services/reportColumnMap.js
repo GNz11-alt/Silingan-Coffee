@@ -6,116 +6,165 @@
 export const COLUMN_MAPS = {
   // Inventory Reports
   'inventory-on-hand': {
-    'productname': 'Product Name',
-    'product_name': 'Product Name',
-    'name': 'Product Name',
-    'category': 'Category',
-    'unit': 'Unit',
-    'stockquantity': 'Current Stock',
-    'reorderlevel': 'Reorder Level',
-    'expirationdate': 'Expiration Date',
-    'shortage': 'Shortage',
-    'status': 'Status',
+    'productname':        'Product Name',
+    'product_name':       'Product Name',
+    'name':               'Product Name',
+    'category':           'Category',
+    'unit':               'Unit',
+    'stockquantity':      'How Many We Have',
+    'reorderlevel':       'Minimum Safe Amount',
+    'expirationdate':     'Expiry Date',
+    'shortage':           'How Many We Need',
+    'status':             'Status',
   },
+ 
+
   'inventory-aging': {
-    'productname': 'Product Name',
-    'product_name': 'Product Name',
-    'name': 'Product Name',
-    'category': 'Category',
-    'unit': 'Unit',
-    'stockquantity': 'Current Stock',
-    'expirationdate': 'Expiration Date',
-    'days_until_expiry': 'Days Until Expiry',
-    'urgency': 'Urgency',
+    'productname':        'Product Name',
+    'product_name':       'Product Name',
+    'name':               'Product Name',
+    'category':           'Category',
+    'unit':               'Unit',
+    'stockquantity':      'How Many We Have',
+    'expirationdate':     'Expiry Date',
+    'days_until_expiry':  'Days Until Expiry',
+    'urgency':            'Action Needed',
   },
+ 
+
   'low-inventory': {
-    'product_name': 'Product Name',
-    'category': 'Category',
-    'we_have': 'How Many We Have',
-    'minimum_safe': 'Minimum Safe Amount',
-    'need_more': 'Need More',
-    'expiration_date': 'Expiration Date',
-    'days_until_expiry': 'Days Until Expiry',
-    'branch_name': 'Branch',
-    'status_label': 'Status',
-  },
-  'stock-turnover': {
-    'name': 'Product Name',
-    'category': 'Category',
-    'unit': 'Unit',
-    'daily_consumption_rate': 'Daily Consumption Rate',
-    'days_of_stock_remaining': 'Days of Stock Remaining',
+    'name':                   'Product Name',
+    'category':               'Category',
+    'unit':                   'Unit',
+    'stockquantity':          'How Many We Have',
+    'reorderlevel':           'Minimum Safe Amount',
+    'shortage':               'How Many We Need',
+    'expirationdate':         'Expiry Date',
+    'days_of_stock_remaining':'Days of Stock Left',
+    'branch_name':            'Branch',
   },
 
+    'low-raw-materials': {
+    'rawproductid':       'ID',
+    'name':               'Ingredient / Supply',
+    'category':           'Category',
+    'unit':               'Unit',
+    'stockquantity':      'How Many We Have',
+    'reorderlevel':       'Minimum Safe Amount',
+    'expirationdate':     'Expiry Date',
+    'hasexpiry':          'Has Expiry Date',
+    'leadtimedays':       'Days to Arrive After Ordering',
+    'status_label':       'What to Do',
+  },
+
+
+
+  'stock-turnover': {
+    'name':                       'Product Name',
+    'category':                   'Category',
+    'unit':                       'Unit',
+    'daily_consumption_rate':     'Sold Per Day (Average)',
+    'days_of_stock_remaining':    'Days of Stock Left',
+  },
+
+
   // Sales Reports
-  'sales-summary': {
-    'period_label': 'Period',
-    'branch_name': 'Branch',
-    'total_revenue': 'Total Revenue',
-    'total_orders': 'Total Orders',
-    'avg_order_value': 'Avg Order Value',
-    'total_distinct_orders': 'Total Distinct Orders',
-  },
-  'sales-performance': {
-    'branch_name': 'Branch',
-    'product_category': 'Category',
-    'total_orders': 'Total Orders',
-    'total_revenue': 'Total Revenue',
-    'avg_order_value': 'Avg Order Value',
-    'total_distinct_orders': 'Total Distinct Orders',
-    'total_revenue_share': 'Revenue Share %',
-  },
   'sales-pipeline': {
-    'order_id': 'Order ID',
+    'order_id':     'Order Number',
+    'order_date':   'Date',
+    'sale_date':    'Date',
+    'branch_name':  'Branch',
     'product_name': 'Product',
-    'quantity': 'Quantity',
-    'unit_price': 'Unit Price',
-    'subtotal': 'Subtotal',
-    'discount': 'Discount',
-    'net_sales': 'Net Sales',
-    'order_date': 'Date',
-    'branch_name': 'Branch',
-    'status': 'Status',
+    'quantity':     'Number Sold',
+    'unit_price':   'Price Each',
+    'subtotal':     'Subtotal',
+    'discount':     'Discount',
+    'net_sales':    'Amount Collected',
+    'status':       'Status',
   },
+
+  'sales-performance': {
+    'branch_name':        'Branch',
+    'product_category':   'Category',
+    'total_revenue':      'Total Money Collected',
+    'total_orders':       'Number of Orders',
+    'avg_order_value':    'Average per Order',
+    'revenue_percentage': 'Share of Total Sales',
+  },
+
+  'sales-monthly': {
+    'year_month':       'Month',
+    'branch_name':      'Branch',
+    'total_revenue':    'Total Money Collected',
+    'total_orders':     'Number of Orders',
+    'avg_order_value':  'Average per Order',
+  },
+ 
+
+  'sales-weekly': {
+    'week_start':       'Week Starting',
+    'week_end':         'Week Ending',
+    'branch_name':      'Branch',
+    'total_revenue':    'Total Money Collected',
+    'total_orders':     'Number of Orders',
+    'avg_order_value':  'Average per Order',
+  },
+
+
   'sales-forecast': {
-    'sale_date': 'Date',
-    'net_sales': 'Actual Sales',
-    'moving_avg_3d': '3-Day Moving Avg',
-    'forecast_sales': 'Forecast',
+    'sale_date':        'Date',
+    'net_sales':        'Actual Sales',
+    'moving_avg_3d':    '3-Day Average',
+    'forecast_sales':   'Expected Sales',
   },
+
 
   // Employee Reports
   'employee-schedule': {
-    'employee_name': 'Employee',
-    'role': 'Position',
-    'shift_date': 'Date',
-    'start_time': 'Start Time',
-    'end_time': 'End Time',
-    'status': 'Status',
-    'branch_name': 'Branch',
+    'employee_name':  'Staff Name',
+    'role':           'Position',
+    'shift_date':     'Date',
+    'start_time':     'Shift Start',
+    'end_time':       'Shift End',
+    'status':         'Status',
+    'branch_name':    'Branch',
   },
 
   // Inventory Period Reports
-  'inventory-summary': {
-    'period_label': 'Period',
-    'branch_name': 'Branch',
-    'product_name': 'Product',
-    'category': 'Category',
-    'unit': 'Unit',
-    'total_quantity_used': 'Qty Used',
-    'current_stock': 'Current Stock',
-    'stock_status': 'Status',
+  'inventory-monthly': {
+    'year_month':           'Month',
+    'branch_name':          'Branch',
+    'product_name':         'Product',
+    'category':             'Category',
+    'unit':                 'Unit',
+    'total_quantity_used':  'Amount Used',
+    'current_stock':        'How Many We Have',
+    'stock_status':         'Status',
   },
+
+  'inventory-weekly': {
+    'week_start':           'Week Starting',
+    'week_end':             'Week Ending',
+    'branch_name':          'Branch',
+    'product_name':         'Product',
+    'category':             'Category',
+    'unit':                 'Unit',
+    'total_quantity_used':  'Amount Used',
+    'current_stock':        'How Many We Have',
+    'stock_status':         'Status',
+  },
+
 
   // Consolidated Report
   'consolidated-report': {
-    'branch_name': 'Branch',
-    'total_revenue': 'Total Revenue',
-    'total_orders': 'Total Orders',
-    'avg_order_value': 'Avg Order Value',
-    'total_products_sold': 'Products Sold',
-    'top_product': 'Top Product',
+    'branch_name':          'Branch',
+    'total_revenue':        'Total Money Collected',
+    'total_orders':         'Number of Orders',
+    'avg_order_value':      'Average per Order',
+    'total_products_sold':  'Total Items Sold',
+    'top_product':          'Best-Selling Product',
   },
+
 };
 
 /**
@@ -146,22 +195,22 @@ export function transformRowData(reportType, rows) {
   if (!map) {
     // Fallback: apply generic transformation
     return rows.map(row => {
-      const transformed = {};
+      const out = {};
       for (const [key, value] of Object.entries(row)) {
         const label = formatColumnName(key);
-        transformed[label] = value ?? '—';
+        out[label] = value ?? '—';
       }
-      return transformed;
+      return out;
     });
   }
 
   return rows.map(row => {
-    const transformed = {};
+    const out = {};
     for (const [key, value] of Object.entries(row)) {
       const label = getColumnLabel(reportType, key);
-      transformed[label] = value ?? '—';
+      out[label] = value ?? '—';
     }
-    return transformed;
+    return out;
   });
 }
 
@@ -170,18 +219,20 @@ export function transformRowData(reportType, rows) {
  */
 export function getColumnOrder(reportType) {
   const orders = {
-    'inventory-on-hand': ['Product Name', 'Category', 'Unit', 'Current Stock', 'Reorder Level', 'Shortage', 'Status'],
-    'inventory-aging': ['Product Name', 'Category', 'Unit', 'Current Stock', 'Expiration Date', 'Days Until Expiry', 'Urgency'],
-    'low-inventory': ['Product Name', 'Category', 'How Many We Have', 'Minimum Safe Amount', 'Need More', 'Days Until Expiry', 'Expiration Date', 'Branch'],
-    'stock-turnover': ['Product Name', 'Category', 'Unit', 'Daily Consumption Rate', 'Days of Stock Remaining'],
-    'sales-pipeline': ['Date', 'Branch', 'Order ID', 'Product', 'Quantity', 'Unit Price', 'Subtotal', 'Discount', 'Net Sales', 'Status'],
-    'sales-performance': ['Branch', 'Category', 'Total Orders', 'Total Revenue', 'Avg Order Value', 'Revenue Share %'],
-    'sales-summary': ['Period', 'Branch', 'Total Orders', 'Total Revenue', 'Avg Order Value'],
-    'sales-forecast': ['Date', 'Actual Sales', '3-Day Moving Avg', 'Forecast'],
-    'inventory-summary': ['Period', 'Branch', 'Product', 'Category', 'Unit', 'Qty Used', 'Current Stock', 'Status'],
-    'employee-schedule': ['Employee', 'Position', 'Date', 'Start Time', 'End Time', 'Status', 'Branch'],
-    'consolidated-report': ['Branch', 'Total Revenue', 'Total Orders', 'Avg Order Value', 'Products Sold', 'Top Product'],
+    'inventory-on-hand':    ['Product Name', 'Category', 'Unit', 'How Many We Have', 'Minimum Safe Amount', 'How Many We Need', 'Status'],
+    'inventory-aging':      ['Product Name', 'Category', 'Unit', 'How Many We Have', 'Expiry Date', 'Days Until Expiry', 'Action Needed'],
+    'low-inventory':        ['Product Name', 'Category', 'Unit', 'How Many We Have', 'Minimum Safe Amount', 'How Many We Need', 'Days of Stock Left', 'Expiry Date', 'Branch'],
+    'low-raw-materials':    ['Ingredient / Supply', 'Category', 'Unit', 'How Many We Have', 'Minimum Safe Amount', 'Expiry Date', 'Days to Arrive After Ordering', 'What to Do'],
+    'stock-turnover':       ['Product Name', 'Category', 'Unit', 'Sold Per Day (Average)', 'Days of Stock Left'],
+    'sales-pipeline':       ['Date', 'Branch', 'Order Number', 'Product', 'Number Sold', 'Price Each', 'Subtotal', 'Discount', 'Amount Collected', 'Status'],
+    'sales-performance':    ['Branch', 'Category', 'Number of Orders', 'Total Money Collected', 'Average per Order', 'Share of Total Sales'],
+    'sales-monthly':        ['Month', 'Branch', 'Number of Orders', 'Total Money Collected', 'Average per Order'],
+    'sales-weekly':         ['Week Starting', 'Week Ending', 'Branch', 'Number of Orders', 'Total Money Collected', 'Average per Order'],
+    'sales-forecast':       ['Date', 'Actual Sales', '3-Day Average', 'Expected Sales'],
+    'inventory-monthly':    ['Month', 'Branch', 'Product', 'Category', 'Unit', 'Amount Used', 'How Many We Have', 'Status'],
+    'inventory-weekly':     ['Week Starting', 'Week Ending', 'Branch', 'Product', 'Category', 'Unit', 'Amount Used', 'How Many We Have', 'Status'],
+    'employee-schedule':    ['Staff Name', 'Position', 'Date', 'Shift Start', 'Shift End', 'Status', 'Branch'],
+    'consolidated-report':  ['Branch', 'Total Money Collected', 'Number of Orders', 'Average per Order', 'Total Items Sold', 'Best-Selling Product'],
   };
-
   return orders[reportType] || [];
 }

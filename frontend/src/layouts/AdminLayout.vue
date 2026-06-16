@@ -1,27 +1,15 @@
 <template>
   <div class="dashboard" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
-    <!-- Mobile top bar -->
     <header class="mobile-topbar">
       <button class="hamburger-btn" @click="isMobileOpen = true">
         <span></span><span></span><span></span>
       </button>
       <div class="mobile-brand">
-        <img
-          src="@/assets/images/logo.png"
-          alt="Silingan Coffee"
-          class="mobile-logo"
-        />
+        <img src="@/assets/images/logo.png" alt="Silingan Coffee" class="mobile-logo" />
         <span>Silingan Coffee</span>
       </div>
     </header>
-
-    <!-- Mobile backdrop -->
-    <div
-      v-if="isMobileOpen"
-      class="sidebar-backdrop"
-      @click="isMobileOpen = false"
-    ></div>
-
+    <div v-if="isMobileOpen" class="sidebar-backdrop" @click="isMobileOpen = false"></div>
     <aside class="sidebar" :class="{ 'mobile-open': isMobileOpen }">
       <div class="sidebar-top">
         <button class="toggle-btn" @click="toggleSidebar">
@@ -162,36 +150,6 @@
             >{{ unreadCount }}</span
           >
         </button>
-        <Teleport to="body">
-          <NotificationPanel
-            v-if="showNotifPanel"
-            :branch-id="null"
-            @close="showNotifPanel = false"
-            @update-count="unreadCount = $event"
-          />
-        </Teleport>
-
-                <Teleport to="body">
-          <div v-if="showLogoutModal" class="cpw-overlay" @click.self="showLogoutModal = false">
-            <div class="cpw-box">
-              <div class="cpw-header">
-                <h6>Confirm Logout</h6>
-                <button class="cpw-close" @click="showLogoutModal = false">
-                  <i class="bi bi-x-lg"></i>
-                </button>
-              </div>
-              <div class="cpw-body">
-                <p style="font-size: 14px; color: #495057; margin: 0;">
-                  Are you sure you want to log out?
-                </p>
-              </div>
-              <div class="cpw-footer">
-                <button class="cpw-cancel" @click="showLogoutModal = false">Cancel</button>
-                <button class="cpw-submit" @click="confirmLogout">Logout</button>
-              </div>
-            </div>
-          </div>
-        </Teleport>
 
         <button
           class="nav-item change-pw-btn"
@@ -331,6 +289,37 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <NotificationPanel
+        v-if="showNotifPanel"
+        :branch-id="null"
+        @close="showNotifPanel = false"
+        @update-count="unreadCount = $event"
+      />
+    </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showLogoutModal" class="cpw-overlay" @click.self="showLogoutModal = false">
+        <div class="cpw-box">
+          <div class="cpw-header">
+            <h6>Confirm Logout</h6>
+            <button class="cpw-close" @click="showLogoutModal = false">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="cpw-body">
+            <p style="font-size: 14px; color: #495057; margin: 0;">
+              Are you sure you want to log out?
+            </p>
+          </div>
+          <div class="cpw-footer">
+            <button class="cpw-cancel" @click="showLogoutModal = false">Cancel</button>
+            <button class="cpw-submit" @click="confirmLogout">Logout</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -364,6 +353,7 @@ import { generateAllNotifications } from "@/services/notificationGenerator.js";
 const router = useRouter();
 const isSidebarCollapsed = ref(false);
 const isMobileOpen = ref(false);
+const showLogoutModal = ref(false);
 const unreadCount = ref(0);
 const showNotifPanel = ref(false);
 const showChangePwModal = ref(false);
@@ -527,20 +517,17 @@ const toggleNotifications = () => {
   showNotifPanel.value = !showNotifPanel.value;
 };
 
-const showLogoutModal = ref(false);
-
-// Replaces your existing logout — now just opens the modal
 const logout = () => {
   showLogoutModal.value = true;
 };
 
-// Called when user confirms
 const confirmLogout = () => {
   localStorage.removeItem("isLoggedIn");
   localStorage.removeItem("username");
   localStorage.removeItem("role");
   localStorage.removeItem("branch");
   localStorage.removeItem("userId");
+  localStorage.removeItem("loginTime");
   router.push("/login");
 };
 
@@ -555,7 +542,8 @@ onMounted(async () => {
   clockInterval = setInterval(() => {
     now.value = new Date();
   }, 1000);
-
+ 
+  // Admin is branch-agnostic — null is correct here, matches NotificationPanel :branch-id="null"
   const notifs = await fetchNotificationBundle(null);
   unreadCount.value = (notifs.unread || []).length;
 
@@ -564,16 +552,11 @@ onMounted(async () => {
     unreadCount.value += 1;
   });
 
-  // Generate notifications on mount
-  generateAllNotifications({ role: "admin" });
-
-  // Regenerate every 30 minutes
-  notifGenInterval = setInterval(
-    () => {
-      generateAllNotifications({ role: "admin" });
-    },
-    30 * 60 * 1000,
-  );
+  generateAllNotifications({ role: 'admin' });
+ 
+  notifGenInterval = setInterval(() => {
+    generateAllNotifications({ role: 'admin' });
+  }, 30 * 60 * 1000);
 });
 
 onUnmounted(() => {
@@ -743,8 +726,6 @@ onUnmounted(() => {
   flex: 1;
   margin-left: 280px;
   transition: margin-left 0.3s ease;
-  min-width: 0;
-  overflow-x: hidden;
 }
 
 .dashboard.sidebar-collapsed .main-content {
@@ -977,12 +958,10 @@ onUnmounted(() => {
 }
 
 @keyframes cpw-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
-/* ── Mobile top bar ─────────────────────────────────────── */
+/* Mobile topbar */
 .mobile-topbar {
   display: none;
   position: fixed;
@@ -1010,6 +989,7 @@ onUnmounted(() => {
   padding: 4px;
   flex-shrink: 0;
 }
+
 .hamburger-btn span {
   display: block;
   width: 22px;
@@ -1026,13 +1006,13 @@ onUnmounted(() => {
   font-weight: 600;
   color: #fff;
 }
+
 .mobile-logo {
   width: 26px;
   height: 26px;
   filter: invert(1);
 }
 
-/* ── Mobile backdrop ────────────────────────────────────── */
 .sidebar-backdrop {
   display: none;
   position: fixed;
@@ -1041,9 +1021,6 @@ onUnmounted(() => {
   z-index: 150;
 }
 
-/* ── Responsive breakpoints ─────────────────────────────── */
-
-/* Tablet: auto-collapse sidebar to icon-only */
 @media (max-width: 1024px) and (min-width: 769px) {
   .sidebar {
     width: 80px;
@@ -1072,7 +1049,6 @@ onUnmounted(() => {
   }
 }
 
-/* Mobile: off-canvas sidebar + top bar */
 @media (max-width: 768px) {
   .mobile-topbar {
     display: flex;
@@ -1091,7 +1067,6 @@ onUnmounted(() => {
   .sidebar.mobile-open {
     transform: translateX(0);
   }
-  /* Reset collapsed state on mobile so full sidebar shows */
   .dashboard.sidebar-collapsed .sidebar {
     width: 280px;
   }
