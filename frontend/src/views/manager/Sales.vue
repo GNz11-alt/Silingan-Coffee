@@ -2,7 +2,16 @@
   <div class="sales-container">
     <header class="page-header">
       <div class="header-text">
-        <h1>Sales Overview</h1>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <h1>Sales Overview</h1>
+          <button
+            class="toggle-amounts-btn"
+            @click="showAmounts = !showAmounts"
+            :title="showAmounts ? 'Hide amounts' : 'Show amounts'"
+          >
+            <component :is="showAmounts ? Eye : EyeOff" :size="18" />
+          </button>
+        </div>
         <p>View sales transactions and performance</p>
         <p v-if="isManager && lockedBranchId" class="branch-label">
           {{ branches.find((b) => b.BranchId === lockedBranchId)?.BranchName }}
@@ -17,16 +26,18 @@
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">
-          <component :is="DollarSign" :size="28" stroke-width="1.5" />
+          <component :is="PesoSign" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">
           <h3>Total Revenue</h3>
           <p class="stat-value">
-            ₱{{
-              totalRevenue.toLocaleString("en-PH", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })
+            {{
+              showAmounts
+                ? totalRevenue.toLocaleString("en-PH", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                : "••••••"
             }}
           </p>
           <span class="stat-trend positive"
@@ -40,7 +51,7 @@
         </div>
         <div class="stat-info">
           <h3>Average Sale</h3>
-          <p class="stat-value">₱{{ avgSale.toFixed(2) }}</p>
+          <p class="stat-value">{{ showAmounts ? "₱" + avgSale.toFixed(2) : "••••••" }}</p>
           <span class="stat-trend">per transaction</span>
         </div>
       </div>
@@ -51,11 +62,14 @@
         <div class="stat-info">
           <h3>Total Discounts</h3>
           <p class="stat-value">
-            ₱{{
-              totalDiscounts.toLocaleString("en-PH", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })
+            {{
+              showAmounts
+                ? "₱" +
+                  totalDiscounts.toLocaleString("en-PH", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                : "••••••"
             }}
           </p>
           <span class="stat-trend warning">given out</span>
@@ -236,7 +250,7 @@
                   <td>
                     <span v-if="tr.discount" class="discount-badge">
                       {{ tr.discount.discountname }}
-                      <em
+                      <em v-if="showAmounts"
                         >({{
                           tr.discount.discounttype === "percentage"
                             ? tr.discount.discountvalue + "%"
@@ -297,8 +311,8 @@
                               >
                                 <td>{{ item.product?.ProductName ?? "—" }}</td>
                                 <td>{{ item.Quantity }}</td>
-                                <td>₱{{ (item.UnitPrice ?? 0).toFixed(2) }}</td>
-                                <td>₱{{ (item.Subtotal ?? 0).toFixed(2) }}</td>
+                                <td>{{ showAmounts ? "₱" + (item.UnitPrice ?? 0).toFixed(2) : "••••••" }}</td>
+                                <td>{{ showAmounts ? "₱" + (item.Subtotal ?? 0).toFixed(2) : "••••••" }}</td>
                               </tr>
                             </tbody>
                           </table>
@@ -308,8 +322,7 @@
                           <div class="summary-rows">
                             <div class="s-row">
                               <span>Subtotal</span
-                              ><span
-                                >₱{{ (tr.TotalAmount ?? 0).toFixed(2) }}</span
+                              ><span>₱{{ (tr.TotalAmount ?? 0).toFixed(2) }}</span
                               >
                             </div>
                             <div class="s-row" v-if="tr.discount">
@@ -317,9 +330,7 @@
                                 >Discount ({{ tr.discount.discountname }})</span
                               >
                               <span class="s-discount"
-                                >-₱{{
-                                  (tr.DiscountedAmount ?? 0).toFixed(2)
-                                }}</span
+                                >{{ showAmounts ? "-₱" + (tr.DiscountedAmount ?? 0).toFixed(2) : "••••••" }}</span
                               >
                             </div>
                             <div class="s-row total">
@@ -327,12 +338,12 @@
                             </div>
                             <div class="s-row" v-if="tr.cashpaid">
                               <span>Cash Paid</span
-                              ><span>₱{{ (tr.cashpaid ?? 0).toFixed(2) }}</span>
+                              ><span>{{ showAmounts ? "₱" + (tr.cashpaid ?? 0).toFixed(2) : "••••••" }}</span>
                             </div>
                             <div class="s-row green" v-if="tr.changegiven">
                               <span>Change</span
                               ><span
-                                >₱{{ (tr.changegiven ?? 0).toFixed(2) }}</span
+                                >{{ showAmounts ? "₱" + (tr.changegiven ?? 0).toFixed(2) : "••••••" }}</span
                               >
                             </div>
                             <div v-if="tr.Status === 'cancelled' && tr.cancel_reason" class="cancel-reason-panel">
@@ -387,10 +398,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch, h } from "vue";
 import { useRoute } from "vue-router";
 import {
-  DollarSign,
   TrendingUp,
   Tag,
   ShoppingBag,
@@ -400,6 +410,8 @@ import {
   Search,
   X,
   CreditCard,
+  Eye,
+  EyeOff,
 } from "lucide-vue-next";
 import { supabase } from "@/supabase";
 import { useUserBranch } from "@/composables/useUserBranch.js";
@@ -454,6 +466,38 @@ const allTransactions = ref([]);
 const branches = ref([]);
 const loading = ref(false);
 const showPOS = ref(false);
+const showAmounts = ref(true);
+
+const PesoSign = {
+  render() {
+    return h(
+      "svg",
+      {
+        xmlns: "http://www.w3.org/2000/svg",
+        width: "28",
+        height: "28",
+        viewBox: "0 0 24 24",
+        fill: "currentColor",
+        stroke: "none",
+      },
+      [
+        h(
+          "text",
+          {
+            x: "50%",
+            y: "50%",
+            "dominant-baseline": "central",
+            "text-anchor": "middle",
+            "font-size": "18",
+            "font-weight": "600",
+            "font-family": "Arial, sans-serif",
+          },
+          "₱",
+        ),
+      ],
+    );
+  },
+};
 
 // ── Filters ─────────────────────────────────────────────────────────────────
 const filterBranch = ref("");
@@ -797,6 +841,21 @@ onMounted(async () => {
 }
 .launch-pos-btn:hover {
   background: #4a3330;
+}
+
+.toggle-amounts-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.toggle-amounts-btn:hover {
+  color: #8b4513;
 }
 
 /* STATS */

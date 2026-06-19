@@ -2,7 +2,16 @@
   <div class="sales-container">
     <header class="page-header">
       <div class="header-text">
-        <h1>Sales Overview</h1>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <h1>Sales Overview</h1>
+          <button
+            class="toggle-amounts-btn"
+            @click="showAmounts = !showAmounts"
+            :title="showAmounts ? 'Hide amounts' : 'Show amounts'"
+          >
+            <component :is="showAmounts ? Eye : EyeOff" :size="18" />
+          </button>
+        </div>
         <p>View sales transactions and performance</p>
       </div>
     </header>
@@ -11,16 +20,19 @@
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">
-          <component :is="DollarSign" :size="28" stroke-width="1.5" />
+          <component :is="PesoSign" :size="28" stroke-width="1.5" />
         </div>
         <div class="stat-info">
           <h3>Total Revenue</h3>
           <p class="stat-value">
-            ₱{{
-              totalRevenue.toLocaleString("en-PH", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })
+            {{
+              showAmounts
+                ? 
+                  totalRevenue.toLocaleString("en-PH", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                : "••••••"
             }}
           </p>
           <span class="stat-trend positive"
@@ -46,7 +58,9 @@
         </div>
         <div class="stat-info">
           <h3>Average Sale</h3>
-          <p class="stat-value">₱{{ avgSale.toFixed(2) }}</p>
+          <p class="stat-value">
+            {{ showAmounts ? "₱" + avgSale.toFixed(2) : "₱••••••" }}
+          </p>
           <span class="stat-trend">per transaction</span>
         </div>
       </div>
@@ -58,11 +72,14 @@
         <div class="stat-info">
           <h3>Total Discounts</h3>
           <p class="stat-value">
-            ₱{{
-              totalDiscounts.toLocaleString("en-PH", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })
+            {{
+              showAmounts
+                ? "₱" +
+                  totalDiscounts.toLocaleString("en-PH", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                : "₱••••••"
             }}
           </p>
           <span class="stat-trend warning">given out</span>
@@ -380,7 +397,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, h } from "vue";
 import { useRoute } from "vue-router";
 import {
   DollarSign,
@@ -392,11 +409,13 @@ import {
   ChevronRight,
   Search,
   X,
+  Eye,
+  EyeOff,
 } from "lucide-vue-next";
 import { supabase } from "@/supabase";
 
 const route = useRoute();
-
+const showAmounts = ref(true);
 // Sort icon inline component
 const SortIcon = {
   props: ["field", "current", "dir"],
@@ -439,11 +458,9 @@ const onVisibilityChange = () => {
   if (document.visibilityState === "visible") fetchAllOrders();
 };
 
-
-const completedCount = computed(() =>
-  allTransactions.value.filter((t) => t.Status === "completed").length
+const completedCount = computed(
+  () => allTransactions.value.filter((t) => t.Status === "completed").length,
 );
-
 
 // Filters
 const filterBranch = ref("");
@@ -452,6 +469,37 @@ const filterPayment = ref("");
 const filterDateFrom = ref("");
 const filterDateTo = ref("");
 const filterSearch = ref("");
+
+const PesoSign = {
+  render() {
+    return h(
+      "svg",
+      {
+        xmlns: "http://www.w3.org/2000/svg",
+        width: "28",
+        height: "28",
+        viewBox: "0 0 24 24",
+        fill: "currentColor",
+        stroke: "none",
+      },
+      [
+        h(
+          "text",
+          {
+            x: "50%",
+            y: "50%",
+            "dominant-baseline": "central",
+            "text-anchor": "middle",
+            "font-size": "18",
+            "font-weight": "600",
+            "font-family": "Arial, sans-serif",
+          },
+          "₱",
+        ),
+      ],
+    );
+  },
+};
 
 // Sort
 const sortBy = ref("CreatedAt");
@@ -487,24 +535,26 @@ const filteredTransactions = computed(() => {
   if (filterPayment.value)
     list = list.filter((t) => t.PaymentMethod === filterPayment.value);
 
-if (filterDateFrom.value)
-  list = list.filter((t) => {
-    const d = t.CreatedAt?.includes("+") || t.CreatedAt?.endsWith("Z")
-      ? t.CreatedAt
-      : t.CreatedAt + "+08:00";
-    return new Date(d) >= new Date(filterDateFrom.value);
-  });
+  if (filterDateFrom.value)
+    list = list.filter((t) => {
+      const d =
+        t.CreatedAt?.includes("+") || t.CreatedAt?.endsWith("Z")
+          ? t.CreatedAt
+          : t.CreatedAt + "+08:00";
+      return new Date(d) >= new Date(filterDateFrom.value);
+    });
 
-if (filterDateTo.value) {
-  const to = new Date(filterDateTo.value);
-  to.setHours(23, 59, 59, 999);
-  list = list.filter((t) => {
-    const d = t.CreatedAt?.includes("+") || t.CreatedAt?.endsWith("Z")
-      ? t.CreatedAt
-      : t.CreatedAt + "+08:00";
-    return new Date(d) <= to;
-  });
-}
+  if (filterDateTo.value) {
+    const to = new Date(filterDateTo.value);
+    to.setHours(23, 59, 59, 999);
+    list = list.filter((t) => {
+      const d =
+        t.CreatedAt?.includes("+") || t.CreatedAt?.endsWith("Z")
+          ? t.CreatedAt
+          : t.CreatedAt + "+08:00";
+      return new Date(d) <= to;
+    });
+  }
 
   if (filterSearch.value) {
     const q = filterSearch.value.toLowerCase();
@@ -546,8 +596,8 @@ const pagedTransactions = computed(() =>
 
 const totalRevenue = computed(() =>
   filteredTransactions.value
-    .filter((t) => t.Status !== "cancelled")  // add this
-    .reduce((s, t) => s + (t.FinalAmount ?? 0), 0)
+    .filter((t) => t.Status !== "cancelled") // add this
+    .reduce((s, t) => s + (t.FinalAmount ?? 0), 0),
 );
 const avgSale = computed(() =>
   filteredTransactions.value.length
@@ -628,7 +678,7 @@ const getBranchName = (id) => {
 const parseManila = (iso) => {
   if (!iso) return null;
   return new Date(
-    iso.includes("+") || iso.endsWith("Z") ? iso : iso + "+08:00"
+    iso.includes("+") || iso.endsWith("Z") ? iso : iso + "+08:00",
   );
 };
 
@@ -637,7 +687,9 @@ const formatDateShort = (iso) => {
   if (!d) return "—";
   return d.toLocaleDateString("en-PH", {
     timeZone: "Asia/Manila",
-    month: "short", day: "numeric", year: "numeric",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 };
 
@@ -646,7 +698,8 @@ const formatTime = (iso) => {
   if (!d) return "";
   return d.toLocaleTimeString("en-PH", {
     timeZone: "Asia/Manila",
-    hour: "2-digit", minute: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 
@@ -967,6 +1020,20 @@ onMounted(async () => {
 }
 .main-table th.sortable:hover {
   color: #31201d;
+}
+.toggle-amounts-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6c757d;
+  padding: 0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.toggle-amounts-btn:hover {
+  color: #8b4513;
 }
 .sort-arrows {
   margin-left: 4px;
