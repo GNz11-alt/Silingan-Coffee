@@ -294,9 +294,7 @@
               <td class="td-text">{{ item.category ?? "—" }}</td>
               <td>
                 <div class="stock-cell">
-                  <span :class="['qty-val', getStatus(item)]">{{
-                    item.stockquantity ?? 0
-                  }}</span>
+                  <span :class="['qty-val', getStatus(item)]">{{ formatQty(item.stockquantity) }}</span>
                   <div class="stock-bar-wrap" v-if="item.reorderlevel">
                     <div
                       class="stock-bar"
@@ -2149,6 +2147,10 @@ const formatDate = (d) => {
     day: "numeric",
     year: "numeric",
   });
+};
+const formatQty = (n) => {
+  if (n === null || n === undefined || isNaN(n)) return "0.00";
+  return (Math.round(n * 100) / 100).toFixed(2);
 };
 
 const showToast = (msg, type = "success") => {
