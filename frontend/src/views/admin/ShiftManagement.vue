@@ -1017,7 +1017,7 @@
               Cancel
             </button>
             <button class="btn btn-danger-brand" @click="confirmConflictSave">
-              Save Anyway
+              Change Shift 
             </button>
           </div>
         </div>
