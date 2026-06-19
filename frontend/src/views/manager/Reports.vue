@@ -620,20 +620,6 @@
               </div>
             </div>
 
-            <div class="mb-3">
-              <label
-                class="d-flex align-items-center gap-2"
-                style="cursor: pointer; font-size: 0.82rem"
-              >
-                <input
-                  type="checkbox"
-                  v-model="genForm.saveToCloud"
-                  class="form-check-input"
-                />
-                <span>Save to cloud storage after generation</span>
-              </label>
-            </div>
-
             <button
               class="btn btn-generate w-100 mb-2"
               @click="generateReport"
@@ -1025,7 +1011,7 @@ export default {
         dateTo: today,
         branchId: null,
         format: "pdf",
-        saveToCloud: false,
+        saveToCloud: true,
       },
       genErrors: {},
 
@@ -1802,7 +1788,7 @@ export default {
         dateTo: today,
         branchId: this.managerBranchId,
         format: "pdf",
-        saveToCloud: false,
+        saveToCloud: true,
       };
       this.genErrors = {};
     },

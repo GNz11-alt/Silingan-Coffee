@@ -83,16 +83,19 @@ export async function getBranchComparison(dateFrom, dateTo, branchId = null) {
 
 
 //raw mats at or below reorder level
-export async function getLowStockItems(branchId = null) {
+export async function getLowStockItems(dateFrom = null, dateTo = null, branchId = null) {
   return supabase.rpc('get_low_stock_items', {
+    p_date_from: dateFrom,
+    p_date_to:   dateTo,
     p_branch_id: branchId,
   })
 }
 
 export async function getLowRawMaterials(branchId = null) {
-  return supabase.rpc('get_low_raw_materials', {
+  const { data, error } = await supabase.rpc('get_low_raw_materials', {
     p_branch_id: branchId,
   })
+  return { data, error }
 }
 
 //daily consumption rate per raw mats 
@@ -171,24 +174,22 @@ const REPORT_FUNCTION_MAP = {
   'sales-performance':   'report_sales_performance',
   'sales-forecast':      'report_sales_forecast',
   'customer-churn':      'report_sales_pipeline',
-  'sales-summary':       'report_sales_summary',
+  'sales-monthly':       'report_sales_monthly',
+  'sales-weekly':        'report_sales_weekly',
   'inventory-on-hand':   null,                        // direct handler below
   'inventory-aging':     null,
+  'low-raw-materials': 'get_low_raw_materials',
   'stock-turnover':      'get_stock_turnover',
   'low-inventory':       null,
-  'low-raw-materials':   null,
-  'inventory-summary':   null,
-  'employee-schedule':   null,
+  'inventory-monthly':   'get_inventory_monthly',
+  'inventory-weekly':    'get_inventory_weekly',
+  'employee-schedule':   'report_employee_schedule',
   'consolidated-report': 'report_consolidated',
 }
 
 //fetch actual data rows, returns an array of objects report ready
 export async function fetchReportData(reportType, { dateFrom, dateTo, branchId } = {}) {
   const fnName = REPORT_FUNCTION_MAP[reportType]
-
-  // Normalize dates to YYYY-MM-DD strings (PostgREST URL filters can't handle Date objects)
-  if (dateFrom instanceof Date) dateFrom = dateFrom.toISOString().slice(0, 10)
-  if (dateTo instanceof Date) dateTo = dateTo.toISOString().slice(0, 10)
 
 // Inventory reports: source from rawproduct + rawproducttransaction
   if (reportType === 'inventory-on-hand') {
@@ -221,7 +222,7 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
 
   if (reportType === 'inventory-aging') {
     const [prodRes, txRes] = await Promise.all([
-      supabase.from('rawproduct').select('rawproductid, name, category, unit, hasexpiry').eq('hasexpiry', true).neq('status', 'Archived'),
+      supabase.from('rawproduct').select('rawproductid, name, category, unit, hasexpiry').neq('status', 'Archived'),
       supabase.from('rawproducttransaction').select('rawproductid, branchid, transactiontype, quantity, expirationdate').not('expirationdate', 'is', null),
     ])
     if (prodRes.error) return { data: [], raw: [], error: prodRes.error }
@@ -258,32 +259,68 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
                 : daysLeft <= 7 ? 'Warning' : 'OK',
       }
     })
-      .filter(p => p.stockquantity > 0 && p.expirationdate && p.expirationdate !== 'N/A')
     return { data: transformRowData(reportType, raw), raw, error: null }
   }
 
   if (reportType === 'low-inventory') {
-    const { data, error } = await getLowStockItems(branchId)
-    if (error) return { data: [], raw: [], error }
-    const raw = (data || []).map(i => ({
-      product_name: i.product_name,
-      category: i.category,
-      we_have: i.we_have,
-      minimum_safe: i.minimum_safe,
-      need_more: i.need_more,
-      expiration_date: i.expiration_date,
-      days_until_expiry: i.days_until_expiry,
-      branch_name: i.branch_name,
-      status_label: i.status_label,
-    }))
+    const [prodRes, txRes, branchRes] = await Promise.all([
+      supabase.from('rawproduct').select('rawproductid, name, category, unit, reorderlevel').neq('status', 'Archived'),
+      supabase.from('rawproducttransaction').select('rawproductid, branchid, transactiontype, quantity, expirationdate'),
+      supabase.from('branch').select('BranchId, BranchName'),
+    ])
+    if (prodRes.error) return { data: [], raw: [], error: prodRes.error }
+    const filteredTx = branchId ? (txRes.data || []).filter(t => t.branchid === branchId) : (txRes.data || [])
+    const branchMap = {}
+    for (const b of branchRes.data || []) branchMap[b.BranchId] = b.BranchName
+    const stockByProduct = {}
+    const branchNamesByProduct = {}
+    const expiryByProduct = {}
+    for (const tx of filteredTx) {
+      const qty = tx.transactiontype === 'in' ? tx.quantity : -tx.quantity
+      const pid = tx.rawproductid
+      stockByProduct[pid] = (stockByProduct[pid] || 0) + qty
+      if (tx.branchid) {
+        if (!branchNamesByProduct[pid]) branchNamesByProduct[pid] = new Set()
+        branchNamesByProduct[pid].add(branchMap[tx.branchid] || tx.branchid)
+      }
+      if (tx.expirationdate) {
+        if (!expiryByProduct[pid] || new Date(tx.expirationdate) < new Date(expiryByProduct[pid])) {
+          expiryByProduct[pid] = tx.expirationdate
+        }
+      }
+    }
+    const raw = (prodRes.data || [])
+      .filter(p => {
+        const stock = stockByProduct[p.rawproductid] || 0
+        return p.reorderlevel && stock <= p.reorderlevel
+      })
+      .map(p => {
+        const stock = stockByProduct[p.rawproductid] || 0
+        return {
+          name: p.name,
+          category: p.category,
+          unit: p.unit || '—',
+          stockquantity: stock,
+          reorderlevel: p.reorderlevel,
+          shortage: Math.max(0, p.reorderlevel - stock),
+          days_of_stock_remaining: '—',
+          expirationdate: expiryByProduct[p.rawproductid] || 'N/A',
+          branch_name: branchNamesByProduct[p.rawproductid]
+            ? [...branchNamesByProduct[p.rawproductid]].join(', ') : '—',
+        }
+      })
     return { data: transformRowData(reportType, raw), raw, error: null }
   }
 
   if (reportType === 'low-raw-materials') {
-    const { data, error } = await getLowRawMaterials(branchId)
-    if (error) return { data: [], raw: [], error }
-    return { data: transformRowData(reportType, data), raw: data, error: null }
+    const { data, error } = await supabase.rpc('get_low_raw_materials', {
+      p_branch_id: params.branchId || null
+    });
+    if (error) return { data: null, error };
+    const transformed = transformRowData('low-raw-materials', data || []);
+    return { data: transformed, raw: data, error: null };
   }
+
 
   if (reportType === 'stock-turnover') {
     const start = dateFrom ? new Date(dateFrom) : null
@@ -336,22 +373,21 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
       const totalUsed = consumptionMap[p.rawproductid] || 0
       const dailyRate = daysInRange > 0 ? totalUsed / daysInRange : 0
       const stock = stockByProduct[p.rawproductid] || 0
-      const daysRemaining = dailyRate > 0 ? Number((stock / dailyRate).toFixed(2)) : (stock > 0 ? 'N/A' : 0)
+      const daysRemaining = dailyRate > 0 ? Math.round(stock / dailyRate * 10) / 10 : (stock > 0 ? 'N/A' : 0)
       return {
         name: p.name,
         category: p.category || '—',
         unit: p.unit || '—',
-        daily_consumption_rate: Number(dailyRate.toFixed(2)),
+        daily_consumption_rate: Math.round(dailyRate * 100) / 100,
         days_of_stock_remaining: daysRemaining,
       }
     })
-      .filter(p => p.daily_consumption_rate > 0 || p.days_of_stock_remaining === 'N/A')
 
     return { data: transformRowData(reportType, raw), raw, error: null }
   }
 
-  if (reportType === 'inventory-summary') {
-    const isWeekly = dateFrom && dateTo ? (new Date(dateTo) - new Date(dateFrom)) / 86400000 <= 42 : false;
+  if (reportType === 'inventory-monthly' || reportType === 'inventory-weekly') {
+    const isWeekly = reportType === 'inventory-weekly'
     const [prodRes, recipeRes, orderRes, branchRes] = await Promise.all([
       supabase.from('rawproduct').select('rawproductid, name, category, unit, reorderlevel').neq('status', 'Archived'),
       supabase.from('recipe').select('rawproductid, finishedproductid, quantityneeded'),
@@ -370,7 +406,7 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
     for (const b of branchRes.data || []) branchNameMap[b.BranchId] = b.BranchName
 
     const orderIds = (orderRes.data || []).map(o => o.OrderId)
-    let oiQuery = supabase.from('orderitem').select('OrderId, ProductId, Quantity')
+    let oiQuery = supabase.from('orderitem').select('ProductId, Quantity')
     if (orderIds.length) oiQuery = oiQuery.in('OrderId', orderIds)
     const { data: orderItems } = orderIds.length ? await oiQuery : { data: [] }
 
@@ -388,25 +424,19 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
       const order = orderLookup[oi.OrderId]
       if (!order) continue
       const createdAt = new Date(order.CreatedAt)
-      let periodKey, periodLabel
+      let periodKey
       if (isWeekly) {
         const ws = new Date(createdAt)
         ws.setDate(ws.getDate() - ws.getDay())
         periodKey = ws.toISOString().split('T')[0]
-        const we = new Date(ws)
-        we.setDate(we.getDate() + 6)
-        periodLabel = ws.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' - ' +
-          we.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       } else {
         periodKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}`
-        periodLabel = periodKey
       }
       const oBranchId = order.BranchId
       const recipes = recipeMap[oi.ProductId] || []
       for (const r of recipes) {
         const key = `${periodKey}:${oBranchId}:${r.rawproductid}`
-        if (!consumptionByPeriod[key]) consumptionByPeriod[key] = { periodLabel, qty: 0 }
-        consumptionByPeriod[key].qty += r.qty * oi.Quantity
+        consumptionByPeriod[key] = (consumptionByPeriod[key] || 0) + r.qty * oi.Quantity
       }
     }
 
@@ -425,7 +455,7 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
     for (const p of prodRes.data || []) productMap[p.rawproductid] = p
 
     const raw = []
-    for (const [key, val] of Object.entries(consumptionByPeriod)) {
+    for (const [key, totalQty] of Object.entries(consumptionByPeriod)) {
       const parts = key.split(':')
       const periodKey = parts[0]
       const branchIdStr = parts[1]
@@ -437,47 +467,34 @@ export async function fetchReportData(reportType, { dateFrom, dateTo, branchId }
       const branchName = branchNameMap[Number(branchIdStr)] || '—'
       const status = stock === 0 ? 'Out of Stock'
         : (p.reorderlevel && stock <= p.reorderlevel) ? 'Low Stock' : 'In Stock'
-      raw.push({
-        period_label: val.periodLabel,
-        branch_name: branchName,
-        product_name: p.name,
-        category: p.category || '—',
-        unit: p.unit || '—',
-        total_quantity_used: val.qty,
-        current_stock: stock,
-        stock_status: status,
-      })
+      if (isWeekly) {
+        const ws = new Date(periodKey)
+        const we = new Date(ws)
+        we.setDate(we.getDate() + 6)
+        raw.push({
+          week_start: periodKey,
+          week_end: we.toISOString().split('T')[0],
+          branch_name: branchName,
+          product_name: p.name,
+          category: p.category || '—',
+          unit: p.unit || '—',
+          total_quantity_used: totalQty,
+          current_stock: stock,
+          stock_status: status,
+        })
+      } else {
+        raw.push({
+          year_month: periodKey,
+          branch_name: branchName,
+          product_name: p.name,
+          category: p.category || '—',
+          unit: p.unit || '—',
+          total_quantity_used: totalQty,
+          current_stock: stock,
+          stock_status: status,
+        })
+      }
     }
-
-    return { data: transformRowData(reportType, raw), raw, error: null }
-  }
-
-// Employee Schedule — direct query (no RPC)
-  if (reportType === 'employee-schedule') {
-    let query = supabase
-      .from('schedule')
-      .select('Role, ShiftDate, StartTime, EndTime, Status, BranchId, employee(FirstName, LastName), branch(BranchName)')
-      .neq('Status', 'Archived')
-      .gte('ShiftDate', dateFrom)
-      .lte('ShiftDate', dateTo)
-      .order('ShiftDate', { ascending: true })
-
-    if (branchId) query = query.eq('BranchId', branchId)
-
-    const { data, error } = await query
-    if (error) return { data: [], raw: [], error }
-
-    const raw = (data || []).map((s) => ({
-      employee_name: s.employee
-        ? `${s.employee.FirstName || ''} ${s.employee.LastName || ''}`.trim()
-        : 'Unknown',
-      role: s.Role || '—',
-      shift_date: s.ShiftDate ? String(s.ShiftDate).slice(0, 10) : '',
-      start_time: s.StartTime ? String(s.StartTime).slice(0, 5) : '',
-      end_time: s.EndTime ? String(s.EndTime).slice(0, 5) : '',
-      status: s.Status || 'Scheduled',
-      branch_name: s.branch?.BranchName || '—',
-    }))
 
     return { data: transformRowData(reportType, raw), raw, error: null }
   }

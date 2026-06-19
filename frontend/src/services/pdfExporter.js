@@ -1,18 +1,19 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import { transformRowData } from './reportColumnMap.js';
+import { STATUS_COLORS } from '@/theme.js';
 
 pdfMake.vfs = pdfFonts;
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 const DARK       = '#1A1A1A';
-const MUTED      = '#6B7280';
+const MUTED      = STATUS_COLORS.neutral;
 const BORDER     = '#E5E0DD';
 
 // ─── Shared Helpers ─────────────────────────────────────────────────────────
 const peso = (n) => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n) => Number(n || 0).toLocaleString('en-PH');
-const pct = (n) => Number(n || 0).toFixed(2) + '%';
+const pct = (n) => Number(n || 0).toFixed(1) + '%';
 const fmtTimeRemaining = (days) => {
   if (days == null || days === 'N/A') return days || '—';
   if (isNaN(days)) return '—';
@@ -84,9 +85,9 @@ const BUILDERS = {
     const out = rows.filter(r => (r['Current Stock'] || r.stockquantity) === 0).length;
 
     const kpis = [
-      { label: 'Total Items', value: num(rows.length) },
-      { label: 'In Stock', value: num(inStock) },
-      { label: 'Low Stock', value: num(low) },
+      { label: 'Total Products', value: num(rows.length) },
+      { label: 'Enough Stock', value: num(inStock) },
+      { label: 'Running Low', value: num(low) },
       { label: 'Out of Stock', value: num(out) }
     ];
 
@@ -104,14 +105,14 @@ const BUILDERS = {
         { text: u(stock), alignment: 'right' },
         { text: u(reorder), alignment: 'right' },
         { text: shortage > 0 ? u(shortage) : '—', alignment: 'right' },
-        { text: status, alignment: 'center', bold: true, color: status === 'OUT OF STOCK' ? '#DC2626' : status === 'LOW STOCK' ? '#D97706' : '#16A34A' }
+        { text: status, alignment: 'center', bold: true, color: status === 'OUT OF STOCK' ? STATUS_COLORS.danger : status === 'LOW STOCK' ? STATUS_COLORS.warning : STATUS_COLORS.success }
       ];
     });
 
     return { 
       content: [
         kpiStrip(kpis),
-        sectionHeader('Detailed Inventory Listing'),
+        sectionHeader('Full list of products and how much we have'),
         { table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
         out > 0 ? noteBox(`⚠️ CRITICAL: ${out} item(s) are out of stock. Immediate restocking action required.`, 'danger') : ''
       ]
@@ -129,7 +130,7 @@ const BUILDERS = {
     }).length;
 
     const kpis = [
-      { label: 'Total Items', value: num(rows.length) },
+      { label: 'Items Checked', value: num(rows.length) },
       { label: 'Expired', value: num(expired) },
       { label: 'Expiring Soon', value: num(critical) },
       { label: 'Safe', value: num(rows.length - expired - critical) }
@@ -159,7 +160,7 @@ const BUILDERS = {
     return { 
       content: [
         kpiStrip(kpis),
-        sectionHeader('Aging Analysis Detail'),
+        sectionHeader('Products expiring soon or already expired'),
         { table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
         expired > 0 ? noteBox(`⚠️ URGENT: ${expired} item(s) have expired. Remove from inventory immediately for compliance.`, 'danger') : ''
       ]
@@ -167,111 +168,124 @@ const BUILDERS = {
   },
 
   'low-inventory': (rows) => {
-    const urgent = rows.filter(r => (r['How Many We Have'] ?? r.we_have) === 0).length;
-    const critical = rows.filter(r => {
-      const d = r['Days Until Expiry'] ?? r.days_until_expiry ?? 'N/A';
-      return d <= 3 && (r['How Many We Have'] ?? r.we_have) > 0;
-    }).length;
-
+    const urgent   = rows.filter(r => Number(r['How Many We Have'] || r.stockquantity) === 0).length;
+    const low      = rows.filter(r => Number(r['How Many We Have'] || r.stockquantity) > 0).length;
+ 
     const kpis = [
-      { label: 'Alert Items', value: num(rows.length) },
-      { label: 'Out of Stock', value: num(urgent) },
-      { label: 'Critical (≤3 days)', value: num(critical) },
+      { label: 'Products to Check',   value: num(rows.length)  },
+      { label: 'Completely Out',       value: num(urgent),      },
+      { label: 'Running Low',          value: num(low),         },
     ];
-
-    const headers = ['Product', 'Category', 'We Have', 'Min Safe', 'Need More', 'Days Left', 'Branch'];
+ 
+    const headers = ['Product', 'Category', 'We Have', 'Safe Amount', 'Need More', 'Days Left', 'Branch'];
     const body = rows.map(r => {
-      const unit = r['Unit'] || r.unit || '';
-      const u = (v) => unit ? num(v) + ' ' + unit : num(v);
+      const have    = r['How Many We Have']    || r.stockquantity  || 0;
+      const safe    = r['Minimum Safe Amount'] || r.reorderlevel   || 0;
+      const need    = r['How Many We Need']    || Math.max(0, safe - have);
+      const unit    = r['Unit'] || r.unit || '';
+      const u       = (v) => unit ? num(v) + ' ' + unit : num(v);
+      const daysRaw = r['Days of Stock Left']  ?? r.days_of_stock_remaining;
       return [
-        { text: r['Product Name'] || r.product_name || r['Product'], bold: true },
-        r['Category'] || r.category,
-        { text: u(r['How Many We Have'] ?? r.we_have ?? 0), alignment: 'right' },
-        { text: u(r['Minimum Safe Amount'] ?? r.minimum_safe ?? 0), alignment: 'right' },
-        { text: u(r['Need More'] ?? r.need_more ?? 0), alignment: 'right' },
-        { text: fmtTimeRemaining(r['Days Until Expiry'] ?? r.days_until_expiry), alignment: 'right' },
-        r['Branch'] || r.branch_name || '—'
-      ];
-    });
-
-    return { 
-      content: [
-        kpiStrip(kpis),
-        sectionHeader('Restocking Priority List'),
-        { table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto', 'auto', '*'], body: [headers, ...body] }, layout: 'silingan' },
-        noteBox(`Action Required: Reorder ${rows.length} item(s) to restore adequate inventory levels.`, urgent > 0 ? 'danger' : 'warning')
-      ]
-    };
-  },
-
-  'low-raw-materials': (rows) => {
-    const urgent = rows.filter(r => (r['How Many We Have'] ?? r.we_have) === 0).length;
-    const critical = rows.filter(r => {
-      const d = r['Days Until Expiry'] ?? r.days_until_expiry ?? 'N/A';
-      return d <= 3 && (r['How Many We Have'] ?? r.we_have) > 0;
-    }).length;
-
-    const kpis = [
-      { label: 'Alert Items', value: num(rows.length) },
-      { label: 'Out of Stock', value: num(urgent) },
-      { label: 'Critical (≤3 days)', value: num(critical) },
-    ];
-
-    const headers = ['Raw Material', 'Category', 'We Have', 'Min Safe', 'Daily Usage', 'Lead Time', 'Suggested Order'];
-    const body = rows.map(r => {
-      const unit = r['Unit'] || r.unit || '';
-      const u = (v) => unit ? num(v) + ' ' + unit : num(v);
-      const safe = r['Minimum Safe Amount'] ?? r.minimum_safe ?? 0;
-      const daily = r['Used Per Day (Average)'] ?? (r.daily_usage || safe / 14);
-      const leadtime = r['Days to Arrive After Ordering'] ?? r.lead_time_days ?? r.leadtimedays ?? 7;
-      const suggested = r['Suggested Order Amount'] ?? r.suggested_order ?? Math.ceil(Math.max(0, safe - (r['How Many We Have'] ?? r.we_have ?? 0)) * 1.2);
-      return [
-        { text: r['Raw Material'] || r.name || r['Product Name'], bold: true },
-        r['Category'] || r.category,
-        { text: u(r['How Many We Have'] ?? r.we_have ?? 0), alignment: 'right' },
+        { text: r['Product Name'] || r.name, bold: true },
+        r['Category'] || r.category || '—',
+        { text: u(have), alignment: 'right', color: Number(have) === 0 ? STATUS_COLORS.danger : STATUS_COLORS.warning },
         { text: u(safe), alignment: 'right' },
-        { text: unit ? Number(daily).toFixed(2) + ' ' + unit : Number(daily).toFixed(2), alignment: 'right' },
-        { text: leadtime + ' day(s)', alignment: 'center' },
-        { text: u(suggested), alignment: 'right' },
+        { text: u(need), alignment: 'right' },
+        { text: fmtTimeRemaining(daysRaw), alignment: 'right' },
+        r['Branch'] || r.branch_name || 'All',
       ];
     });
-
+ 
     return {
       content: [
         kpiStrip(kpis),
-        sectionHeader('Raw Materials Restocking Priority'),
-        { table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
-        noteBox(`Immediate action recommended for ${urgent} out-of-stock raw material(s).`, urgent > 0 ? 'danger' : 'warning')
+        sectionHeader('Products that need restocking'),
+        { table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto', 'auto', '*'], body: [headers, ...body] }, layout: 'silingan' },
+        urgent > 0
+          ? noteBox(`⚠️ Urgent: ${urgent} product(s) are completely out of stock. Customers cannot order these right now.`, 'danger')
+          : noteBox(`Reminder: ${rows.length} product(s) are below their safe stock level. Restock soon to avoid running out.`, 'warning'),
       ]
     };
   },
 
+    'low-raw-materials': (rows) => {
+    const orderNow  = rows.filter(r => Number(r['How Many We Have'] || r.stockquantity) === 0).length;
+    const orderSoon = rows.filter(r => Number(r['How Many We Have'] || r.stockquantity) > 0).length;
+ 
+    const kpis = [
+      { label: 'Total to Reorder',  value: num(rows.length)  },
+      { label: 'Order Now (Empty)', value: num(orderNow)     },
+      { label: 'Order Soon (Low)',  value: num(orderSoon)    },
+    ];
+ 
+    const headers = ['Ingredient / Supply', 'Category', 'We Have', 'We Need At Least', 'Expiry Date', 'Days to Arrive', 'What to Do'];
+    const body = rows.map(r => {
+      const have      = r['How Many We Have']        || r.stockquantity || 0;
+      const safe      = r['Minimum Safe Amount']     || r.reorderlevel  || 0;
+      const unit      = r['Unit'] || r.unit || '';
+      const u         = (v) => unit ? num(v) + ' ' + unit : num(v);
+      const expiry    = r['Expiry Date']             || r.expirationdate;
+      const hasExpiry = r.hasexpiry;
+      const lead      = r['Days to Arrive After Ordering'] ?? r.leadtimedays;
+      const status    = r['What to Do']              || r.status_label  || '—';
+      const isUrgent  = status === 'Order now';
+      return [
+        { text: r['Ingredient / Supply'] || r.name, bold: true },
+        r['Category'] || r.category || '—',
+        { text: u(have), alignment: 'right', bold: isUrgent, color: isUrgent ? STATUS_COLORS.danger : STATUS_COLORS.warning },
+        { text: u(safe), alignment: 'right' },
+        { text: (hasExpiry && expiry) ? String(expiry) : '—', alignment: 'center' },
+        { text: lead != null ? lead + ' days' : '—', alignment: 'center' },
+        { text: status, alignment: 'center', bold: true,
+          color: isUrgent ? STATUS_COLORS.danger : STATUS_COLORS.warning },
+      ];
+    });
+ 
+    // Split into two sections: order now vs order soon
+    const nowRows  = body.filter((_, i) => rows[i] && Number(rows[i].stockquantity || rows[i]['How Many We Have'] || 0) === 0);
+    const soonRows = body.filter((_, i) => rows[i] && Number(rows[i].stockquantity || rows[i]['How Many We Have'] || 0) > 0);
+ 
+    const content = [kpiStrip(kpis)];
+ 
+    if (nowRows.length) {
+      content.push(sectionHeader('Order immediately — completely out of stock'));
+      content.push({ table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto', 'auto', 'auto'], body: [headers, ...nowRows] }, layout: 'silingan' });
+    }
+ 
+    if (soonRows.length) {
+      content.push(sectionHeader('Order soon — getting low'));
+      content.push({ table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto', 'auto', 'auto'], body: [headers, ...soonRows] }, layout: 'silingan' });
+    }
+ 
+    if (orderNow > 0) {
+      content.push(noteBox(`⚠️ ${orderNow} ingredient(s) are completely gone. Order these today to avoid running out of products.`, 'danger'));
+    }
+ 
+    return { content };
+  },
+
+
+
   'stock-turnover': (rows) => {
-    const critical = rows.filter(r => {
-      const d = r['Days of Stock Remaining'] ?? r.days_of_stock_remaining;
-      const rate = r['Daily Consumption Rate'] ?? r.daily_consumption_rate ?? 0;
-      return rate > 0 && d !== 'N/A' && d <= 3;
-    }).length;
+    const critical = rows.filter(r => (r['Days of Stock Remaining'] || r.days_of_stock_remaining) <= 3).length;
     const adequate = rows.length - critical;
 
     const kpis = [
       { label: 'Items Tracked', value: num(rows.length) },
-      { label: 'Critical Stock', value: num(critical) },
-      { label: 'Adequate Stock', value: num(adequate) },
+      { label: 'Almost Out (≤3 days)', value: num(critical) },
+      { label: 'Enough for Now', value: num(adequate) },
     ];
 
     const headers = ['Product', 'Category', 'Daily Rate', 'Days Left', 'Stock Status'];
     const body = rows.map(r => {
-      const rate = r['Daily Consumption Rate'] ?? r.daily_consumption_rate ?? 0;
-      const days = r['Days of Stock Remaining'] ?? r.days_of_stock_remaining;
-      const displayDays = rate > 0 ? days : 'N/A';
-      const status = rate > 0 ? (days === 'N/A' ? 'N/A' : (days <= 3 ? 'CRITICAL' : 'ADEQUATE')) : 'N/A';
+      const days = r['Days of Stock Remaining'] || r.days_of_stock_remaining;
+      const status = days <= 3 ? 'CRITICAL' : 'ADEQUATE';
       const unit = r['Unit'] || r.unit || '';
       return [
         { text: r['Product Name'] || r.name, bold: status === 'CRITICAL' },
         r['Category'] || r.category,
-        { text: Number(rate).toFixed(2) + (unit ? ' ' + unit : ''), alignment: 'right' },
-        { text: rate > 0 ? fmtTimeRemaining(days) : 'N/A', alignment: 'right', bold: status === 'CRITICAL' },
+        { text: (r['Daily Consumption Rate'] || r.daily_consumption_rate || 0).toFixed(2) + (unit ? ' ' + unit : ''), alignment: 'right' },
+        { text: fmtTimeRemaining(days), alignment: 'right', bold: days <= 3 },
         { text: status, alignment: 'center', bold: true }
       ];
     });
@@ -279,16 +293,15 @@ const BUILDERS = {
     return { 
       content: [
         kpiStrip(kpis),
-        sectionHeader('Consumption Velocity Analysis'),
+        sectionHeader('How fast each product is selling vs how much is left'),
         { table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
       ]
     };
   },
 
   'sales-pipeline': (rows) => {
-    const totalSales = rows.reduce((s, r) => s + Number(r['Net Sales'] || r.net_sales || 0), 0);
-    const orderIds = new Set(rows.map(r => r['Order ID'] || r.order_id));
-    const totalOrders = orderIds.size;
+    const totalSales = rows.reduce((s, r) => s + Number((r['Net Sales'] || r.subtotal) || 0), 0);
+    const totalOrders = rows.length;
     const avgOrder = totalOrders > 0 ? totalSales / totalOrders : 0;
 
     const kpis = [
@@ -305,14 +318,14 @@ const BUILDERS = {
       { text: r['Quantity'] || r.quantity, alignment: 'right' },
       { text: peso(r['Unit Price'] || r.unit_price || 0), alignment: 'right' },
       { text: peso(r['Subtotal'] || r.subtotal || 0), alignment: 'right' },
-      { text: peso(r['Net Sales'] || r.net_sales || 0), alignment: 'right', bold: true },
+      { text: peso(Number(r['Subtotal'] || r.subtotal || 0) - Number(r['Discount'] || r.discount || 0)), alignment: 'right', bold: true },
       { text: r['Status'] || r.status || 'Completed', alignment: 'center' }
     ]);
 
     return {
       content: [
         kpiStrip(kpis),
-        sectionHeader('Transaction Details'),
+        sectionHeader('Every sale made during this period'),
         { table: { headerRows: 1, widths: ['auto', 'auto', '*', 'auto', 'auto', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
       ]
     };
@@ -320,13 +333,13 @@ const BUILDERS = {
 
   'sales-performance': (rows) => {
     const totalRev = rows.reduce((s, r) => s + Number(r['Total Revenue'] || r.total_revenue || 0), 0);
-    const totalOrds = rows[0]?.total_distinct_orders || rows[0]?.['Total Distinct Orders'] || 0;
+    const totalOrds = rows.reduce((s, r) => s + Number(r['Total Orders'] || r.total_orders || 0), 0);
     const topBranch = rows.reduce((a, b) => (Number(b['Total Revenue'] || b.total_revenue || 0) > Number(a['Total Revenue'] || a.total_revenue || 0)) ? b : a);
 
     const kpis = [
-      { label: 'Total Revenue', value: peso(totalRev) },
-      { label: 'Total Orders', value: num(totalOrds) },
-      { label: 'Top Branch', value: topBranch['Branch'] || topBranch.branch_name || '—' },
+      { label: 'Total Money Collected', value: peso(totalRev) },
+      { label: 'Number of Orders', value: num(totalOrds) },
+      { label: 'Best-Performing Branch', value: topBranch['Branch'] || topBranch.branch_name || '—' },
     ];
 
     const headers = ['Branch', 'Category', 'Orders', 'Revenue', 'Avg Order', 'Share %'];
@@ -342,31 +355,25 @@ const BUILDERS = {
     return {
       content: [
         kpiStrip(kpis),
-        sectionHeader('Performance Breakdown'),
+        sectionHeader('Sales totals by branch and category Breakdown'),
         { table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
       ]
     };
   },
 
-  'sales-summary': (rows, meta) => {
+  'sales-monthly': (rows) => {
     const totalRev = rows.reduce((s, r) => s + Number(r['Total Revenue'] || r.total_revenue || 0), 0);
     const totalOrds = rows.reduce((s, r) => s + Number(r['Total Orders'] || r.total_orders || 0), 0);
-    const distinctPeriods = new Set(rows.map(r => r['Period'] || r.period_label));
-    const count = distinctPeriods.size || rows.length;
-    const sampleLabel = distinctPeriods.values().next().value || '';
-    const isWeekly = sampleLabel.includes(' - ');
-    const periodLabel = isWeekly ? 'Weekly' : 'Monthly';
-    const avgLabel = count > 0 ? (isWeekly ? 'Avg Weekly' : 'Avg Monthly') : 'Total (Single Period)';
 
     const kpis = [
       { label: 'Total Revenue', value: peso(totalRev) },
       { label: 'Total Orders', value: num(totalOrds) },
-      { label: avgLabel, value: count > 1 ? peso(totalRev / count) : peso(totalRev) },
+      { label: 'Avg Monthly', value: peso(totalRev / Math.max(1, rows.length)) },
     ];
 
-    const headers = ['Period', 'Branch', 'Orders', 'Revenue', 'Avg Order'];
+    const headers = ['Month', 'Branch', 'Orders', 'Revenue', 'Avg Order'];
     const body = rows.map(r => [
-      { text: r['Period'] || r.period_label, bold: true },
+      { text: r['Month'] || r.year_month, bold: true },
       r['Branch'] || r.branch_name,
       { text: num(r['Total Orders'] || r.total_orders), alignment: 'right' },
       { text: peso(r['Total Revenue'] || r.total_revenue || 0), alignment: 'right' },
@@ -376,40 +383,65 @@ const BUILDERS = {
     return {
       content: [
         kpiStrip(kpis),
-        sectionHeader(`${periodLabel} Performance Metrics`),
+        sectionHeader('Sales totals per month'),
         { table: { headerRows: 1, widths: ['auto', '*', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
       ]
     };
   },
 
   'consolidated-report': (rows) => {
-    const totalBranches = rows.length;
-    const totalRevenue = rows.reduce((s, r) => s + Number(r['Total Revenue'] ?? r.total_revenue ?? 0), 0);
-    const totalOrders = rows.reduce((s, r) => s + Number(r['Total Orders'] ?? r.total_orders ?? 0), 0);
-    const totalProducts = rows.reduce((s, r) => s + Number(r['Products Sold'] ?? r.total_products_sold ?? 0), 0);
+    const totalRev = rows.reduce((s, r) => s + Number(r['Total Revenue'] || r.total_revenue || 0), 0);
+    const totalOrds = rows.reduce((s, r) => s + Number(r['Total Orders'] || r.total_orders || 0), 0);
 
     const kpis = [
-      { label: 'Total Branches', value: num(totalBranches) },
-      { label: 'Total Revenue', value: peso(totalRevenue) },
-      { label: 'Total Orders', value: num(totalOrders) },
-      { label: 'Products Sold', value: num(totalProducts) },
+      { label: 'Total Revenue', value: peso(totalRev) },
+      { label: 'Total Orders', value: num(totalOrds) },
+      { label: 'Avg Order', value: peso(totalOrds > 0 ? totalRev / totalOrds : 0) },
     ];
 
-    const headers = ['Branch', 'Total Revenue', 'Total Orders', 'Avg Order Value', 'Products Sold', 'Top Product'];
+    const headers = ['Branch', 'Revenue', 'Orders', 'Avg Order', 'Products Sold', 'Top Product'];
     const body = rows.map(r => [
-      { text: r['Branch'] || r.branch_name || '—', bold: true },
-      { text: peso(r['Total Revenue'] ?? r.total_revenue ?? 0), alignment: 'right' },
-      { text: num(r['Total Orders'] ?? r.total_orders ?? 0), alignment: 'right' },
-      { text: peso(r['Avg Order Value'] ?? r.avg_order_value ?? 0), alignment: 'right' },
-      { text: num(r['Products Sold'] ?? r.total_products_sold ?? 0), alignment: 'right' },
-      { text: r['Top Product'] || r.top_product || '—' },
+      { text: r['Branch'] || r.branch_name, bold: true },
+      { text: peso(r['Total Revenue'] || r.total_revenue || 0), alignment: 'right' },
+      { text: num(r['Total Orders'] || r.total_orders), alignment: 'right' },
+      { text: peso(r['Avg Order Value'] || r.avg_order_value || 0), alignment: 'right' },
+      { text: num(r['Products Sold'] || r.total_products_sold), alignment: 'right' },
+      r['Top Product'] || r.top_product || '—'
     ]);
 
     return {
       content: [
         kpiStrip(kpis),
-        sectionHeader('Branch Performance Overview'),
+        sectionHeader('Summary for each branch'),
         { table: { headerRows: 1, widths: ['*', 'auto', 'auto', 'auto', 'auto', '*'], body: [headers, ...body] }, layout: 'silingan' },
+      ]
+    };
+  },
+
+  'sales-weekly': (rows) => {
+    const totalRev = rows.reduce((s, r) => s + Number(r['Total Revenue'] || r.total_revenue || 0), 0);
+    const totalOrds = rows.reduce((s, r) => s + Number(r['Total Orders'] || r.total_orders || 0), 0);
+
+    const kpis = [
+      { label: 'Total Revenue', value: peso(totalRev) },
+      { label: 'Total Orders', value: num(totalOrds) },
+      { label: 'Avg Weekly', value: peso(totalRev / Math.max(1, rows.length)) },
+    ];
+
+    const headers = ['Week Start', 'Branch', 'Orders', 'Revenue', 'Avg Order'];
+    const body = rows.map(r => [
+      { text: r['Week Start'] || r.week_start || r['Week'] || r.week_number, bold: true },
+      r['Branch'] || r.branch_name,
+      { text: num(r['Total Orders'] || r.total_orders), alignment: 'right' },
+      { text: peso(r['Total Revenue'] || r.total_revenue || 0), alignment: 'right' },
+      { text: peso(r['Avg Order Value'] || r.avg_order_value || 0), alignment: 'right' }
+    ]);
+
+    return {
+      content: [
+        kpiStrip(kpis),
+        sectionHeader('Sales totals per week'),
+        { table: { headerRows: 1, widths: ['auto', '*', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
       ]
     };
   },
@@ -431,8 +463,8 @@ const BUILDERS = {
 
     const kpis = [
       { label: 'Total Employees', value: num(employees) },
-      { label: 'Total Hours', value: totalHours.toFixed(2) },
-      { label: 'Avg Hours/Employee', value: avgHours.toFixed(2) },
+      { label: 'Total Hours', value: totalHours.toFixed(0) },
+      { label: 'Avg Hours/Employee', value: avgHours.toFixed(1) },
     ];
 
     const headers = ['Employee', 'Position', 'Shift Date', 'Hours', 'Status'];
@@ -440,35 +472,35 @@ const BUILDERS = {
       { text: r['Employee Name'] || r.employee_name || r.name, bold: true },
       r['Position'] || r.position || r.role,
       r['Shift Date'] || r.shift_date || r.date,
-      { text: getHours(r).toFixed(2), alignment: 'right' },
+      { text: getHours(r).toFixed(1), alignment: 'right' },
       { text: r['Status'] || r.status || 'Scheduled', alignment: 'center' }
     ]);
 
     return {
       content: [
         kpiStrip(kpis),
-        sectionHeader('Staff Schedule Detail'),
+        sectionHeader('Who is scheduled to work and when'),
         { table: { headerRows: 1, widths: ['*', '*', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
       ]
     };
   },
 
-  'inventory-summary': (rows) => {
+  'inventory-monthly': (rows) => {
     const totalUsed = rows.reduce((s, r) => s + Number(r['Qty Used'] || r.total_quantity_used || 0), 0);
-    const periods = [...new Set(rows.map(r => r['Period'] || r.period_label))].length;
+    const months = [...new Set(rows.map(r => r['Month'] || r.year_month))].length;
 
     const kpis = [
-      { label: 'Periods', value: num(periods) },
+      { label: 'Months', value: num(months) },
       { label: 'Total Units Used', value: num(totalUsed) },
       { label: 'Products Tracked', value: num(rows.length) },
     ];
 
-    const headers = ['Period', 'Branch', 'Product', 'Category', 'Qty Used', 'Stock', 'Status'];
+    const headers = ['Month', 'Branch', 'Product', 'Category', 'Qty Used', 'Stock', 'Status'];
     const body = rows.map(r => {
       const unit = r['Unit'] || r.unit || '';
       const u = (v) => unit ? num(v) + ' ' + unit : num(v);
       return [
-        { text: r['Period'] || r.period_label, bold: true },
+        { text: r['Month'] || r.year_month, bold: true },
         r['Branch'] || r.branch_name,
         r['Product'] || r.product_name,
         r['Category'] || r.category,
@@ -481,7 +513,41 @@ const BUILDERS = {
     return {
       content: [
         kpiStrip(kpis),
-        sectionHeader('Inventory Usage Summary'),
+        sectionHeader('How much of each product was used each month'),
+        { table: { headerRows: 1, widths: ['auto', 'auto', '*', '*', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
+      ]
+    };
+  },
+
+  'inventory-weekly': (rows) => {
+    const totalUsed = rows.reduce((s, r) => s + Number(r['Qty Used'] || r.total_quantity_used || 0), 0);
+    const weeks = [...new Set(rows.map(r => r['Week Start'] || r.week_start))].length;
+
+    const kpis = [
+      { label: 'Weeks', value: num(weeks) },
+      { label: 'Total Units Used', value: num(totalUsed) },
+      { label: 'Products Tracked', value: num(rows.length) },
+    ];
+
+    const headers = ['Week Start', 'Branch', 'Product', 'Category', 'Qty Used', 'Stock', 'Status'];
+    const body = rows.map(r => {
+      const unit = r['Unit'] || r.unit || '';
+      const u = (v) => unit ? num(v) + ' ' + unit : num(v);
+      return [
+        { text: r['Week Start'] || r.week_start, bold: true },
+        r['Branch'] || r.branch_name,
+        r['Product'] || r.product_name,
+        r['Category'] || r.category,
+        { text: u(r['Qty Used'] || r.total_quantity_used || 0), alignment: 'right' },
+        { text: u(r['Current Stock'] || r.current_stock), alignment: 'right' },
+        { text: r['Status'] || r.stock_status || '—', alignment: 'center', bold: true }
+      ];
+    });
+
+    return {
+      content: [
+        kpiStrip(kpis),
+        sectionHeader('How much of each product was used each week'),
         { table: { headerRows: 1, widths: ['auto', 'auto', '*', '*', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
       ]
     };
@@ -502,25 +568,17 @@ const BUILDERS = {
     
     const totalForecast = validForecasts.reduce((s, r) => s + Number(r['Forecasted Revenue'] || r.forecast_sales || r['Forecast'] || 0), 0);
     const totalActual = validForecasts.reduce((s, r) => s + Number(r['Actual Revenue'] || r.net_sales || r['Actual Sales'] || 0), 0);
-    const accuracyRows = validForecasts.filter(r =>
-        Number(r.forecast_sales || r['Forecast'] || 0) > 0
-    );
-    const totalDiff = accuracyRows.reduce((s, r) => {
-        const f = Number(r.forecast_sales || r['Forecast'] || 0);
-        const a = Number(r.net_sales || r['Actual Sales'] || 0);
-        return s + Math.abs(a - f);
+    const totalDiff = validForecasts.reduce((s, r) => {
+      const f = Number(r['Forecasted Revenue'] || r.forecast_sales || r['Forecast'] || 0);
+      const a = Number(r['Actual Revenue'] || r.net_sales || r['Actual Sales'] || 0);
+      return s + Math.abs(a - f);
     }, 0);
-    const totalActualFiltered = accuracyRows.reduce((s, r) =>
-        s + Number(r.net_sales || r['Actual Sales'] || 0), 0
-    );
-    const accuracy = totalActualFiltered > 0
-        ? Math.max(0, (1 - totalDiff / totalActualFiltered) * 100)
-        : 0;
+    const accuracy = totalActual > 0 ? Math.max(0, (1 - totalDiff / totalActual) * 100) : 0;
 
     const kpis = [
       { label: 'Forecasted Revenue', value: peso(totalForecast) },
       { label: 'Actual Revenue', value: peso(totalActual) },
-      { label: 'Accuracy', value: accuracy.toFixed(2) + '%' },
+      { label: 'Accuracy', value: accuracy.toFixed(1) + '%' },
     ];
 
     const headers = ['Date', 'Actual Sales', '3-Day Moving Avg', 'Forecast', 'Accuracy %'];
@@ -533,19 +591,15 @@ const BUILDERS = {
         { text: r.sale_date || r['Date'] || '', bold: true },
         { text: peso(actual), alignment: 'right' },
         { text: peso(movAvg), alignment: 'right' },
-        forecast > 0
-          ? { text: peso(forecast), alignment: 'right' }
-          : { text: 'N/A—no prior data', alignment: 'right', color: '#6B7280' },
-        forecast > 0
-          ? { text: acc.toFixed(2) + '%', alignment: 'right', bold: true, color: acc >= 80 ? '#16A34A' : acc >= 50 ? '#D97706' : '#DC2626' }
-          : { text: 'N/A', alignment: 'right', color: '#6B7280' }
+        { text: peso(forecast), alignment: 'right' },
+        { text: acc.toFixed(1) + '%', alignment: 'right', bold: true, color: acc >= 80 ? STATUS_COLORS.success : acc >= 50 ? STATUS_COLORS.warning : STATUS_COLORS.danger }
       ];
     });
 
     return {
       content: [
         kpiStrip(kpis),
-        sectionHeader('Forecast vs. Actual Detail'),
+        sectionHeader('What we expected vs what actually happened'),
         { table: { headerRows: 1, widths: ['auto', 'auto', 'auto', 'auto', 'auto'], body: [headers, ...body] }, layout: 'silingan' },
       ]
     };
@@ -554,13 +608,13 @@ const BUILDERS = {
 
 // ─── Main Export Function ───────────────────────────────────────────────────
 
-export function exportPDF(reportType, rows, meta) {
+export function exportPDF(reportType, rows, meta, chartImages, productData) {
   // 1. Determine Builder and prepare document content
   const builder = BUILDERS[reportType];
   let reportConfig;
 
   if (builder) {
-    reportConfig = builder(rows, meta);
+    reportConfig = builder(rows);
   } else {
     // Fallback: Generic table from transformed data
     const transformedRows = transformRowData(reportType, rows);
@@ -580,9 +634,51 @@ export function exportPDF(reportType, rows, meta) {
   // 2. Build content array
   const contentArray = Array.isArray(reportConfig.content) ? reportConfig.content : [reportConfig.content];
   
-  // Prepend a Report Summary header
-  contentArray.unshift({ text: 'Report Summary', style: 'sectionHeader', alignment: 'center', margin: [0, 0, 0, 12] });
-  
+  // Add chart images at the end (dashboard-style layout)
+  if (chartImages && chartImages.length > 0) {
+    contentArray.push({ text: '', pageBreak: 'before' });
+    contentArray.push({ text: 'Analytics Charts', style: 'sectionHeader', alignment: 'center', margin: [0, 0, 0, 15] });
+    // Pair charts side by side like the analytics dashboard
+    for (let i = 0; i < chartImages.length; i += 2) {
+      const left = chartImages[i];
+      const right = chartImages[i + 1];
+      const makeCol = (img) => ({
+        stack: [
+          { text: img.title, style: 'chartTitle' },
+          { text: img.desc, style: 'chartDesc' },
+          img.svg
+            ? { svg: img.svg, width: 240, alignment: 'center', margin: [0, 4, 0, 6] }
+            : { image: img.data, width: 240, alignment: 'center', margin: [0, 4, 0, 6] }
+        ],
+        margin: [0, 0, 8, 0]
+      });
+      if (right) {
+        contentArray.push({ columns: [makeCol(left), makeCol(right)], margin: [0, 0, 0, 12] });
+      } else {
+        contentArray.push({ stack: [makeCol(left)], alignment: 'center', margin: [0, 0, 0, 12] });
+      }
+    }
+  }
+
+  // Add product performance table for inventory reports
+  if (reportType.startsWith('inventory-') && productData && productData.length > 0) {
+    contentArray.push({ text: 'Product Performance', style: 'sectionHeader', alignment: 'center', margin: [0, 0, 0, 15] });
+    const headers = ['#', 'Product', 'Category', 'Units Sold', 'Revenue', 'Avg Price'];
+    const body = productData.map((p, i) => [
+      { text: String(i + 1), alignment: 'center' },
+      p.product_name || '—',
+      p.category || '—',
+      { text: num(p.units_sold || 0), alignment: 'right' },
+      { text: '₱' + Number(p.revenue || 0).toLocaleString('en-PH'), alignment: 'right' },
+      { text: '₱' + Number(p.avg_price || 0).toFixed(2), alignment: 'right' },
+    ]);
+    contentArray.push({
+      table: { headerRows: 1, widths: ['auto', '*', '*', 'auto', 'auto', 'auto'], body: [headers, ...body] },
+      layout: 'silingan',
+      margin: [0, 0, 0, 10],
+    });
+  }
+
   // 3. Build the document
   const isWide = rows.length > 0 && Object.keys(rows[0]).length > 7;
 
@@ -646,6 +742,8 @@ export function exportPDF(reportType, rows, meta) {
 
     styles: {
       sectionHeader: { fontSize: 11, bold: true, color: DARK, margin: [0, 10, 0, 6] },
+      chartTitle: { fontSize: 10, bold: true, color: DARK, margin: [0, 0, 0, 3] },
+      chartDesc: { fontSize: 8, color: MUTED, margin: [0, 0, 0, 8] },
       kpiLabel: { fontSize: 7.5, color: MUTED, bold: true, margin: [0, 0, 0, 3] },
       kpiValue: { fontSize: 14, bold: true, margin: [0, 2, 0, 0] },
       kpiSub: { fontSize: 6.5, color: MUTED },

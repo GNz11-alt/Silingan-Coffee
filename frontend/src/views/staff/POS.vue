@@ -204,13 +204,21 @@
             <label class="discount-id-label">
               <CreditCard :size="12" />{{ getDiscountIdLabel(selectedDiscount) }} *
             </label>
-            <input
-              v-model="discountIdNumber"
-              type="text"
-              class="discount-id-input"
-              :placeholder="getDiscountIdPlaceholder(selectedDiscount)"
-              maxlength="30"
-            />
+                <input
+                  v-model="discountIdNumber"
+                  type="text"
+                  class="discount-id-input"
+                  :class="{
+                    'discount-id-input--error': discountIdError,
+                    'discount-id-input--valid': discountIdNumber && !discountIdError && !discountIdValidating
+                  }"
+                  :placeholder="getDiscountIdPlaceholder(selectedDiscount)"
+                  maxlength="30"
+                  @input="onDiscountIdInput"
+                />
+                <div v-if="discountIdValidating" class="discount-id-checking">
+                  <span class="discount-id-spinner"></span> Checking...
+                </div>
             <span v-if="discountIdError" class="discount-id-error">{{ discountIdError }}</span>
           </div>
         </div>
@@ -403,10 +411,9 @@
               <div class="crd-label">Cash Received</div>
                 <input
                   class="crd-amount"
-                  type="number"
+                  type="text"
                   inputmode="decimal"
-                  min="0"
-                  :value="cashReceived"
+                  :value="cashReceived || ''"
                   @input="onManualCashInput"
                   @keydown.enter.prevent="$event.target.blur()"
                   placeholder="0.00"
@@ -776,6 +783,8 @@ const branchRecord = ref(null);
 const employeeRecord = ref(null);
 const branchId = ref(null);
 
+const discountIdValidating = ref(false);
+
 // Stock & recipe state
 const rawMaterialStock = ref({});
 const inventoryUnitMap = ref({});
@@ -841,7 +850,28 @@ const cashReceived = computed(() =>
 );
 
 const onManualCashInput = (e) => {
-  const val = parseFloat(e.target.value);
+  // Strip anything that isn't a digit or decimal point
+  let raw = e.target.value.replace(/[^\d.]/g, "");
+
+  // Only allow one decimal point
+  const parts = raw.split(".");
+  if (parts.length > 2) raw = parts[0] + "." + parts.slice(1).join("");
+
+  // Cap integer part to 7 digits (max ₱9,999,999)
+  if (parts[0].length > 7) {
+    parts[0] = parts[0].slice(0, 7);
+    raw = parts.length > 1 ? parts[0] + "." + parts[1] : parts[0];
+  }
+
+  // Cap decimal part to 2 digits
+  if (parts.length > 1 && parts[1].length > 2) {
+    raw = parts[0] + "." + parts[1].slice(0, 2);
+  }
+
+  // Write cleaned value back to input
+  e.target.value = raw;
+
+  const val = parseFloat(raw);
   manualOverride.value = isNaN(val) ? 0 : val;
 };
 
@@ -1193,8 +1223,26 @@ const fetchTransactions = async (force = false) => {
 
 const openHistory = async () => { showHistory.value = true; await fetchTransactions(); };
 
-// ─── Discount helpers ─────────────────────────────────────────────────────────
-const onDiscountChange = () => { discountIdNumber.value = ""; discountIdError.value = ""; };
+const onDiscountChange = () => {
+  discountIdNumber.value = "";
+  discountIdError.value = "";
+  discountIdValidating.value = false;
+};
+let _discountDebounce = null;
+const onDiscountIdInput = async () => {
+  discountIdError.value = "";
+  discountIdValidating.value = false;
+  clearTimeout(_discountDebounce);
+  if (!discountIdNumber.value.trim()) return;
+  // For DB lookups (employee/staff), debounce 600ms; others validate instantly
+  const name = selectedDiscount.value?.discountname?.toLowerCase() ?? "";
+  const delay = (name.includes("employee") || name.includes("staff")) ? 600 : 0;
+  _discountDebounce = setTimeout(async () => {
+    discountIdValidating.value = name.includes("employee") || name.includes("staff");
+    discountIdError.value = await validateDiscountId(selectedDiscount.value, discountIdNumber.value);
+    discountIdValidating.value = false;
+  }, delay);
+};
 const getDiscountIdLabel = (d) => {
   const n = d?.discountname?.toLowerCase() ?? "";
   if (n.includes("pwd")) return "PWD ID Number";
@@ -1203,9 +1251,60 @@ const getDiscountIdLabel = (d) => {
 };
 const getDiscountIdPlaceholder = (d) => {
   const n = d?.discountname?.toLowerCase() ?? "";
-  if (n.includes("pwd")) return "e.g. PWD-2024-000001";
-  if (n.includes("senior")) return "e.g. SC-2024-000001";
+  if (n.includes("pwd"))    return "e.g. 03-15-04-000-0001234";
+  if (n.includes("senior")) return "e.g. 26-1139-00123";
+  if (n.includes("employee") || n.includes("staff")) return "Enter your user ID";
   return "Enter ID / card number";
+};
+
+const validateDiscountId = async (discount, value) => {
+  if (!discount || !value.trim()) return "";
+  const v = value.trim();
+  const name = discount.discountname?.toLowerCase() ?? "";
+
+  // ── PWD ID ──────────────────────────────────────────────────────────
+  // Format: RR-PP-MM-BBB-NNNNNNN or RR-PP-MM-BBB-NNNNN
+  if (name.includes("pwd")) {
+    const valid =
+      /^\d{2}-\d{2}-\d{2}-\d{3}-\d{7}$/.test(v) ||
+      /^\d{2}-\d{2}-\d{2}-\d{3}-\d{5}$/.test(v);
+    if (!valid)
+      return "Format must be RR-PP-MM-BBB-NNNNNNN (e.g. 03-15-04-000-0001234). Some LGUs use 5-digit serials.";
+    return "";
+  }
+
+  // ── Senior Citizen OSCA ID ───────────────────────────────────────────
+  // Accepted patterns (LGUs vary):
+  //   YY-XXXX-##### (numeric location code)
+  //   CITY-YY-#####  (alpha city prefix)
+  //   YY-ALPHA_NUM-##### (mixed location codes)
+  if (name.includes("senior")) {
+    const valid =
+      /^\d{2}-\d{2,6}-\d{3,6}$/.test(v) ||
+      /^[A-Za-z]{2,10}-\d{2}-\d{3,6}$/.test(v) ||
+      /^\d{2}-[A-Za-z0-9]{2,8}-\d{3,6}$/.test(v);
+    if (!valid)
+      return "Expected YY-LOCATION-SERIAL or CITY-YY-SERIAL (e.g. 26-1139-00123). Hyphens required.";
+    return "";
+  }
+
+  // ── Employee / Staff discount — validate user ID against DB ──────────
+  if (name.includes("employee") || name.includes("staff")) {
+    if (!v) return "User ID is required.";
+    const { data } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", v)
+      .maybeSingle();
+    if (!data) return "No matching user found. Enter the exact user ID.";
+    return "";
+  }
+
+  // ── Generic fallback ─────────────────────────────────────────────────
+  if (v.length < 3) return "ID must be at least 3 characters.";
+  if (v.length > 30) return "ID must be 30 characters or fewer.";
+  if (/[<>"'`]/.test(v)) return "ID contains invalid characters.";
+  return "";
 };
 
 // Add this helper function at the top with other helpers
@@ -1391,10 +1490,16 @@ const deductInventoryFEFO = async (cartItems, bid) => {
 };
 
 // ─── Payment ──────────────────────────────────────────────────────────────────
-const openPayment = () => {
-  if (selectedDiscount.value && !discountIdNumber.value.trim()) {
-    discountIdError.value = `${getDiscountIdLabel(selectedDiscount.value)} is required.`;
-    return;
+const openPayment = async () => {
+  if (selectedDiscount.value) {
+    if (!discountIdNumber.value.trim()) {
+      discountIdError.value = `${getDiscountIdLabel(selectedDiscount.value)} is required.`;
+      return;
+    }
+    discountIdValidating.value = true;
+    const err = await validateDiscountId(selectedDiscount.value, discountIdNumber.value);
+    discountIdValidating.value = false;
+    if (err) { discountIdError.value = err; return; }
   }
   discountIdError.value = "";
   clearDenomCounts();
@@ -1798,6 +1903,33 @@ onMounted(async () => {
 }
 .crd-amount[contenteditable]:focus {
   background: rgba(49, 32, 29, 0.06);
+}
+
+/*discount */
+.discount-id-input--error {
+  border-color: #dc2626 !important;
+  background: #fff5f5;
+}
+.discount-id-input--valid {
+  border-color: #16a34a !important;
+  background: #f0fdf4;
+}
+.discount-id-checking {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+.discount-id-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid #ddd;
+  border-top-color: #888;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
 }
 
 /* ─── GCash ─────────────────────────────────────────────────────────────────── */
